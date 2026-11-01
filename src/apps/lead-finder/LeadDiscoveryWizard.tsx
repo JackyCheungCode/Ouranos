@@ -211,7 +211,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const portField=/port|seaport|unlocode/.test(semantic)
   const showHelp=Boolean(expandedHelp[key])
   return <label className="ldw-field" key={key}>
-   <span className="ldw-field-heading"><span>{field.title || key}{required&&<b> *</b>}</span>{field.description&&<button type="button" className="ldw-help-button" aria-expanded={showHelp} onClick={e=>{e.preventDefault();setExpandedHelp(current=>({...current,[key]:!current[key]}))}}><HelpCircle size={13}/>{showHelp?'收起提示':'字段提示'}</button>}</span>
+   <span className="ldw-field-heading"><span className="ldw-field-label">{field.title || key}{required&&<b> *</b>}</span><small className="ldw-field-type">{Array.isArray(field.type)?field.type.join(' / '):(field.type||'text')}</small>{field.description&&<button type="button" className="ldw-help-button" aria-expanded={showHelp} onClick={e=>{e.preventDefault();setExpandedHelp(current=>({...current,[key]:!current[key]}))}}><HelpCircle size={13}/>{showHelp?'收起提示':'字段提示'}</button>}</span>
    {enumValues.length>0?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">请选择</option>{enumValues.map(option=><option key={String(option)} value={String(option)}>{String(option)}</option>)}</select>
    :countryField?<select value={String(value)} onChange={e=>{const next=e.target.value;set(next);const found=countries.find(c=>c.code===next||c.geoName===next);if(found){setCountryCode(found.code);setSelectedCountries(current=>current.includes(found.code)?current:[...current,found.code])}}}><option value="">选择国家</option>{countries.map(c=><option key={c.code} value={/code/.test(semantic)?c.code:c.geoName}>{c.flag} {c.name}</option>)}</select>
    :regionField?<select value={String(value)} onChange={e=>set(e.target.value)} disabled={!countryCode||locationBusy}><option value="">全部地区（不限制）</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select>
@@ -278,6 +278,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  return <div className="ldw-shell">
   <div className="ldw-intro"><div><span className="ldw-eyebrow">LEAD DISCOVERY WORKSPACE</span><h2>发现潜在客户</h2><p>先选择客户来源，再选择供应商和采集器。参数表单会根据采集器 Schema 自动生成。</p></div><span className="ldw-status"><Sparkles size={14}/> 动态采集配置</span></div>
+  <div className="ldw-odoo-flow" aria-label="潜客发现流程">{[['01','来源平台'],['02','数据供应商'],['03','目标市场'],['04','采集器与参数'],['05','任务设置']].map(([n,label])=><div className="ldw-odoo-flow-item" key={n}><span>{n}</span><b>{label}</b></div>)}</div>
   <div className="ldw-step-grid">
    <section className="ldw-card"><div className="ldw-step-title"><span>01</span><div><h3>选择客户来源平台</h3><p>先确定你要从哪里发现潜在客户。按类别收纳，点击展开。</p></div></div>
     <div className="ldw-platform-groups">{platformGroups.map(group=><div className="ldw-platform-group" key={group.label}>
