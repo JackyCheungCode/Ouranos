@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Check, ChevronDown, ExternalLink, HelpCircle, Loader2, MapPin, Search, ShieldCheck, Sparkles } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ExternalLink, HelpCircle, Loader2, MapPin, Search, ShieldCheck, Sparkles, MessageCircle, Send } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from 'react-leaflet'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
@@ -13,6 +13,7 @@ type Actor = { id: string; name: string; username: string; title: string; descri
 type SchemaField = { title?: string; description?: string; type?: string | string[]; editor?: string; default?: unknown; prefill?: unknown; example?: unknown; placeholderValue?: string; enum?: unknown[]; items?: SchemaField; properties?: Record<string, SchemaField>; required?: string[]; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; minItems?: number; maxItems?: number; pattern?: string; format?: string }
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
 type MapLocation = { lat:number; lon:number; label:string }
+type ChatMessage = { role:'user'|'assistant'; content:string }
 const marketMarkerIcon=divIcon({className:'ldw-map-marker',html:'<span></span>',iconSize:[22,22],iconAnchor:[11,11]})
 const platformGroups = [
  { label: '搜索引擎与地图', items: [['google-maps','Google Maps','google maps business places'],['google-search','Google Search','google search results'],['bing','Bing','bing search results'],['yelp','Yelp','yelp business'] ] },
@@ -137,6 +138,13 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [aiError,setAiError] = useState('')
  const [aiApplied,setAiApplied] = useState(false)
  const [aiAnalyzedContext,setAiAnalyzedContext] = useState('')
+ const [chatMessages,setChatMessages] = useState<ChatMessage[]>([{role:'assistant',content:'你好！先用自然语言告诉我你想在哪个平台寻找什么类型的潜在客户。我会先识别平台；你手动选择 Actor 后，我会读取它的真实参数要求，继续逐项与你确认。'}])
+ const [chatInput,setChatInput] = useState('')
+ const [recognizedPlatform,setRecognizedPlatform] = useState('')
+ const [aiMissingInformation,setAiMissingInformation] = useState<string[]>([])
+ const [aiFieldExplanations,setAiFieldExplanations] = useState<Record<string,string>>({})
+ const [manualConfigOpen,setManualConfigOpen] = useState(false)
+ const [autoAnalysisKey,setAutoAnalysisKey] = useState('')
  const [keywords,setKeywords] = useState('')
  const [product,setProduct] = useState('')
  const [industry,setIndustry] = useState('')
@@ -239,7 +247,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  const selectActor = async (item: Actor) => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
-  setActor(item);setSchema(null);setValues({});setAiGenerated(null);setAiSummary('');setAiStrategy('');setAiWarnings([]);setAiApplied(false);setAiError('');setSchemaBusy(true);setError('');setNotice('')
+  setActor(item);setSchema(null);setValues({});setAiGenerated(null);setAiSummary('');setAiStrategy('');setAiWarnings([]);setAiMissingInformation([]);setAiFieldExplanations({});setAiApplied(false);setAiAnalyzedContext('');setAutoAnalysisKey('');setAiError('');setSchemaBusy(true);setError('');setNotice('');
+  setChatMessages(current=>[current[0],...current.filter(message=>message.role==='user'),{role:'assistant',content:'已选择 '+(item.title||item.name)+'。我正在读取它的真实输入 Schema，随后会根据参数要求继续与你确认。'}])
   const actorId=item.username+'~'+item.name
   const {data,error:invokeError}=await supabase.functions.invoke('apify-actor-schema',{body:{workspace_id:workspaceId,actor_id:actorId,channel_key:channel}})
   if(invokeError||data?.error){setError(data?.error||invokeError?.message||'读取 Actor Schema 失败');setActor(null);setSchemaBusy(false);return}
@@ -319,6 +328,73 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   setValues(current=>({...current,...mapped}));setAiApplied(true)
   setNotice('AI 参数已填入 Schema 表单。请检查最终 JSON 和必填项校验结果。')
  }
+ const sendAssistantTurn = async (messages:ChatMessage[], requestText:string, schemaOverride?:JsonSchema, actorOverride?:Actor) => {
+  const activeSchema=schemaOverride||schema
+  const activeActor=actorOverride||actor
+  const mode=activeSchema&&activeActor?'conversation':'intent'
+  if(!supabase){setAiError('Supabase 尚未配置，请先完成系统连接。');return}
+  setAiBusy(true);setAiError('')
+  try{
+   const {data:sessionData,error:sessionError}=await supabase.auth.getSession()
+   if(sessionError||!sessionData.session?.access_token)throw new Error('登录状态已失效，请重新登录。')
+   const supportedPlatforms=platformGroups.flatMap(group=>group.items.map(([id,name])=>({id,name})))
+   const response=await fetch('https://ouranos-ai-assistant.xg-y.workers.dev',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+sessionData.session.access_token},
+    body:JSON.stringify({
+     mode,model:aiModel,user_request:requestText,conversation:messages.slice(-20),
+     supported_platforms:supportedPlatforms,channel,actor_id:activeActor?activeActor.username+'~'+activeActor.name:'',actor_name:activeActor?.title||'',actor_description:activeActor?.description||'',
+     actor_schema:activeSchema,
+     previous_actor_input:activeSchema?schemaValidation.payload:{},
+     market:{countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},
+     task_limits:{task_name:taskName,product,industry,keywords,target_type:targetType,target_count:Number(targetCount),max_cost_usd:Number(maxCost)}
+    })
+   })
+   const result=await response.json()
+   if(!response.ok||!result?.ok)throw new Error(result?.error||'AI 暂时无法处理这条消息，请稍后重试。')
+   if(mode==='intent'){
+    if(result.platform_id){
+     const platform=supportedPlatforms.find(item=>item.id===result.platform_id)
+     if(platform){setChannel(platform.id);setRecognizedPlatform(platform.name)}
+    }
+    setAiSummary(String(result.summary||''))
+    setChatMessages(current=>[...current,{role:'assistant',content:String(result.assistant_message||'我已理解你的需求。请展开手动配置，搜索并选择一个 Actor。')}])
+    return
+   }
+   const generated=(result.actor_input||{}) as Record<string,unknown>
+   setAiGenerated(generated)
+   setAiSummary(String(result.summary||''));setAiStrategy(String(result.strategy||''))
+   setAiWarnings(Array.isArray(result.warnings)?result.warnings.map(String):[])
+   setAiMissingInformation(Array.isArray(result.missing_information)?result.missing_information.map(String):[])
+   setAiFieldExplanations(result.field_explanations&&typeof result.field_explanations==='object'?result.field_explanations as Record<string,string>:{})
+   const mapped=Object.fromEntries(Object.entries(generated).map(([key,value])=>{
+    const field=activeSchema?.properties?.[key];const type=field?fieldType(field):'string'
+    if(type==='array'&&field?.editor==='stringList')return [key,Array.isArray(value)?value:[]]
+    if(type==='array'||type==='object')return [key,JSON.stringify(value,null,2)]
+    return [key,value]
+   }))
+   setValues(current=>({...current,...mapped}))
+   setAiApplied(true);setAiAnalyzedContext(aiContextKey)
+   setChatMessages(current=>[...current,{role:'assistant',content:String(result.assistant_message||'参数预览已更新。请检查下面的参数和待确认事项。')}])
+  }catch(error){setAiError(error instanceof Error?error.message:'AI 对话失败，请稍后重试。')}
+  finally{setAiBusy(false)}
+ }
+ const submitChat = async () => {
+  const message=chatInput.trim()
+  if(!message||aiBusy)return
+  const next=[...chatMessages,{role:'user' as const,content:message}]
+  setChatMessages(next);setChatInput('')
+  const requestText=aiRequest||message
+  if(!aiRequest)setAiRequest(message)
+  await sendAssistantTurn(next,requestText)
+ }
+ useEffect(()=>{
+  if(!schema||!actor||!aiRequest||aiBusy)return
+  const key=actor.id+':'+aiContextKey
+  if(autoAnalysisKey===key||aiAnalyzedContext===aiContextKey)return
+  setAutoAnalysisKey(key)
+  void sendAssistantTurn(chatMessages,aiRequest)
+ },[schema,actor?.id,aiContextKey])
  const startSearch = async () => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
@@ -356,6 +432,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  return <div className="ldw-shell">
   <div className="ldw-intro"><div><span className="ldw-eyebrow">LEAD DISCOVERY WORKSPACE</span><h2>发现潜在客户</h2><p>先定义目标市场和搜索任务，再选择采集器；AI 将依据真实 Schema 生成参数。</p></div><span className="ldw-status"><Sparkles size={14}/> 动态采集配置</span></div>
   <div className="ldw-odoo-flow" aria-label="潜客发现流程">{[['01','来源平台'],['02','数据供应商'],['03','目标市场'],['04','搜索任务限制'],['05','选择 Actor'],['06','AI 分析与参数']].map(([n,label])=><div className="ldw-odoo-flow-item" key={n}><span>{n}</span><b>{label}</b></div>)}</div>
+  <button type="button" className="ldw-manual-toggle" aria-expanded={manualConfigOpen} onClick={()=>setManualConfigOpen(value=>!value)}><span><b>手动配置</b><small>{recognizedPlatform?'已识别平台：'+recognizedPlatform:'平台、Actor、目标市场和抓取设置'}{actor?' · 已选择：'+actor.title:''}</small></span><span>{manualConfigOpen?'收起配置':'展开配置'} <ChevronDown size={15}/></span></button>
+  {manualConfigOpen&&<div className="ldw-manual-config-body">
   <div className="ldw-step-grid">
    <section className="ldw-card"><div className="ldw-step-title"><span>01</span><div><h3>选择客户来源平台</h3><p>先确定你要从哪里发现潜在客户。按类别收纳，点击展开。</p></div></div>
     <div className="ldw-platform-groups">{platformGroups.map(group=><div className="ldw-platform-group" key={group.label}>
@@ -405,21 +483,28 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     
    </div>}
   </section> 
-  <section className="ldw-card ldw-ai-step"><div className="ldw-step-title"><span>06</span><div><h3>AI 智能分析与 Schema 参数生成</h3><p>AI 综合目标市场、搜索限制、补充要求和当前 Actor 的真实 Schema，先总结需求，再生成参数。</p></div></div>
-   <label className="ldw-field"><span>AI 模型</span><select value={aiModel} onChange={e=>setAiModel(e.target.value)}><option value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">Cloudflare Workers AI · Llama 3.3 70B（默认）</option><option value="@cf/meta/llama-4-scout-17b-16e-instruct">Cloudflare Workers AI · Llama 4 Scout 17B</option></select><small>模型在服务端运行，不会向浏览器暴露 Cloudflare API 凭证。</small></label>
-   <label className="ldw-field"><span>补充抓取需求（自然语言）</span><textarea rows={4} value={aiRequest} onChange={e=>setAiRequest(e.target.value)} placeholder="例如：优先寻找真实经营的 USB Cable 批发商和制造商，尽可能获取企业官网、公开邮箱和联系电话；排除零售店和无关结果。也可以留空，AI 将根据上方配置分析。"/></label>
+  </div>}
+  <section className="ldw-card ldw-ai-step ldw-chat-card">
+   <div className="ldw-step-title"><span><MessageCircle size={16}/></span><div><h3>AI 需求助手</h3><p>先描述业务目标；识别平台后，由你手动选择 Actor，AI 再根据真实 Schema 逐项确认并实时完善参数。</p></div></div>
+   <label className="ldw-field"><span>AI 模型</span><select value={aiModel} onChange={e=>setAiModel(e.target.value)}><option value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">Cloudflare Workers AI · Llama 3.3 70B（默认）</option><option value="@cf/meta/llama-4-scout-17b-16e-instruct">Cloudflare Workers AI · Llama 4 Scout 17B</option></select></label>
+   {recognizedPlatform&&<div className="ldw-platform-detected"><Check size={14}/> AI 已识别平台：<b>{recognizedPlatform}</b>{!actor&&<span>请展开「手动配置」搜索并选择 Actor</span>}</div>}
+   <div className="ldw-chat-history" aria-live="polite">{chatMessages.map((message,index)=><div key={index} className={'ldw-chat-message '+message.role}><span>{message.role==='assistant'?'AI 助手':'你'}</span><p>{message.content}</p></div>)}{aiBusy&&<div className="ldw-chat-message assistant"><span>AI 助手</span><p className="ldw-chat-thinking"><Loader2 size={13}/> 正在结合当前需求和 Actor Schema 分析…</p></div>}</div>
+   <div className="ldw-chat-composer"><textarea rows={2} value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void submitChat()}}} placeholder={schema&&actor?'回答 AI 的问题，或补充你希望采集的细节…':'描述你想在哪个平台寻找什么类型的潜在客户…'} /><button type="button" onClick={()=>void submitChat()} disabled={!chatInput.trim()||aiBusy}><Send size={14}/> 发送</button></div>
    {aiError&&<div className="ldw-error">{aiError}</div>}
-   <div className="ldw-ai-actions"><button type="button" onClick={()=>void analyzeActorInput()} disabled={!schema||!actor||aiBusy}>{aiBusy?<><Loader2 size={14}/> 正在分析并生成参数…</>:<><Sparkles size={14}/> AI 分析需求并生成参数</>}</button></div>
-   {aiGenerated&&<div className="ldw-ai-result">
-    <div className="ldw-ai-result-heading"><b>AI 需求分析结果</b><span>{aiModel}</span></div>
-    <div className="ldw-ai-summary"><b>需求总结</b><p>{aiSummary||'AI 已完成需求分析。'}</p></div>
-    <div className="ldw-ai-summary"><b>建议采集策略</b><p>{aiStrategy||'按当前市场和 Actor Schema 执行。'}</p></div>
-    {aiWarnings.length>0&&<div className="ldw-ai-warnings"><b>需要注意</b><ul>{aiWarnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul></div>}
-    <div className="ldw-ai-actions"><button type="button" onClick={applyAiGenerated}><Check size={14}/> 确认分析结果并填入 Schema</button></div>
+   {schema&&actor&&<div className="ldw-ai-live-preview">
+    <div className="ldw-ai-result-heading"><b>实时参数预览</b><span>{actor.title}</span></div>
+    {aiSummary&&<div className="ldw-ai-summary"><b>需求理解</b><p>{aiSummary}</p></div>}
+    {aiStrategy&&<div className="ldw-ai-summary"><b>采集策略</b><p>{aiStrategy}</p></div>}
+    <div className="ldw-ai-preview-status"><span>参数校验：{schemaValidation.valid?'通过':'待完善'}</span><span>已生成字段：{Object.keys(schemaValidation.payload).length} / {schemaKeys(schema).length}</span><span>待确认：{aiMissingInformation.length}</span></div>
+    {aiMissingInformation.length>0&&<div className="ldw-ai-warnings"><b>还需要确认</b><ul>{aiMissingInformation.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
+    {aiWarnings.length>0&&<div className="ldw-ai-warnings"><b>能力或参数提醒</b><ul>{aiWarnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul></div>}
+    {Object.keys(aiFieldExplanations).length>0&&<div className="ldw-ai-explanations"><b>字段生成说明</b>{Object.entries(aiFieldExplanations).map(([key,explanation])=><div key={key}><span>{localizeTitle(key,schema.properties?.[key]||{})}</span><small>{String(explanation)}</small></div>)}</div>}
+    <button type="button" className="ldw-preview-json-toggle" onClick={()=>setShowRequestPreview(value=>!value)}><b>查看 Actor 原始 JSON 参数</b><span>{showRequestPreview?'收起':'展开'} <ChevronDown size={13}/></span></button>
+    {showRequestPreview&&<pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre>}
+    {aiApplied&&<div className="ldw-validation-ok">AI 参数已同步到手动配置。你可以展开手动配置修改任意字段，预览会同步更新。</div>}
    </div>}
-   {aiApplied&&<div className="ldw-validation-ok">已将 AI 生成的参数填入 Schema。请检查动态表单和最终 JSON，必要时可以手动调整。</div>}
-   <div className="ldw-ai-manual-note">AI 生成结果不会直接提交。确认后才会填入 Schema；所有参数仍需通过 Actor Schema 校验，最终提交内容以请求参数预览为准。也可以跳过 AI，手动填写 Schema。</div>
-   <div className="ldw-submit-row"><span>创建后将由所选 Actor 执行。只有通过 Schema 校验且已确认费用授权，才能启动任务。</span><button disabled={!schema||!actor||!costConsent||busy||!schemaValidation.valid} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认并启动搜索'} <ArrowRight size={15}/></button></div>
+   {!schema&&<div className="ldw-chat-hint">AI 识别平台后，请点击上方「手动配置」展开平台与 Actor 搜索。选择 Actor 后，AI 会自动读取 Schema 并开始参数确认。</div>}
+   <div className="ldw-submit-row"><span>只有 Actor 已选择、Schema 校验通过、所有必填信息完整且费用授权确认后，才能创建任务。</span><button disabled={!schema||!actor||!costConsent||busy||!schemaValidation.valid||aiMissingInformation.length>0} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并创建任务'} <ArrowRight size={15}/></button></div>
   </section>
 
  </div>
