@@ -246,7 +246,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     else if(/countrycode|country_code/.test(k)&&countryCode)actorInput[key]=countryCode
     else if(/^country$|countryname|country_name/.test(k)&&selectedCountry)actorInput[key]=selectedCountry.geoName
     else if(/^city$|cityname|city_name/.test(k)&&city)actorInput[key]=city
-    else if(/^state$|^region$|stateorprovince/.test(k)&&region)actorInput[key]=region
+    else if(/^state$|^region$|stateorprovince/.test(k)&&region&&region!=='__all__')actorInput[key]=region
     else if(/max.*(place|result|item|record|lead)|^(limit|maxresults|maxitems)$/.test(k))actorInput[key]=Number(targetCount)
     else if(/searchquery|searchterm|^query$/.test(k)&&keywords.trim())actorInput[key]=keywords.trim()
    }
