@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Activity, ArrowRight, Bot, CheckCircle2, ChevronRight, CircleHelp,
   Cloud, Database, ExternalLink, KeyRound, Search, Settings2, ShieldCheck,
@@ -66,7 +66,8 @@ export default function SystemIntegrationsApp() {
   const selectedConnection = selected?.group==='ai' ? selectedAiConfigs.find(item=>item.status==='connected'&&item.is_enabled) : dataConnections.find(item=>item.provider_key===selectedKey&&item.status==='connected'&&item.is_enabled)
   const configuredConnection = selected?.group==='ai' ? selectedDefaultAi : selectedDataConnection
   const connectedCount = dataConnections.filter(item=>item.status==='connected'&&item.is_enabled).length + aiConfigs.filter(item=>item.status==='connected'&&item.is_enabled).length
-  const latestTest = [...dataConnections,...aiConfigs].map(item=>item.last_tested_at).filter(Boolean).sort().at(-1)
+  const testDates=[...dataConnections,...aiConfigs].map(item=>item.last_tested_at).filter((value):value is string=>Boolean(value)).sort()
+  const latestTest = testDates[testDates.length-1]
   const filtered = providers.filter(item => (item.name + item.category + item.description + item.channels).toLowerCase().includes(query.toLowerCase()))
   const chooseSection = (next: Section) => {
     setSection(next)
@@ -97,7 +98,7 @@ export default function SystemIntegrationsApp() {
 
     <div className="int-tabs">
       <button className={section === 'data' ? 'active' : ''} onClick={() => chooseSection('data')}><Database size={15}/> 数据采集服务 <span>7</span></button>
-      <button className={section === 'ai' ? 'active' : ''} onClick={() => chooseSection('ai')}><Sparkles size={15}/> AI 模型服务 <span>5</span></button>
+      <button className={section === 'ai' ? 'active' : ''} onClick={() => chooseSection('ai')}><Sparkles size={15}/> AI 模型服务 <span>{aiProviders.length}</span></button>
       <button className={section === 'logs' ? 'active' : ''} onClick={() => chooseSection('logs')}><Activity size={15}/> 集成日志</button>
     </div>
 
@@ -135,7 +136,7 @@ export default function SystemIntegrationsApp() {
             <div className="int-section-title"><h3>服务配置</h3><span>连接参数</span></div>
             <div className="int-config-row"><span>服务商</span><b>{selected.name}</b></div>
             <div className="int-config-row"><span>支持渠道 / 能力</span><b>{selected.channels}</b></div>
-            {selected.group === 'ai' && <><div className="int-config-row"><span>模型名称</span><b>{selectedAiConfigs.length?selectedAiConfigs.map(item=>item.model_name).join('、'):'尚未配置模型'}</b></div><div className="int-config-row"><span>默认模型</span><b>{selectedDefaultAi?.model_name||'未设置'}</b></div></>}
+            {selected.group === 'ai' && <><div className="int-config-row"><span>模型名称</span><b>{selected.key==='works-ai'?'Works AI 默认模型':selectedAiConfigs.length?selectedAiConfigs.map(item=>item.model_name).join('、'):'尚未配置模型'}</b></div><div className="int-config-row"><span>默认模型</span><b>{selected.key==='works-ai'?'Works AI':selectedDefaultAi?.model_name||'未设置'}</b></div></>}
             {selected.key !== "works-ai" && <div className="int-config-row"><span>API 凭证</span><b className="int-credential-state"><KeyRound size={13}/> {configuredConnection?'已安全保存（Vault）':'尚未配置'}</b></div>}
             {selected.key !== "works-ai" && <div className="int-config-row"><span>密钥存储</span><b>Supabase Vault（服务端）</b></div>}
             <div className="int-config-row"><span>最近测试</span><b>{configuredConnection?.last_tested_at?new Date(configuredConnection.last_tested_at).toLocaleString():'从未测试'}</b></div>{configuredConnection?.last_error&&<div className="int-config-row"><span>最近错误</span><b className="int-error-text">{configuredConnection.last_error}</b></div>}
