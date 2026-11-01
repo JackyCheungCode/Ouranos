@@ -1,0 +1,2 @@
+alter table public.integration_connections add column if not exists verification_method text not null default 'not_tested';
+alter table public.ai_model_configs add column if not exists verification_method text not null default 'not_tested';
