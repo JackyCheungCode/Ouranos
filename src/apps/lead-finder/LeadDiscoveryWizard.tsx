@@ -36,6 +36,7 @@ const portCatalog = [
 
 const providerDescriptions: Record<string,string> = { Apify:'搜索 Apify Store 中可用的 Actors，并读取每个 Actor 自己的输入 Schema。', 'Bright Data':'数据集 / Scraper 产品目录与专属输入参数。', Octoparse:'模板任务与参数 Schema。', Firecrawl:'网站搜索、抓取与提取操作。', PhantomBuster:'Agent 工作流及参数。', TexAu:'自动化 Action 与参数。', '跨境魔方':'跨境电商数据 API 与接口参数。' }
 const schemaKeys = (schema: JsonSchema) => Object.entries(schema.properties || {})
+const stableStringify=(value:unknown):string=>Array.isArray(value)?'['+value.map(stableStringify).join(',')+']':value&&typeof value==='object'?'{'+Object.keys(value as Record<string,unknown>).sort().map(k=>JSON.stringify(k)+':'+stableStringify((value as Record<string,unknown>)[k])).join(',')+'}':JSON.stringify(value)??'null'
 const fieldTitleZh:Record<string,string> = {searchStringsArray:'搜索关键词',searchString:'搜索关键词',searchTerms:'搜索关键词',searchQuery:'搜索查询',query:'搜索查询',locationQuery:'搜索地点',location:'搜索地点',categoryFilterWords:'商家类别关键词',startUrls:'起始网址',customGeolocation:'自定义地理位置',maxCrawledPlacesPerSearch:'每个搜索词最大采集数量',maxResults:'最大结果数量',maxItems:'最大采集数量',includeNearbyPlaces:'包含附近地点',scrapeContacts:'采集联系方式',proxyConfiguration:'代理配置',language:'语言',country:'国家',countryCode:'国家代码',city:'城市',state:'州 / 省',region:'地区'}
 const titlePhraseZh:Record<string,string> = {'search terms':'搜索关键词','search term':'搜索关键词','search query':'搜索查询','location':'搜索地点','maximum results':'最大结果数量','max results':'最大结果数量','max crawled places per search':'每个搜索词最大采集数量','start urls':'起始网址','place categories':'商家类别','include nearby places':'包含附近地点','scrape contacts':'采集联系方式','custom geolocation':'自定义地理位置','proxy configuration':'代理配置'}
 const localizeTitle=(key:string,field:SchemaField)=>fieldTitleZh[key]||titlePhraseZh[String(field.title||'').toLowerCase()]||titlePhraseZh[key.replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[_-]+/g,' ').toLowerCase()]||('采集参数：'+(field.title||key))
@@ -44,24 +45,6 @@ const localizeEnum=(value:unknown)=>({true:'是',false:'否',daily:'每天',week
 const isEmptyRequired=(value:unknown)=>value===undefined||value===null||value===''||(Array.isArray(value)&&value.length===0)||(typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value as object).length===0)
 const fieldType=(field:SchemaField)=>Array.isArray(field.type)?field.type.find(x=>x!=='null')||'string':field.type||'string'
 const getDefaultValue = (field: SchemaField, required = false) => field.default ?? (fieldType(field) === 'boolean' ? false : fieldType(field) === 'array' ? (required ? '' : '[]') : fieldType(field) === 'object' ? (required ? '' : '{}') : '')
-const outputMapping = (schema: Record<string, unknown>) => {
- const props = ((schema.properties || {}) as Record<string, unknown>)
- const keys = Object.keys(props)
- const pick = (candidates: string[], fallback: string) => candidates.find(k => keys.includes(k)) || fallback
- return {
-  company_name: pick(['companyName','company_name','businessName','business_name','name','title'], 'name'),
-  website: pick(['website','websiteUrl','website_url','url','domain'], 'website'),
-  email: pick(['email','emails','businessEmail'], 'email'),
-  phone: pick(['phone','phoneNumber','phone_number','telephone'], 'phone'),
-  country_name: pick(['country','countryName','country_name'], 'country'),
-  address: pick(['address','fullAddress','full_address','streetAddress'], 'address'),
-  contact_name: pick(['contactName','fullName','full_name','personName','person_name','name'], 'name'),
-  job_title: pick(['jobTitle','job_title','position','role'], 'jobTitle'),
-  contact_email: pick(['contactEmail','email','emailAddress'], 'email'),
-  contact_phone: pick(['contactPhone','phone','phoneNumber'], 'phone'),
-  source_url: pick(['url','website','websiteUrl','link'], 'url')
- }
-}
 const nominatim = async (params: Record<string,string>) => {
  const url = new URL('https://nominatim.openstreetmap.org/search')
  Object.entries({format:'jsonv2',addressdetails:'1',dedupe:'1',limit:'30',...params}).forEach(([k,v])=>url.searchParams.set(k,v))
@@ -132,7 +115,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [schema,setSchema] = useState<JsonSchema|null>(null)
  const [schemaBusy,setSchemaBusy] = useState(false)
  const [values,setValues] = useState<Record<string,unknown>>({})
- const [mapping,setMapping] = useState<Record<string,string>>({})
  const [keywords,setKeywords] = useState('')
  const [product,setProduct] = useState('')
  const [industry,setIndustry] = useState('')
@@ -156,8 +138,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   else if(!next.includes(countryCode)||!countryCode||!selectedCountries.includes(code))setCountryCode(next[next.length-1])
  }
 
- useEffect(()=>{ setProvider(availableProviders[0] || 'Apify'); setActor(null); setSchema(null); setActors([]); setValues({}); setMapping({}); setError(''); setNotice('') },[channel])
- useEffect(()=>{ setActor(null);setSchema(null);setValues({});setMapping({});setError('');setNotice('') },[provider])
+ useEffect(()=>{ setProvider(availableProviders[0] || 'Apify'); setActor(null); setSchema(null); setActors([]); setValues({});  setError(''); setNotice('') },[channel])
+ useEffect(()=>{ setActor(null);setSchema(null);setValues({});setError('');setNotice('') },[provider])
  useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label)},[channel])
  useEffect(()=>{
   let active=true
@@ -198,31 +180,13 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  const selectActor = async (item: Actor) => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
-  setActor(item);setSchema(null);setValues({});setMapping({});setSchemaBusy(true);setError('');setNotice('')
+  setActor(item);setSchema(null);setValues({});setSchemaBusy(true);setError('');setNotice('')
   const actorId=item.username+'~'+item.name
   const {data,error:invokeError}=await supabase.functions.invoke('apify-actor-schema',{body:{workspace_id:workspaceId,actor_id:actorId,channel_key:channel}})
   if(invokeError||data?.error){setError(data?.error||invokeError?.message||'读取 Actor Schema 失败');setActor(null);setSchemaBusy(false);return}
   const nextSchema=(data.input_schema || {}) as JsonSchema
   const initial=Object.fromEntries(schemaKeys(nextSchema).map(([key,field])=>[key,getDefaultValue(field,(nextSchema.required||[]).includes(key))]))
-  setSchema(nextSchema);setValues(initial);setMapping(outputMapping((data.output_schema || {}) as Record<string,unknown>))
-  setNotice('已读取 Actor 最新输入 Schema。以下字段由 Actor 定义，尚未启动采集。')
-  setSchemaBusy(false)
- }
- const renderField = ([key,field]:[string,SchemaField]) => {
-  const value=values[key] ?? getDefaultValue(field)
-  const required=schema?.required?.includes(key)
-  const set=(v:unknown)=>setValues(current=>({...current,[key]:v}))
-  const enumValues=field.enum || []
-  const semantic=key.toLowerCase()
-  const countryField=/country|countrycode|country_code/.test(semantic)
-  const regionField=/^(state|region|province|stateorprovince)$/.test(semantic)||/stateorprovince|regionname|province/.test(semantic)
-  const cityField=/^city$|cityname|city_name/.test(semantic)
-  const portField=/port|seaport|unlocode/.test(semantic)
-  const showHelp=Boolean(expandedHelp[key])
-  const fieldError=schemaValidation.errors[key]
-  const constraints=[field.minimum!==undefined?'≥ '+field.minimum:'',field.maximum!==undefined?'≤ '+field.maximum:'',field.minLength!==undefined?'最少 '+field.minLength+' 字符':'',field.maxLength!==undefined?'最多 '+field.maxLength+' 字符':'',field.minItems!==undefined?'至少 '+field.minItems+' 项':'',field.maxItems!==undefined?'最多 '+field.maxItems+' 项':'',field.pattern?'正则格式':'',field.format?field.format:''].filter(Boolean)
-  return <label className={'ldw-field ldw-schema-field '+(fieldError?'has-error':'')} key={key}>
-   <span className="ldw-field-heading"><span className="ldw-field-label">{localizeTitle(key,field)}{required&&<b> * 必填</b>}</span><small className="ldw-field-type">{Array.isArray(field.type)?field.type.join(' / '):(field.type||'text')}</small>{constraints.length>0&&<small className="ldw-constraint-chip">{constraints.join(' · ')}</small>}<button type="button" className="ldw-help-button" aria-expanded={showHelp} onClick={e=>{e.preventDefault();setExpandedHelp(current=>({...current,[key]:!current[key]}))}}><HelpCircle size={13}/>{showHelp?'收起说明':'字段说明'}</button></span>
+  setSchema(nextSchema);setValues(initial);setExpandedHelp(current=>({...current,[key]:!current[key]}))}}><HelpCircle size={13}/>{showHelp?'收起说明':'字段说明'}</button></span>
    {enumValues.length>0?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">请选择</option>{enumValues.map(option=><option key={String(option)} value={String(option)}>{localizeEnum(option)}</option>)}</select>
    :countryField?<select value={String(value)} onChange={e=>{const next=e.target.value;set(next);const found=countries.find(c=>c.code===next||c.geoName===next);if(found){setCountryCode(found.code);setSelectedCountries(current=>current.includes(found.code)?current:[...current,found.code])}}}><option value="">选择国家</option>{countries.map(c=><option key={c.code} value={/code/.test(semantic)?c.code:c.geoName}>{c.flag} {c.name}</option>)}</select>
    :regionField?<select value={String(value)} onChange={e=>set(e.target.value)} disabled={!countryCode||locationBusy}><option value="">全部地区（不限制）</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select>
@@ -246,15 +210,13 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    const actorInput:Record<string,unknown>={...schemaValidation.payload}
     const taskTitle=taskName.trim()||product.trim()||keywords.trim()||actor.title
    const actorId=actor.username+'~'+actor.name
-    const schemaText=JSON.stringify(schema)
+    const schemaText=stableStringify(schema)
     const schemaHash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(schemaText)))].map(b=>b.toString(16).padStart(2,'0')).join('')
     const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region,city},source_channel:channel}
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspaceId,created_by:userId,name:taskTitle,status:'draft',target_profile:profile,selected_channels:[channel],target_count:Number(targetCount)}).select('id').single()
    if(taskError)throw new Error(taskError.message)
    const adapterKey='apify-'+channel+'-'+(actor.username+'-'+actor.name).toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,110)
-   const finalMapping={...mapping}
-   if(targetType==='contacts'){finalMapping.company_name='';finalMapping.contact_name=finalMapping.contact_name||'fullName'}
-   const config={input_defaults:actorInput,input_mapping:{},field_mapping:finalMapping,max_cost:Number(maxCost),max_items:Number(targetCount)}
+   const config={field_mapping:{},max_cost:Number(maxCost),max_items:Number(targetCount)}
    const {error:selectionError}=await supabase.from('workspace_adapter_selections').upsert({workspace_id:workspaceId,adapter_key:adapterKey,channel_key:channel,is_enabled:true,priority:10,config,created_by:userId,updated_at:new Date().toISOString()},{onConflict:'workspace_id,adapter_key'})
    if(selectionError)throw new Error('搜索任务已保存，但适配器配置失败：'+selectionError.message)
    const {data:queued,error:queueError}=await supabase.functions.invoke('enqueue-lead-search',{body:{workspace_id:workspaceId,task_id:task.id,confirm_cost:true}})
@@ -306,7 +268,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    {schema&&actor&&<div className="ldw-schema-panel">
     <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个动态输入字段 · Schema 来自 Actor 最新构建 · {pricingLabel(actor)}</small><small>{Number(actor.currentPricingInfo?.pricePerUnitUsd)>0 ? `按 ${targetCount} 条估算约 $${(Number(actor.currentPricingInfo?.pricePerUnitUsd)*Number(targetCount)).toFixed(2)}` : '最终费用以 Actor 计费模型和实际使用量为准'}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
     <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div><div className="ldw-request-preview"><button type="button" onClick={()=>setShowRequestPreview(v=>!v)}><span><b>请求参数预览</b><small>{Object.keys(schemaValidation.payload).length} 个字段 · {Object.keys(schemaValidation.errors).length} 项校验问题</small></span><span>{showRequestPreview?'收起':'展开'} <ChevronDown size={13}/></span></button>{showRequestPreview&&<><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过，可以提交':`请修正 ${Object.keys(schemaValidation.errors).length} 个字段错误后再提交`}</div></>}</div>
-    <details className="ldw-mapping"><summary>高级设置：输出字段映射</summary><p>自动根据常见字段名称匹配企业名称、网站、电话等字段；如 Actor 输出字段特殊，可在这里调整。</p><div className="ldw-mapping-grid">{Object.entries(mapping).map(([key,value])=><label className="ldw-field" key={key}><span>{key}</span><input value={value} onChange={e=>setMapping(current=>({...current,[key]:e.target.value}))}/></label>)}</div></details>
+    
    </div>}
   </section>
   <section className="ldw-card"><div className="ldw-step-title"><span>05</span><div><h3>搜索任务设置</h3><p>确认关键词、数量和收费授权后才会创建执行任务。</p></div></div>
