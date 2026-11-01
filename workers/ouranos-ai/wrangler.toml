@@ -1,0 +1,10 @@
+name = "ouranos-ai-assistant"
+main = "index.ts"
+compatibility_date = "2026-11-02"
+
+[ai]
+binding = "AI"
+
+[vars]
+SUPABASE_URL = "https://riridqzemfcnnjfiqevm.supabase.co"
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_PjFO615673uSM8X_gnsLYA_gIyGS6XB"
