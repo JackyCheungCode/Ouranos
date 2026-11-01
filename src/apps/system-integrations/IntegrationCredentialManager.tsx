@@ -24,6 +24,12 @@ export default function IntegrationCredentialManager({provider,configured,modelN
   const [error,setError]=useState('')
   useEffect(()=>{setApiKey('');setExternalUserId('');setCustomerId('');setZone('');setZoneUsername('');setZonePassword('');setModelName(initialModel||'');setMessage('');setError('')},[provider.key,initialModel])
   const kind=provider.group==='ai'?'ai_model':'data_source'
+  const confirmManual=async()=>{
+    if(!supabase||!workspace)return
+    if(!window.confirm('请确认你已在跨境魔方官方后台验证该 API Key 有效。Ouranos 不会发送计费请求，只会按你的确认启用连接。'))return
+    setBusy(true);setError('');setMessage('')
+    try{const {data,error:invokeError}=await supabase.functions.invoke('integration-actions',{body:{action:'manual_confirm',workspace_id:workspace.id,kind:'data_source',provider_key:provider.key}});if(invokeError||data?.error)throw new Error(data?.error||invokeError?.message||'手动确认失败');setMessage(data.message||'连接已手动确认启用');await onRefresh()}catch(e){setError(e instanceof Error?e.message:'手动确认失败')}finally{setBusy(false)}
+  }
   const invoke=async(action:'save'|'test'|'delete')=>{
     if(!supabase||!workspace)return
     setBusy(true);setError('');setMessage('')
@@ -60,7 +66,7 @@ export default function IntegrationCredentialManager({provider,configured,modelN
     {provider.key==='brightdata'&&<div className="int-credential-grid"><label>Customer ID<input value={customerId} onChange={e=>setCustomerId(e.target.value)} placeholder="Bright Data Customer ID"/></label><label>Zone 名称<input value={zone} onChange={e=>setZone(e.target.value)} placeholder="SERP / Scraper zone"/></label><label>Zone 用户名<input value={zoneUsername} onChange={e=>setZoneUsername(e.target.value)} placeholder="Proxy / Browser API username"/></label><label>Zone 密码<input type="password" autoComplete="new-password" value={zonePassword} onChange={e=>setZonePassword(e.target.value)} placeholder="Zone password"/></label></div>}
     <div className="int-credential-actions">
       <button className="int-primary" disabled={busy} onClick={()=>void invoke('save')}><KeyRound size={13}/>{busy?'处理中…':configured?'更新并安全保存':'安全保存凭证'}</button>
-      <button className="int-filter-button" disabled={busy||!configured} onClick={()=>void invoke('test')}><Zap size={13}/> 测试连接</button>
+      <button className="int-filter-button" disabled={busy||!configured} onClick={()=>void invoke('test')}><Zap size={13}/> 测试连接</button>{provider.key==='kuajingmofang'&&configured&&<button className="int-filter-button" disabled={busy} onClick={()=>void confirmManual()}><ShieldCheck size={13}/> 我已核验，手动启用</button>}
       <button className="int-danger-button" disabled={busy||!configured} onClick={()=>void invoke('delete')}><Trash2 size={13}/> 删除</button>
     </div>
     {error&&<div className="int-db-error">{error}</div>}
