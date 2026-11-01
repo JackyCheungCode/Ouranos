@@ -135,3 +135,15 @@
 
 
 .ldw-field-key{display:block;margin-top:2px;color:var(--odoo-muted,#817984);font-size:8px;line-height:1.35;overflow-wrap:anywhere}
+
+/* Actionable Schema validation diagnostics */
+.ldw-schema-error-summary{margin:12px 0;padding:12px 14px;border:1px solid #e5aaa5;border-radius:7px;background:#fff7f6;color:#702d29}
+.ldw-schema-error-summary>div{display:grid;gap:4px;margin-bottom:8px}
+.ldw-schema-error-summary>div b{font-size:12px}
+.ldw-schema-error-summary>div span{font-size:10px;color:#87524e}
+.ldw-schema-error-summary ol{display:grid;gap:7px;margin:0;padding-left:20px}
+.ldw-schema-error-summary li{padding-left:2px;font-size:10px}
+.ldw-schema-error-summary li a{font-weight:700;color:#8e302b;text-decoration:underline;text-underline-offset:2px}
+.ldw-schema-error-summary li span,.ldw-schema-error-summary li small{display:block;margin-top:2px}
+.ldw-schema-error-summary li small{color:#98736f;font-size:9px;overflow-wrap:anywhere}
+.ldw-schema-field.has-error{scroll-margin-top:24px}
