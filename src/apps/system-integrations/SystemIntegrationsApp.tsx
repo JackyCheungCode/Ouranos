@@ -16,6 +16,7 @@ type Provider = { key: string; name: string; category: string; description: stri
 type DataConnection = {provider_key:string;status:string;is_enabled:boolean;last_tested_at:string|null;last_error:string|null}
 type AiConfig = {provider_key:string;provider_name:string;model_name:string;is_default:boolean;is_enabled:boolean;status:string;last_tested_at:string|null;last_error:string|null;base_url:string|null}
 type IntegrationLog = {id:string;created_at:string;provider_name:string;action:string;status:string;message:string|null}
+type CostSummary = {provider_key:string;cost_currency:string;run_count:number;completed_runs:number;failed_runs:number;estimated_total:number;actual_total:number;records_found:number;estimated_cost_runs:number;actual_cost_runs:number;unpriced_runs:number}
 
 const dataProviders: Provider[] = [
   { key:'apify', name:'Apify', category:'网页采集平台', description:'通过 Actors 运行可配置的数据发现和网页采集任务。', channels:'Google 搜索 · Google Maps · 公开网站', docs:'https://docs.apify.com/', group:'data' },
@@ -47,6 +48,7 @@ export default function SystemIntegrationsApp() {
   const [dbLoading,setDbLoading] = useState(false)
   const [dbError,setDbError] = useState('')
   const [integrationLogs,setIntegrationLogs] = useState<IntegrationLog[]>([])
+  const [costSummary,setCostSummary] = useState<CostSummary[]>([])
   const [section, setSection] = useState<Section>('data')
   const [selectedKey, setSelectedKey] = useState('apify')
   const [query, setQuery] = useState('')
@@ -63,7 +65,7 @@ export default function SystemIntegrationsApp() {
     setDbLoading(false)
   }
   useEffect(()=>{void refreshConnections()},[workspace?.id])
-  useEffect(()=>{if(section!=='logs'||!supabase||!workspace)return;let alive=true;supabase.from('integration_events').select('id,created_at,provider_name,action,status,message').eq('workspace_id',workspace.id).order('created_at',{ascending:false}).limit(200).then(({data,error})=>{if(!alive)return;if(error)setDbError(error.message);else setIntegrationLogs((data||[]) as IntegrationLog[])});return()=>{alive=false}},[section,workspace?.id])
+  useEffect(()=>{if(section!=='logs'||!supabase||!workspace)return;let alive=true;Promise.all([supabase.from('integration_events').select('id,created_at,provider_name,action,status,message').eq('workspace_id',workspace.id).order('created_at',{ascending:false}).limit(200),supabase.from('lead_provider_cost_summary').select('provider_key,cost_currency,run_count,completed_runs,failed_runs,estimated_total,actual_total,records_found,estimated_cost_runs,actual_cost_runs,unpriced_runs').eq('workspace_id',workspace.id).order('actual_total',{ascending:false})]).then(([logs,costs])=>{if(!alive)return;if(logs.error)setDbError(logs.error.message);else setIntegrationLogs((logs.data||[]) as IntegrationLog[]);if(costs.error)setDbError(costs.error.message);else setCostSummary((costs.data||[]) as CostSummary[])});return()=>{alive=false}},[section,workspace?.id])
   const providers = section === 'ai' ? aiProviders : dataProviders
   const selected = useMemo(() => [...dataProviders, ...aiProviders].find(item => item.key === selectedKey) ?? providers[0], [selectedKey, providers])
   const selectedDataConnection = dataConnections.find(item=>item.provider_key===selectedKey)
@@ -156,7 +158,7 @@ export default function SystemIntegrationsApp() {
       </section>
     </div> : <section className="int-log-panel">
       <div className="int-log-toolbar"><div><h2>集成日志</h2><p>查看连接测试、API 调用和异常记录。</p></div><button className="int-filter-button"><Settings2 size={14}/> 筛选</button></div>
-      <div className="int-log-table"><div className="int-log-head"><span>时间</span><span>服务商</span><span>操作</span><span>结果</span></div>{integrationLogs.map(log=><div className="int-log-row" key={log.id}><span>{new Date(log.created_at).toLocaleString()}</span><span>{log.provider_name}</span><span>{log.action==='save'?'保存 / 更新':log.action==='delete'?'删除':'连接测试'}</span><span>{log.message||log.status}</span></div>)}</div>
+      <div className="int-cost-summary"><div className="int-cost-summary-head"><div><h3>API 费用与使用量</h3><p>按服务商和币种分别统计，不将不同币种合并。</p></div><span>来源：任务运行记录</span></div>{costSummary.length?<div className="int-cost-grid">{costSummary.map(item=><article key={item.provider_key+item.cost_currency}><b>{item.provider_key}</b><small>{item.cost_currency} · {item.run_count} 次运行</small><strong>{item.actual_cost_runs?item.actual_total.toFixed(4):'费用未回传'}</strong><small>估算 {item.estimated_cost_runs?item.estimated_total.toFixed(4):'—'} · 已发现 {item.records_found} 条</small><small>成功 {item.completed_runs} · 失败 {item.failed_runs} · 未计价 {item.unpriced_runs}</small></article>)}</div>:<div className="int-log-empty"><Database size={18}/><span>暂无搜索运行费用记录。</span></div>}</div><div className="int-log-table"><div className="int-log-head"><span>时间</span><span>服务商</span><span>操作</span><span>结果</span></div>{integrationLogs.map(log=><div className="int-log-row" key={log.id}><span>{new Date(log.created_at).toLocaleString()}</span><span>{log.provider_name}</span><span>{log.action==='save'?'保存 / 更新':log.action==='delete'?'删除':'连接测试'}</span><span>{log.message||log.status}</span></div>)}</div>
       {!integrationLogs.length&&<div className="int-log-empty"><Activity size={22}/><b>暂无集成日志</b><span>凭证保存、删除和连接测试记录会显示在这里。</span></div>}
     </section>}
 
