@@ -1,260 +1,202 @@
-import { useMemo, useState } from 'react'
-import {
-  ArrowLeft, ArrowRight, Bot, Building2, Check, CheckCircle2,
-  CircleHelp, Clock3, Database, Globe2, Linkedin, Plus, Search,
-  Settings2, ShieldCheck, Sparkles, Target, Users, Workflow
-} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, ArrowRight, Bot, Building2, Check, CheckCircle2, ChevronDown, CircleHelp, Clock3, Database, Globe2, Plus, Search, Settings2, ShieldCheck, Sparkles, Target, Users, Workflow, X, Inbox, UserRoundCheck } from 'lucide-react'
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
+import type { Feature, FeatureCollection, Geometry } from 'geojson'
+import type { Layer, PathOptions } from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import './LeadFinderApp.css'
 
-type Tab = 'search' | 'tasks' | 'sources'
+type Tab = 'search' | 'tasks' | 'review' | 'sources'
 type TargetType = 'companies' | 'contacts' | 'both'
+type Country = { code:string; name:string; flag:string; geoName:string }
+type Channel = { id:string; name:string; detail:string; logo:string; providers:string[]; status:string }
+type ChannelGroup = { id:string; title:string; description:string; channels:Channel[] }
 
-type SearchTask = {
-  id: string
-  name: string
-  criteria: string
-  createdAt: string
-  channels: number
-  status: '待接入数据源'
-}
+const countries:Country[] = [
+ {code:'US',name:'美国',flag:'🇺🇸',geoName:'United States of America'},{code:'CA',name:'加拿大',flag:'🇨🇦',geoName:'Canada'},{code:'MX',name:'墨西哥',flag:'🇲🇽',geoName:'Mexico'},{code:'BR',name:'巴西',flag:'🇧🇷',geoName:'Brazil'},{code:'AR',name:'阿根廷',flag:'🇦🇷',geoName:'Argentina'},{code:'CL',name:'智利',flag:'🇨🇱',geoName:'Chile'},
+ {code:'GB',name:'英国',flag:'🇬🇧',geoName:'United Kingdom'},{code:'DE',name:'德国',flag:'🇩🇪',geoName:'Germany'},{code:'FR',name:'法国',flag:'🇫🇷',geoName:'France'},{code:'IT',name:'意大利',flag:'🇮🇹',geoName:'Italy'},{code:'ES',name:'西班牙',flag:'🇪🇸',geoName:'Spain'},{code:'NL',name:'荷兰',flag:'🇳🇱',geoName:'Netherlands'},{code:'BE',name:'比利时',flag:'🇧🇪',geoName:'Belgium'},{code:'CH',name:'瑞士',flag:'🇨🇭',geoName:'Switzerland'},{code:'SE',name:'瑞典',flag:'🇸🇪',geoName:'Sweden'},{code:'NO',name:'挪威',flag:'🇳🇴',geoName:'Norway'},{code:'PL',name:'波兰',flag:'🇵🇱',geoName:'Poland'},{code:'TR',name:'土耳其',flag:'🇹🇷',geoName:'Turkey'},{code:'RU',name:'俄罗斯',flag:'🇷🇺',geoName:'Russia'},
+ {code:'CN',name:'中国大陆',flag:'🇨🇳',geoName:'China'},{code:'MO',name:'中国澳门',flag:'🇲🇴',geoName:'Macao'},{code:'HK',name:'中国香港',flag:'🇭🇰',geoName:'Hong Kong'},{code:'TW',name:'中国台湾',flag:'🇹🇼',geoName:'Taiwan'},{code:'JP',name:'日本',flag:'🇯🇵',geoName:'Japan'},{code:'KR',name:'韩国',flag:'🇰🇷',geoName:'South Korea'},{code:'SG',name:'新加坡',flag:'🇸🇬',geoName:'Singapore'},{code:'MY',name:'马来西亚',flag:'🇲🇾',geoName:'Malaysia'},{code:'TH',name:'泰国',flag:'🇹🇭',geoName:'Thailand'},{code:'VN',name:'越南',flag:'🇻🇳',geoName:'Vietnam'},{code:'ID',name:'印度尼西亚',flag:'🇮🇩',geoName:'Indonesia'},{code:'PH',name:'菲律宾',flag:'🇵🇭',geoName:'Philippines'},{code:'IN',name:'印度',flag:'🇮🇳',geoName:'India'},{code:'PK',name:'巴基斯坦',flag:'🇵🇰',geoName:'Pakistan'},{code:'BD',name:'孟加拉国',flag:'🇧🇩',geoName:'Bangladesh'},
+ {code:'AE',name:'阿联酋',flag:'🇦🇪',geoName:'United Arab Emirates'},{code:'SA',name:'沙特阿拉伯',flag:'🇸🇦',geoName:'Saudi Arabia'},{code:'IL',name:'以色列',flag:'🇮🇱',geoName:'Israel'},{code:'ZA',name:'南非',flag:'🇿🇦',geoName:'South Africa'},{code:'EG',name:'埃及',flag:'🇪🇬',geoName:'Egypt'},{code:'NG',name:'尼日利亚',flag:'🇳🇬',geoName:'Nigeria'},{code:'KE',name:'肯尼亚',flag:'🇰🇪',geoName:'Kenya'},{code:'AU',name:'澳大利亚',flag:'🇦🇺',geoName:'Australia'},{code:'NZ',name:'新西兰',flag:'🇳🇿',geoName:'New Zealand'}
+]
 
-const channels = [
-  { id: 'google', name: 'Google 搜索 / 地图', detail: '企业官网、当地企业、进口商与经销商', icon: Search },
-  { id: 'linkedin', name: 'LinkedIn', detail: '企业主页、管理人员与采购决策人', icon: Linkedin },
-  { id: 'websites', name: '独立站', detail: '品牌官网、制造商、批发商与 DTC 企业', icon: Globe2 },
-  { id: 'ecommerce', name: 'Amazon / 电商平台', detail: '品牌、卖家、店铺及产品经营者', icon: Building2 },
-  { id: 'b2b', name: 'B2B 平台', detail: '进口商、采购商、供应商与批发商', icon: Users },
-  { id: 'social', name: 'Facebook / Instagram', detail: '品牌商、零售商与社交电商企业', icon: Users },
-  { id: 'crossborder', name: '跨境电商店铺数据', detail: '跨境卖家、店铺、品牌及经营品类', icon: Database },
-  { id: 'other', name: '其他网站', detail: '行业目录、商业名录及公开网站', icon: Globe2 },
+const channelGroups:ChannelGroup[] = [
+ {id:'social',title:'社交媒体与职业社交',description:'企业主页、品牌账号、创始人及采购决策人',channels:[
+  {id:'linkedin',name:'LinkedIn',detail:'公司主页、员工、职位与专业联系人',logo:'linkedin',providers:['Apify','PhantomBuster','TexAu'],status:'需验证授权与平台规则'},
+  {id:'facebook',name:'Facebook',detail:'企业主页、商家信息、公开帖子',logo:'facebook',providers:['Apify','PhantomBuster','TexAu'],status:'公开数据 / 授权范围'},
+  {id:'instagram',name:'Instagram',detail:'品牌账号、商业主页、公开内容',logo:'instagram',providers:['Apify','PhantomBuster','TexAu'],status:'公开数据 / 授权范围'},
+  {id:'tiktok',name:'TikTok',detail:'品牌账号、创作者、公开短视频线索',logo:'tiktok',providers:['Apify','Bright Data'],status:'按地区与接口能力验证'},
+  {id:'youtube',name:'YouTube',detail:'品牌频道、企业视频与商务联系线索',logo:'youtube',providers:['Apify','Bright Data'],status:'公开频道数据'},
+  {id:'x',name:'X（Twitter）',detail:'品牌账号、企业动态与公开互动',logo:'x',providers:['Apify','Bright Data'],status:'按授权与接口验证'},
+  {id:'pinterest',name:'Pinterest',detail:'品牌主页、商品与视觉内容',logo:'pinterest',providers:['Apify','Bright Data'],status:'公开页面采集'},
+  {id:'reddit',name:'Reddit',detail:'品牌讨论、行业社群与需求信号',logo:'reddit',providers:['Apify','Bright Data'],status:'公开内容 / API 条款'},
+  {id:'threads',name:'Threads',detail:'品牌账号与公开社交内容',logo:'threads',providers:['Apify'],status:'能力需逐项验证'},
+  {id:'telegram',name:'Telegram',detail:'公开频道、企业社群与联系方式',logo:'telegram',providers:['Apify'],status:'仅公开频道 / 授权范围'},
+  {id:'vk',name:'VK',detail:'俄语市场企业与品牌社交主页',logo:'vk',providers:['Apify','Bright Data'],status:'能力需逐项验证'},
+ ]},
+ {id:'search',title:'搜索引擎与地图',description:'搜索结果、本地企业、商家地址与官网发现',channels:[
+  {id:'google-search',name:'Google Search',detail:'关键词搜索、企业官网与采购意向页面',logo:'google',providers:['Apify','Bright Data'],status:'搜索结果数据服务'},
+  {id:'google-maps',name:'Google Maps',detail:'本地企业、商家类别、电话与地址',logo:'googlemaps',providers:['Apify','Bright Data'],status:'按服务商产品与条款验证'},
+  {id:'bing',name:'Microsoft Bing',detail:'网页、企业与本地商业搜索',logo:'bing',providers:['Bright Data','Apify'],status:'搜索结果 / 公开网页'},
+  {id:'yandex',name:'Yandex',detail:'俄罗斯及周边市场搜索与地图',logo:'yandex',providers:['Apify','Bright Data'],status:'按地区验证'},
+  {id:'baidu',name:'百度',detail:'中国大陆网页与企业信息搜索',logo:'baidu',providers:['Apify','Octoparse'],status:'按站点与条款验证'},
+  {id:'naver',name:'Naver',detail:'韩国搜索、企业与本地商家',logo:'naver',providers:['Apify','Bright Data'],status:'按接口验证'},
+  {id:'yelp',name:'Yelp',detail:'本地商家、服务企业与评价信息',logo:'yelp',providers:['Apify','Bright Data'],status:'公开数据 / API 优先'},
+  {id:'apple-maps',name:'Apple Maps',detail:'商家位置与本地企业发现',logo:'apple',providers:['Apify'],status:'能力需逐项验证'},
+ ]},
+ {id:'b2b',title:'B2B 采购与供应商平台',description:'进口商、采购商、制造商、批发商及供应商',channels:[
+  {id:'alibaba',name:'Alibaba.com',detail:'全球供应商、产品与企业线索',logo:'alibaba',providers:['Apify','Octoparse'],status:'页面 / 授权方式验证'},
+  {id:'made-in-china',name:'Made-in-China',detail:'中国制造商、供应商与产品目录',logo:'',providers:['Apify','Octoparse'],status:'公开页面采集'},
+  {id:'globalsources',name:'Global Sources',detail:'采购商、供应商与展会企业',logo:'',providers:['Apify','Octoparse'],status:'公开页面采集'},
+  {id:'tradekey',name:'TradeKey',detail:'全球买家、卖家与贸易询盘',logo:'',providers:['Apify','Octoparse'],status:'公开页面采集'},
+  {id:'ec21',name:'EC21',detail:'国际贸易企业与产品目录',logo:'',providers:['Apify','Octoparse'],status:'公开页面采集'},
+  {id:'kompass',name:'Kompass',detail:'全球企业名录与行业分类',logo:'',providers:['Apify','Octoparse'],status:'需遵循数据许可'},
+  {id:'europages',name:'Europages',detail:'欧洲企业、制造商与经销商',logo:'',providers:['Apify','Octoparse'],status:'公开页面 / 许可验证'},
+  {id:'thomasnet',name:'Thomasnet',detail:'北美工业供应商与制造商',logo:'',providers:['Apify','Bright Data'],status:'公开页面 / 许可验证'},
+  {id:'indiamart',name:'IndiaMART',detail:'印度供应商、批发商与制造商',logo:'',providers:['Apify','Octoparse'],status:'按站点规则验证'},
+  {id:'1688',name:'1688',detail:'中国大陆供应商与批发商',logo:'',providers:['Apify','Octoparse'],status:'授权与访问方式验证'},
+ ]},
+ {id:'ecommerce',title:'电商平台与跨境店铺',description:'品牌、卖家、店铺、商品与经营类目',channels:[
+  {id:'amazon',name:'Amazon',detail:'品牌、卖家、店铺与商品目录',logo:'amazon',providers:['Apify','Bright Data','跨境魔方'],status:'按市场与数据产品验证'},
+  {id:'ebay',name:'eBay',detail:'商家、品牌与商品经营者',logo:'ebay',providers:['Apify','Bright Data'],status:'公开数据 / API 优先'},
+  {id:'walmart',name:'Walmart Marketplace',detail:'美国市场品牌与第三方卖家',logo:'walmart',providers:['Apify','Bright Data'],status:'按数据集验证'},
+  {id:'etsy',name:'Etsy',detail:'独立品牌、手工品卖家与店铺',logo:'etsy',providers:['Apify','Bright Data'],status:'公开页面 / API 优先'},
+  {id:'shopify',name:'Shopify 独立店铺',detail:'Shopify 商家、品牌官网与商品',logo:'shopify',providers:['Apify','Bright Data','Firecrawl'],status:'店铺发现与网站抓取'},
+  {id:'aliexpress',name:'AliExpress',detail:'跨境卖家、品牌与商品线索',logo:'aliexpress',providers:['Apify','跨境魔方'],status:'能力需逐项验证'},
+  {id:'temu',name:'Temu',detail:'平台商家与商品经营线索',logo:'',providers:['Apify','跨境魔方'],status:'能力需逐项验证'},
+  {id:'tiktok-shop',name:'TikTok Shop',detail:'店铺、品牌与跨境卖家',logo:'tiktok',providers:['Apify','跨境魔方'],status:'按地区与接口验证'},
+  {id:'shopee',name:'Shopee',detail:'东南亚及台湾地区店铺',logo:'',providers:['Apify','跨境魔方'],status:'按市场与数据产品验证'},
+  {id:'lazada',name:'Lazada',detail:'东南亚电商品牌与卖家',logo:'',providers:['Apify','跨境魔方'],status:'按市场与数据产品验证'},
+  {id:'mercadolibre',name:'Mercado Libre',detail:'拉美电商卖家与品牌',logo:'',providers:['Apify','跨境魔方'],status:'能力需逐项验证'},
+ ]},
+ {id:'web',title:'企业官网与公开网页',description:'公司官网、产品、联系页面及网站技术信息',channels:[
+  {id:'company-sites',name:'企业官方网站',detail:'About、Contact、Products、Wholesale 页面',logo:'chrome',providers:['Firecrawl','Apify','Octoparse','Bright Data'],status:'网站抓取与结构化提取'},
+  {id:'directories',name:'企业黄页 / 商业目录',detail:'行业名录、公司目录与本地黄页',logo:'',providers:['Apify','Octoparse','Bright Data'],status:'逐站点检查许可'},
+  {id:'news',name:'新闻与媒体网站',detail:'企业新闻、融资、扩张与采购动态',logo:'',providers:['Firecrawl','Apify','Bright Data'],status:'公开网页'},
+  {id:'job-sites',name:'招聘网站',detail:'招聘职位、扩张信号与企业规模线索',logo:'',providers:['Apify','Bright Data'],status:'公开职位 / 条款验证'},
+  {id:'whois',name:'域名 / DNS 信息',detail:'域名注册与网站基础信息（可用字段受限）',logo:'cloudflare',providers:['Apify','Bright Data'],status:'公开字段与隐私限制'},
+  {id:'review-sites',name:'评价 / 点评网站',detail:'企业评价、产品口碑与门店信息',logo:'trustpilot',providers:['Apify','Octoparse'],status:'公开页面 / API 优先'},
+ ]},
+ {id:'trade',title:'贸易、进出口与企业数据库',description:'贸易记录、海关数据、企业注册与商业信息',channels:[
+  {id:'trade-records',name:'进出口 / 海关数据',detail:'进口商、出口商、货运与产品线索',logo:'',providers:['跨境魔方','Apify'],status:'取决于数据授权与覆盖国家'},
+  {id:'company-registry',name:'企业注册信息',detail:'注册主体、企业状态与公开登记资料',logo:'',providers:['Apify','Bright Data'],status:'各国登记机关差异较大'},
+  {id:'business-data',name:'商业数据库 / 信用信息',detail:'企业规模、营收区间与商业关系',logo:'',providers:['Apify'],status:'需购买数据许可或独立 API'},
+  {id:'exhibitors',name:'展会 / 参展商名录',detail:'参展企业、品牌、采购商与行业活动',logo:'',providers:['Apify','Octoparse','Firecrawl'],status:'公开展商目录'},
+ ]},
 ]
 
 const providers = [
-  { name: 'Apify', category: '多渠道采集执行', description: '通过适用的 Actors 执行搜索、地图及网站数据采集。', channels: 'Google · Maps · 网站' },
-  { name: 'Bright Data', category: '网页数据基础设施', description: '获取搜索结果和公开网页数据，支持大规模数据工作流。', channels: '搜索 · 公开网页' },
-  { name: 'Octoparse', category: '结构化网页采集', description: '执行配置好的网站数据采集任务。', channels: '网站 · 商业目录' },
-  { name: 'Firecrawl', category: '网站发现与补全', description: '抓取企业网站并提取结构化页面内容。', channels: '企业官网 · 联系页面' },
-  { name: 'PhantomBuster', category: '社交自动化工作流', description: '在平台允许和账户授权范围内运行社交渠道工作流。', channels: 'LinkedIn · 社交渠道' },
-  { name: 'TexAu', category: '自动化工作流', description: '编排获准使用的社交与网页自动化任务。', channels: '社交渠道 · 自动化' },
-  { name: '跨境魔方', category: '跨境电商数据', description: '接入可用的店铺、品牌和跨境电商企业数据接口。', channels: '跨境店铺 · 品牌' },
+ {name:'Apify',category:'多渠道采集执行',description:'Actors 可覆盖搜索、地图、社媒公开页面及网站采集，具体取决于 Actor 与授权。',channels:'Google · Maps · 社媒 · 网站'},
+ {name:'Bright Data',category:'网页数据基础设施',description:'搜索结果与公开网页数据产品，具体平台覆盖以已购买的数据产品为准。',channels:'搜索引擎 · 公开网页'},
+ {name:'Octoparse',category:'结构化网页采集',description:'适合配置型网站采集与商业目录数据抽取，不代表所有站点均可访问。',channels:'企业网站 · 商业目录'},
+ {name:'Firecrawl',category:'网站抓取与提取',description:'用于官网发现后的网页抓取、页面解析与结构化信息补全。',channels:'企业官网 · 联系页 · 产品页'},
+ {name:'PhantomBuster',category:'社交自动化工作流',description:'社交工作流能力受平台条款、账户授权及产品更新影响。',channels:'LinkedIn · 社交渠道'},
+ {name:'TexAu',category:'自动化工作流',description:'自动化工作流平台，具体渠道按当前可用模块与授权核验。',channels:'社交渠道 · 自动化'},
+ {name:'跨境魔方',category:'跨境电商数据',description:'用于跨境店铺、品牌与卖家数据；以实际 API 套餐覆盖范围为准。',channels:'跨境店铺 · 品牌 · 卖家'},
 ]
-
 const workflow = [
-  { title: '多渠道发现企业', detail: '按客户画像分发到已启用的数据源，收集企业名称、网站和来源。', icon: Search },
-  { title: '企业识别与去重', detail: '优先使用域名、企业标识、电话及名称地址相似度识别重复企业。', icon: ShieldCheck },
-  { title: '企业信息补全', detail: '提取官网介绍、产品、公开企业邮箱、电话、地址和社交链接。', icon: Building2 },
-  { title: '联系人发现', detail: '围绕已确认企业寻找采购、管理及业务负责人，并建立关联。', icon: Users },
-  { title: 'AI 分析与客户入库', detail: '评估匹配度和数据可信度，保留证据来源后进入潜在客户库。', icon: Sparkles },
+ {title:'多渠道发现企业',detail:'按画像分发到已配置的数据源，收集企业名称、网站和来源证据。',icon:Search},
+ {title:'企业识别与去重',detail:'优先使用域名、企业标识、电话及名称地址相似度识别重复企业。',icon:ShieldCheck},
+ {title:'企业信息补全',detail:'提取官网介绍、产品、公开企业邮箱、电话、地址和社交链接。',icon:Building2},
+ {title:'联系人发现',detail:'围绕已确认企业寻找采购、管理及业务负责人，并建立关联。',icon:Users},
+ {title:'AI 分析与待审核',detail:'评估匹配度和可信度，结果先进入待处理线索，等待人工审核。',icon:Inbox},
 ]
+const defaultModel = 'Works AI'
+
+function Logo({slug,name}:{slug:string;name:string}) {
+ const [failed,setFailed] = useState(false)
+ return slug && !failed ? <img className="lead-channel-logo" src={'https://cdn.simpleicons.org/'+slug} alt="" onError={()=>setFailed(true)}/> : <span className="lead-channel-logo-fallback">{name.slice(0,1)}</span>
+}
+function CountryMap({selected}:{selected:Country[]}) {
+ const [geo,setGeo] = useState<FeatureCollection<Geometry> | null>(null)
+ useEffect(()=>{let alive=true;fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json()).then(data=>{if(alive)setGeo(data)}).catch(()=>{if(alive)setGeo(null)});return()=>{alive=false}},[])
+ const selectedNames = new Set(selected.map(c=>c.geoName.toLowerCase()))
+ const style = (feature?:Feature):PathOptions => {
+  const props = feature?.properties as Record<string,string> | undefined
+  const name = (props?.ADMIN || props?.name || props?.NAME || '').toLowerCase()
+  const picked = selectedNames.has(name) || (name==='china' && selected.some(c=>c.code==='CN'))
+  return {color:picked?'#714b67':'#c8c4c8',weight:picked?1.5:.55,fillColor:picked?'#a887a0':'#e8e6e8',fillOpacity:picked?.72:.32}
+ }
+ return <div className="lead-map-shell">
+  <MapContainer center={[24,5]} zoom={1.35} minZoom={1} maxZoom={7} scrollWheelZoom={false} worldCopyJump style={{height:300,width:'100%'}}>
+   <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+   {geo && <GeoJSON key={selected.map(c=>c.code).sort().join(',')} data={geo} style={style} onEachFeature={(feature,layer:Layer)=>{const p=feature.properties as Record<string,string>;layer.bindTooltip(p?.ADMIN || p?.name || '')}}/>}
+  </MapContainer>
+  <div className="lead-map-caption"><span><i/> 已选国家 / 地区</span><span>OpenStreetMap · GeoJSON 边界</span></div>
+  {!geo && <div className="lead-map-loading">地图边界加载中；请检查网络连接。</div>}
+ </div>
+}
 
 export default function LeadFinderApp() {
-  const [tab, setTab] = useState<Tab>('search')
-  const [product, setProduct] = useState('')
-  const [industry, setIndustry] = useState('')
-  const [countries, setCountries] = useState('全球')
-  const [targetType, setTargetType] = useState<TargetType>('both')
-  const [quantity, setQuantity] = useState('500')
-  const [keywords, setKeywords] = useState('')
-  const [selectedChannels, setSelectedChannels] = useState(channels.map(item => item.id))
-  const [showPlan, setShowPlan] = useState(false)
-  const [tasks, setTasks] = useState<SearchTask[]>([])
-  const [activeTask, setActiveTask] = useState<string | null>(null)
-  const [sourceNotice, setSourceNotice] = useState(false)
+ const [tab,setTab] = useState<Tab>('search')
+ const [product,setProduct] = useState('')
+ const [industry,setIndustry] = useState('')
+ const [selectedCountries,setSelectedCountries] = useState<string[]>([])
+ const [countryQuery,setCountryQuery] = useState('')
+ const [countryOpen,setCountryOpen] = useState(false)
+ const [targetType,setTargetType] = useState<TargetType>('both')
+ const [quantity,setQuantity] = useState('500')
+ const [keywords,setKeywords] = useState('')
+ const [selectedChannels,setSelectedChannels] = useState<string[]>(channelGroups.flatMap(g=>g.channels.map(c=>c.id)))
+ const [expandedGroups,setExpandedGroups] = useState<string[]>(['social','search'])
+ const [channelQuery,setChannelQuery] = useState('')
+ const [showPlan,setShowPlan] = useState(false)
+ const [selectedModel,setSelectedModel] = useState(defaultModel)
+ const [tasks,setTasks] = useState<{id:string;name:string;criteria:string;createdAt:string;channels:number;status:string}[]>([])
+ const [activeTask,setActiveTask] = useState<string|null>(null)
+ const [reviewFilter,setReviewFilter] = useState('all')
+ const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
+ const selectedNames = useMemo(()=>channelGroups.flatMap(g=>g.channels).filter(c=>selectedChannels.includes(c.id)).map(c=>c.name),[selectedChannels])
+ const activeTaskData = tasks.find(t=>t.id===activeTask)
+ const toggleCountry = (code:string)=>setSelectedCountries(current=>current.includes(code)?current.filter(c=>c!==code):[...current,code])
+ const toggleChannel = (id:string)=>setSelectedChannels(current=>current.includes(id)?current.filter(c=>c!==id):[...current,id])
+ const canPlan = Boolean(product.trim()||industry.trim()||keywords.trim())
+ const createTask = ()=>{
+  const task={id:'LD-'+String(Date.now()).slice(-7),name:product.trim()||industry.trim()||'全球潜在客户搜索',criteria:[selectedCountryItems.length?selectedCountryItems.map(c=>c.name).join('、'):'全球',industry,product,targetType==='companies'?'企业':targetType==='contacts'?'联系人':'企业 + 联系人'].filter(Boolean).join(' · '),createdAt:new Date().toLocaleString(),channels:selectedChannels.length,status:'待配置数据源'}
+  setTasks(current=>[task,...current]);setActiveTask(task.id);setShowPlan(false);setTab('tasks')
+ }
+ const visibleChannels = channelGroups.map(g=>({...g,channels:g.channels.filter(c=>(c.name+c.detail+c.providers.join('')).toLowerCase().includes(channelQuery.toLowerCase()))})).filter(g=>g.channels.length)
 
-  const selectedNames = useMemo(() => channels.filter(item => selectedChannels.includes(item.id)).map(item => item.name), [selectedChannels])
-  const activeTaskData = tasks.find(task => task.id === activeTask)
+ return <div className="lead-workspace">
+  <div className="lead-page-head"><div><div className="lead-eyebrow">PROSPECTING / LEAD DISCOVERY</div><h1>潜在客户搜索</h1><p>跨渠道发现目标企业与联系人，经过人工审核后再转入正式客户目录。</p></div><div className="lead-head-actions"><span className="lead-mode-pill"><Sparkles size={14}/> AI 智能规划</span><button className="lead-quiet-button" onClick={()=>setTab('sources')}><Database size={15}/> 数据源目录</button></div></div>
+  <div className="lead-tabs" role="tablist" aria-label="潜在客户搜索导航">
+   <button className={tab==='search'?'active':''} onClick={()=>{setTab('search');setActiveTask(null)}}><Target size={16}/> 创建搜索</button>
+   <button className={tab==='tasks'?'active':''} onClick={()=>{setTab('tasks');setActiveTask(null)}}><Workflow size={16}/> 搜索任务 <span>{tasks.length}</span></button>
+   <button className={tab==='review'?'active':''} onClick={()=>{setTab('review');setActiveTask(null)}}><Inbox size={16}/> 待处理线索 <span>0</span></button>
+   <button className={tab==='sources'?'active':''} onClick={()=>setTab('sources')}><Database size={16}/> 数据源目录</button>
+  </div>
 
-  const toggleChannel = (id: string) => setSelectedChannels(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])
-  const selectAllChannels = () => setSelectedChannels(current => current.length === channels.length ? [] : channels.map(item => item.id))
-
-  const createTask = () => {
-    const task: SearchTask = {
-      id: `LD-${String(Date.now()).slice(-7)}`,
-      name: product.trim() || industry.trim() || '全球潜在客户搜索',
-      criteria: [countries, industry, product, targetType === 'companies' ? '企业' : targetType === 'contacts' ? '联系人' : '企业 + 联系人'].filter(Boolean).join(' · '),
-      createdAt: new Date().toLocaleString(),
-      channels: selectedChannels.length,
-      status: '待接入数据源',
-    }
-    setTasks(current => [task, ...current])
-    setActiveTask(task.id)
-    setShowPlan(false)
-    setTab('tasks')
-  }
-
-  const canPlan = Boolean(product.trim() || industry.trim() || keywords.trim())
-
-  return (
-    <div className="lead-workspace">
-      <div className="lead-page-head">
-        <div>
-          <div className="lead-eyebrow">PROSPECTING / LEAD DISCOVERY</div>
-          <h1>潜在客户搜索</h1>
-          <p>从全球多渠道发现目标企业，补全企业信息并寻找关键联系人。</p>
-        </div>
-        <div className="lead-head-actions">
-          <span className="lead-mode-pill"><Sparkles size={14}/> AI 智能规划</span>
-          <button className="lead-quiet-button" onClick={() => setTab('sources')}><Settings2 size={15}/> 数据源配置</button>
-        </div>
-      </div>
-
-      <div className="lead-tabs" role="tablist" aria-label="潜在客户搜索导航">
-        <button className={tab === 'search' ? 'active' : ''} onClick={() => { setTab('search'); setActiveTask(null) }}><Target size={16}/> 创建搜索</button>
-        <button className={tab === 'tasks' ? 'active' : ''} onClick={() => { setTab('tasks'); setActiveTask(null) }}><Workflow size={16}/> 搜索任务 <span>{tasks.length}</span></button>
-        <button className={tab === 'sources' ? 'active' : ''} onClick={() => setTab('sources')}><Database size={16}/> 数据源管理</button>
-      </div>
-
-      {tab === 'search' && !showPlan && (
-        <div className="lead-search-layout">
-          <section className="lead-main-column">
-            <div className="lead-card">
-              <div className="lead-card-heading">
-                <div><span className="lead-step">STEP 01</span><h2>定义目标客户</h2><p>告诉 Ouranos 你想寻找什么样的企业和联系人。</p></div>
-                <span className="lead-step-icon"><Target size={19}/></span>
-              </div>
-              <div className="lead-form-grid">
-                <label className="lead-field lead-field-wide">
-                  <span>产品 / 服务关键词 <b>*</b></span>
-                  <input value={product} onChange={event => setProduct(event.target.value)} placeholder="例如：汽车配件、太阳能组件、工业泵..." />
-                </label>
-                <label className="lead-field">
-                  <span>目标行业</span>
-                  <input value={industry} onChange={event => setIndustry(event.target.value)} placeholder="例如：汽车零部件、能源、制造业" />
-                </label>
-                <label className="lead-field">
-                  <span>目标国家 / 地区</span>
-                  <input value={countries} onChange={event => setCountries(event.target.value)} placeholder="全球，或输入国家 / 地区" />
-                </label>
-                <div className="lead-field lead-field-wide">
-                  <span>搜索对象</span>
-                  <div className="lead-segmented">
-                    <button className={targetType === 'companies' ? 'selected' : ''} onClick={() => setTargetType('companies')}><Building2 size={15}/> 企业</button>
-                    <button className={targetType === 'contacts' ? 'selected' : ''} onClick={() => setTargetType('contacts')}><Users size={15}/> 联系人</button>
-                    <button className={targetType === 'both' ? 'selected' : ''} onClick={() => setTargetType('both')}><Users size={15}/> 企业 + 联系人</button>
-                  </div>
-                </div>
-                <label className="lead-field">
-                  <span>目标企业数量</span>
-                  <select value={quantity} onChange={event => setQuantity(event.target.value)}>
-                    <option value="100">最多 100 家</option><option value="500">约 500 家</option><option value="1000">约 1,000 家</option><option value="5000">5,000 家以上</option><option value="custom">稍后设定</option>
-                  </select>
-                </label>
-                <label className="lead-field">
-                  <span>补充搜索关键词</span>
-                  <input value={keywords} onChange={event => setKeywords(event.target.value)} placeholder="进口商、批发商、经销商..." />
-                </label>
-              </div>
-            </div>
-
-            <div className="lead-card">
-              <div className="lead-card-heading">
-                <div><span className="lead-step">STEP 02</span><h2>选择发现渠道</h2><p>默认启用全部渠道，AI 会根据目标客户动态规划搜索。</p></div>
-                <button className="lead-link-button" onClick={selectAllChannels}>{selectedChannels.length === channels.length ? '取消全选' : '全部启用'}</button>
-              </div>
-              <div className="lead-channel-grid">
-                {channels.map(channel => {
-                  const Icon = channel.icon
-                  const checked = selectedChannels.includes(channel.id)
-                  return <button key={channel.id} className={'lead-channel-option ' + (checked ? 'checked' : '')} onClick={() => toggleChannel(channel.id)} aria-pressed={checked}>
-                    <span className="lead-channel-icon"><Icon size={17}/></span>
-                    <span className="lead-channel-copy"><b>{channel.name}</b><small>{channel.detail}</small></span>
-                    <span className="lead-check">{checked && <Check size={13}/>}</span>
-                  </button>
-                })}
-              </div>
-              <div className="lead-selection-foot"><span>已启用 {selectedChannels.length} / {channels.length} 个渠道</span><span>数据源实际可用性以连接配置和授权为准</span></div>
-            </div>
-
-            <div className="lead-card lead-flow-card">
-              <div className="lead-card-heading">
-                <div><span className="lead-step">STEP 03</span><h2>自动执行流程</h2><p>Ouranos 按照企业优先的顺序组织多轮搜索。</p></div>
-                <span className="lead-auto-label"><Bot size={14}/> 自动工作流</span>
-              </div>
-              <div className="lead-mini-flow">
-                {workflow.map((item, index) => {
-                  const Icon = item.icon
-                  return <div className="lead-mini-step" key={item.title}><span className="lead-mini-number">{index + 1}</span><span className="lead-mini-icon"><Icon size={16}/></span><span><b>{item.title}</b><small>{item.detail}</small></span>{index < workflow.length - 1 && <ArrowRight className="lead-mini-arrow" size={15}/>}</div>
-                })}
-              </div>
-            </div>
-            <div className="lead-submit-row">
-              <span><ShieldCheck size={15}/> 创建计划不会立即调用外部 API</span>
-              <button className="lead-primary-button" disabled={!canPlan || selectedChannels.length === 0} onClick={() => setShowPlan(true)}>生成 AI 搜索计划 <ArrowRight size={16}/></button>
-            </div>
-          </section>
-
-          <aside className="lead-side-column">
-            <div className="lead-side-card lead-side-highlight">
-              <span className="lead-side-icon"><Sparkles size={18}/></span>
-              <h3>AI 搜索规划器</h3>
-              <p>根据目标客户画像，规划搜索渠道、企业识别、信息补全和联系人发现顺序。</p>
-              <div className="lead-side-stat"><span>搜索模式</span><b>AI 自动规划</b></div>
-              <div className="lead-side-stat"><span>市场范围</span><b>{countries || '待设置'}</b></div>
-              <div className="lead-side-stat"><span>目标数量</span><b>{quantity === 'custom' ? '稍后设定' : quantity + ' 家'}</b></div>
-            </div>
-            <div className="lead-side-card">
-              <h3>将收集的客户资料</h3>
-              <div className="lead-data-tags">{['公司名称','国家 / 地区','官方网站','企业邮箱','联系电话','社交媒体','联系人 / 职位','产品品类','公司地址','公司规模','来源渠道','发现时间'].map(item => <span key={item}>{item}</span>)}</div>
-            </div>
-            <div className="lead-side-note"><CircleHelp size={16}/><span>企业和联系人会分开建档，通过关联关系连接。每条数据都保留来源和验证状态。</span></div>
-          </aside>
-        </div>
-      )}
-
-      {tab === 'search' && showPlan && (
-        <div className="lead-plan-view">
-          <button className="lead-back-button" onClick={() => setShowPlan(false)}><ArrowLeft size={15}/> 返回修改条件</button>
-          <div className="lead-plan-hero">
-            <span className="lead-plan-mark"><Sparkles size={22}/></span>
-            <div><span className="lead-step">AI SEARCH PLAN</span><h2>搜索计划已生成</h2><p>这是根据当前条件生成的执行方案预览。确认后会创建任务记录；真实采集需先配置服务商连接。</p></div>
-          </div>
-          <div className="lead-plan-grid">
-            <div className="lead-card">
-              <h3>目标客户画像</h3>
-              <div className="lead-summary-list"><span>产品 / 服务</span><b>{product || '未指定'}</b><span>行业</span><b>{industry || '由关键词识别'}</b><span>国家 / 地区</span><b>{countries || '全球'}</b><span>搜索对象</span><b>{targetType === 'companies' ? '企业' : targetType === 'contacts' ? '联系人' : '企业 + 联系人'}</b><span>目标数量</span><b>{quantity === 'custom' ? '稍后设定' : quantity + ' 家'}</b><span>补充关键词</span><b>{keywords || '无'}</b></div>
-            </div>
-            <div className="lead-card">
-              <h3>已选择的发现渠道</h3>
-              <div className="lead-plan-chips">{selectedNames.map(name => <span key={name}><CheckCircle2 size={13}/>{name}</span>)}</div>
-              <div className="lead-plan-hint"><ShieldCheck size={15}/> AI 将优先使用可用且已授权的数据源；未连接的渠道会标记为待配置，不会假定已执行。</div>
-            </div>
-          </div>
-          <div className="lead-card">
-            <h3>计划执行顺序</h3>
-            <div className="lead-plan-steps">{workflow.map((item, index) => { const Icon = item.icon; return <div className="lead-plan-step" key={item.title}><span>{index + 1}</span><Icon size={18}/><div><b>{item.title}</b><small>{item.detail}</small></div></div> })}</div>
-          </div>
-          <div className="lead-submit-row"><span><Clock3 size={15}/> 任务创建后可在「搜索任务」中查看状态</span><button className="lead-primary-button" onClick={createTask}>创建搜索任务 <ArrowRight size={16}/></button></div>
-        </div>
-      )}
-
-      {tab === 'tasks' && (
-        <div className="lead-content-panel">
-          {activeTaskData ? (
-            <div className="lead-task-detail">
-              <button className="lead-back-button" onClick={() => setActiveTask(null)}><ArrowLeft size={15}/> 返回任务列表</button>
-              <div className="lead-task-title-row"><div><span className="lead-step">SEARCH TASK</span><h2>{activeTaskData.name}</h2><p>{activeTaskData.criteria}</p></div><span className="lead-status pending"><Clock3 size={13}/> 待接入数据源</span></div>
-              <div className="lead-notice"><CircleHelp size={18}/><div><b>任务已创建，尚未开始真实采集</b><p>当前版本已完成前端任务流程。连接服务商 API、后端任务队列和数据存储后，才能启动真实搜索。</p></div></div>
-              <div className="lead-task-metrics"><div><b>0</b><span>发现记录</span></div><div><b>0</b><span>唯一企业</span></div><div><b>0</b><span>联系人</span></div><div><b>{activeTaskData.channels}</b><span>选择渠道</span></div></div>
-              <div className="lead-card"><h3>执行阶段</h3><div className="lead-plan-steps">{workflow.map((item, index) => {const Icon = item.icon;return <div className="lead-plan-step muted" key={item.title}><span>{index + 1}</span><Icon size={18}/><div><b>{item.title}</b><small>{item.detail}</small></div><em>等待后端接入</em></div>})}</div></div>
-              <div className="lead-card"><h3>任务信息</h3><div className="lead-summary-list"><span>任务编号</span><b>{activeTaskData.id}</b><span>创建时间</span><b>{activeTaskData.createdAt}</b><span>搜索条件</span><b>{activeTaskData.criteria}</b><span>状态</span><b>待接入数据源</b></div></div>
-            </div>
-          ) : (
-            <>
-              <div className="lead-content-heading"><div><h2>搜索任务</h2><p>查看已创建的客户发现任务及其执行阶段。</p></div><button className="lead-primary-button small" onClick={() => {setTab('search');setShowPlan(false)}}><Plus size={15}/> 新建搜索</button></div>
-              {tasks.length ? <div className="lead-task-list">{tasks.map(task => <button className="lead-task-row" key={task.id} onClick={() => setActiveTask(task.id)}><span className="lead-task-symbol"><Target size={18}/></span><span className="lead-task-copy"><b>{task.name}</b><small>{task.criteria} · {task.createdAt}</small></span><span className="lead-status pending"><Clock3 size={12}/>{task.status}</span><ArrowRight size={16}/></button>)}</div> : <div className="lead-empty-state"><span><Search size={24}/></span><h3>还没有搜索任务</h3><p>定义目标客户并生成搜索计划，创建你的第一个多渠道发现任务。</p><button className="lead-primary-button" onClick={() => setTab('search')}>创建第一个搜索 <ArrowRight size={15}/></button></div>}
-            </>
-          )}
-        </div>
-      )}
-
-      {tab === 'sources' && (
-        <div className="lead-content-panel">
-          <div className="lead-content-heading"><div><h2>数据源管理</h2><p>统一查看七家数据服务商的连接状态与职责。当前尚未配置真实 API 凭证。</p></div><span className="lead-status pending"><Clock3 size={13}/> 0 / 7 已连接</span></div>
-          {sourceNotice && <div className="lead-notice"><CircleHelp size={17}/><div><b>连接配置将在后端接入阶段开放</b><p>请勿在浏览器中输入 API Key。后续将通过服务端密钥管理完成安全连接。</p></div><button className="lead-notice-close" onClick={() => setSourceNotice(false)} aria-label="关闭提示">×</button></div>}
-          <div className="lead-provider-grid">{providers.map(provider => <div className="lead-provider-card" key={provider.name}><div className="lead-provider-top"><span className="lead-provider-logo">{provider.name.slice(0, 1)}</span><span className="lead-status pending">未连接</span></div><h3>{provider.name}</h3><span className="lead-provider-category">{provider.category}</span><p>{provider.description}</p><div className="lead-provider-channels">{provider.channels}</div><button className="lead-provider-action" onClick={() => setSourceNotice(true)}>查看连接要求 <ArrowRight size={14}/></button></div>)}</div>
-          <div className="lead-security-note"><ShieldCheck size={17}/><span>安全提示：API Key 只能保存在服务端密钥管理中，不会放入浏览器、前端代码或 Git 仓库。</span></div>
-        </div>
-      )}
+  {tab==='search'&&!showPlan&&<div className="lead-search-layout"><section className="lead-main-column">
+   <div className="lead-card"><div className="lead-card-heading"><div><span className="lead-step">STEP 01</span><h2>定义目标客户</h2><p>先确定目标市场与客户画像，再选择发现渠道。</p></div><span className="lead-step-icon"><Target size={19}/></span></div>
+    <div className="lead-form-grid">
+     <label className="lead-field lead-field-wide"><span>产品 / 服务关键词 <b>*</b></span><input value={product} onChange={e=>setProduct(e.target.value)} placeholder="例如：汽车配件、太阳能组件、工业泵..."/></label>
+     <label className="lead-field"><span>目标行业</span><input value={industry} onChange={e=>setIndustry(e.target.value)} placeholder="例如：汽车零部件、能源、制造业"/></label>
+     <div className="lead-field country-field"><span>目标国家 / 地区</span><button className="lead-country-trigger" onClick={()=>setCountryOpen(v=>!v)}><span>{selectedCountryItems.length?selectedCountryItems.map(c=>c.flag).join(' ')+'  '+selectedCountryItems.length+' 个国家 / 地区':'全球（不限制）'}</span><ChevronDown size={15}/></button>
+      {countryOpen&&<div className="lead-country-popover"><div className="lead-country-search"><Search size={14}/><input value={countryQuery} onChange={e=>setCountryQuery(e.target.value)} placeholder="搜索国家或地区"/></div><div className="lead-country-actions"><button onClick={()=>setSelectedCountries([])}>清空</button><button onClick={()=>setSelectedCountries(countries.map(c=>c.code))}>选择列表全部</button></div><div className="lead-country-list">{countries.filter(c=>(c.name+c.code).toLowerCase().includes(countryQuery.toLowerCase())).map(c=><button key={c.code} onClick={()=>toggleCountry(c.code)} className={selectedCountries.includes(c.code)?'selected':''}><span className="lead-round-flag">{c.flag}</span><span>{c.name}</span>{selectedCountries.includes(c.code)&&<Check size={14}/>}</button>)}</div><div className="lead-country-note">中国大陆、中国澳门、中国香港、中国台湾分别选择和统计。</div></div>}
+     </div>
+     <div className="lead-field lead-field-wide"><span>目标区域地图</span><CountryMap selected={selectedCountryItems}/></div>
+     <div className="lead-field lead-field-wide"><span>搜索对象</span><div className="lead-segmented"><button className={targetType==='companies'?'selected':''} onClick={()=>setTargetType('companies')}><Building2 size={15}/> 企业</button><button className={targetType==='contacts'?'selected':''} onClick={()=>setTargetType('contacts')}><Users size={15}/> 联系人</button><button className={targetType==='both'?'selected':''} onClick={()=>setTargetType('both')}><Users size={15}/> 企业 + 联系人</button></div></div>
+     <label className="lead-field"><span>目标企业数量</span><select value={quantity} onChange={e=>setQuantity(e.target.value)}><option value="100">最多 100 家</option><option value="500">约 500 家</option><option value="1000">约 1,000 家</option><option value="5000">5,000 家以上</option><option value="custom">稍后设定</option></select></label>
+     <label className="lead-field"><span>补充搜索关键词</span><input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="进口商、批发商、经销商..."/></label>
     </div>
-  )
+   </div>
+   <div className="lead-card"><div className="lead-card-heading"><div><span className="lead-step">STEP 02</span><h2>发现渠道</h2><p>按业务类型分组；展开分类后勾选具体渠道。渠道与可执行供应商关联展示。</p></div><button className="lead-link-button" onClick={()=>setSelectedChannels(selectedChannels.length===channelGroups.reduce((n,g)=>n+g.channels.length,0)?[]:channelGroups.flatMap(g=>g.channels.map(c=>c.id)))}>{selectedChannels.length===channelGroups.reduce((n,g)=>n+g.channels.length,0)?'取消全选':'全部启用'}</button></div>
+    <div className="lead-channel-toolbar"><div className="lead-channel-search"><Search size={14}/><input value={channelQuery} onChange={e=>setChannelQuery(e.target.value)} placeholder="搜索渠道，例如 LinkedIn、Amazon、Google Maps"/></div><span>{selectedChannels.length} 个已选</span></div>
+    <div className="lead-channel-groups">{visibleChannels.map(group=><section className="lead-channel-group" key={group.id}><button className="lead-channel-group-head" onClick={()=>setExpandedGroups(v=>v.includes(group.id)?v.filter(x=>x!==group.id):[...v,group.id])}><span><b>{group.title}</b><small>{group.description}</small></span><span className="lead-group-count">{group.channels.filter(c=>selectedChannels.includes(c.id)).length}/{group.channels.length}</span><ChevronDown className={expandedGroups.includes(group.id)?'rotated':''} size={16}/></button>
+      {expandedGroups.includes(group.id)&&<div className="lead-channel-grid">{group.channels.map(channel=>{const checked=selectedChannels.includes(channel.id);return <button key={channel.id} className={'lead-channel-option '+(checked?'checked':'')} onClick={()=>toggleChannel(channel.id)} aria-pressed={checked}><span className="lead-channel-icon"><Logo slug={channel.logo} name={channel.name}/></span><span className="lead-channel-copy"><b>{channel.name}</b><small>{channel.detail}</small><small className="lead-provider-hint">支持服务：{channel.providers.join(' · ')}</small></span><span className="lead-check">{checked&&<Check size={13}/>}</span></button>})}</div>}
+     </section>)}</div>
+    <div className="lead-selection-foot"><span>已启用 {selectedChannels.length} 个渠道 / {channelGroups.reduce((n,g)=>n+g.channels.length,0)} 个目录渠道</span><span>实际可执行能力以服务商连接、套餐、授权和平台条款为准</span></div>
+   </div>
+   <div className="lead-card lead-flow-card"><div className="lead-card-heading"><div><span className="lead-step">STEP 03</span><h2>发现与审核流程</h2><p>新发现的数据不会自动进入客户目录。</p></div><span className="lead-auto-label"><Bot size={14}/> 自动工作流</span></div><div className="lead-mini-flow">{workflow.map((item,index)=>{const Icon=item.icon;return <div className="lead-mini-step" key={item.title}><span className="lead-mini-number">{index+1}</span><span className="lead-mini-icon"><Icon size={16}/></span><span><b>{item.title}</b><small>{item.detail}</small></span>{index<workflow.length-1&&<ArrowRight className="lead-mini-arrow" size={15}/>}</div>})}</div></div>
+   <div className="lead-submit-row"><span><ShieldCheck size={15}/> 生成计划不会立即调用外部 API</span><button className="lead-primary-button" disabled={!canPlan||!selectedChannels.length} onClick={()=>setShowPlan(true)}>生成 AI 搜索计划 <ArrowRight size={16}/></button></div>
+  </section>
+  <aside className="lead-side-column"><div className="lead-side-card lead-side-highlight"><span className="lead-side-icon"><Sparkles size={18}/></span><h3>AI 搜索规划器</h3><p>结合目标画像、渠道覆盖和已配置服务，规划搜索与补全顺序。</p><div className="lead-side-stat"><span>默认 AI 模型</span><b>{defaultModel}</b></div><div className="lead-side-stat"><span>市场范围</span><b>{selectedCountryItems.length?selectedCountryItems.length+' 个国家 / 地区':'全球'}</b></div><div className="lead-side-stat"><span>已选渠道</span><b>{selectedChannels.length} 个</b></div></div><div className="lead-side-card"><h3>待发现资料字段</h3><div className="lead-data-tags">{['公司名称','国家 / 地区','官方网站','企业邮箱','联系电话','社交媒体','联系人 / 职位','产品品类','公司地址','公司规模','来源渠道','发现时间'].map(x=><span key={x}>{x}</span>)}</div></div><div className="lead-side-note"><CircleHelp size={16}/><span>发现结果先保存在「待处理线索」，用户可审核、合并重复项，再手动转入企业目录、联系人或 CRM。</span></div></aside></div>}
+
+  {tab==='search'&&showPlan&&<div className="lead-plan-view"><button className="lead-back-button" onClick={()=>setShowPlan(false)}><ArrowLeft size={15}/> 返回修改条件</button><div className="lead-plan-hero"><span className="lead-plan-mark"><Sparkles size={22}/></span><div><span className="lead-step">AI SEARCH PLAN</span><h2>搜索计划预览</h2><p>选择执行计划使用的 AI 模型。当前只是预览；连接服务商并完成认证后才会真实执行。</p></div></div><div className="lead-card"><h3>AI 模型</h3><div className="lead-model-select"><label>计划生成模型<select value={selectedModel} onChange={e=>setSelectedModel(e.target.value)}><option>Works AI</option><option>OpenAI · GPT 系列（需连接）</option><option>Anthropic · Claude（需连接）</option><option>Google · Gemini（需连接）</option><option>DeepSeek（需连接）</option><option>OpenRouter（需连接）</option></select></label><span className="lead-model-default"><Sparkles size={14}/> 默认模型 · Works AI</span></div><p className="lead-model-note">第三方模型选项需在「系统集成 → AI 模型服务」完成 API 配置后才可调用。</p></div><div className="lead-plan-grid"><div className="lead-card"><h3>目标客户画像</h3><div className="lead-summary-list"><span>产品 / 服务</span><b>{product||'未指定'}</b><span>行业</span><b>{industry||'由关键词识别'}</b><span>国家 / 地区</span><b>{selectedCountryItems.length?selectedCountryItems.map(c=>c.name).join('、'):'全球'}</b><span>搜索对象</span><b>{targetType==='companies'?'企业':targetType==='contacts'?'联系人':'企业 + 联系人'}</b><span>目标数量</span><b>{quantity==='custom'?'稍后设定':quantity+' 家'}</b><span>关键词</span><b>{keywords||'无'}</b></div></div><div className="lead-card"><h3>已选发现渠道</h3><div className="lead-plan-chips">{selectedNames.map(name=><span key={name}><CheckCircle2 size={13}/>{name}</span>)}</div><div className="lead-plan-hint"><ShieldCheck size={15}/> 只会调度已配置且具备相应渠道能力的服务商；未配置渠道会标记为待配置。</div></div></div><div className="lead-card"><h3>计划执行顺序</h3><div className="lead-plan-steps">{workflow.map((item,index)=>{const Icon=item.icon;return <div className="lead-plan-step" key={item.title}><span>{index+1}</span><Icon size={18}/><div><b>{item.title}</b><small>{item.detail}</small></div></div>})}</div></div><div className="lead-submit-row"><span><Clock3 size={15}/> 结果进入待处理线索，不会直接创建客户档案</span><button className="lead-primary-button" onClick={createTask}>创建搜索任务 <ArrowRight size={16}/></button></div></div>}
+
+  {tab==='tasks'&&<div className="lead-content-panel">{activeTaskData?<div className="lead-task-detail"><button className="lead-back-button" onClick={()=>setActiveTask(null)}><ArrowLeft size={15}/> 返回任务列表</button><div className="lead-task-title-row"><div><span className="lead-step">SEARCH TASK</span><h2>{activeTaskData.name}</h2><p>{activeTaskData.criteria}</p></div><span className="lead-status pending"><Clock3 size={13}/> {activeTaskData.status}</span></div><div className="lead-notice"><CircleHelp size={18}/><div><b>任务已创建，尚未开始真实采集</b><p>连接 API、任务队列与数据存储后才会启动真实搜索；所有结果将先进入待处理线索。</p></div></div><div className="lead-task-metrics"><div><b>0</b><span>发现记录</span></div><div><b>0</b><span>唯一企业</span></div><div><b>0</b><span>联系人</span></div><div><b>{activeTaskData.channels}</b><span>选择渠道</span></div></div><div className="lead-card"><h3>任务信息</h3><div className="lead-summary-list"><span>任务编号</span><b>{activeTaskData.id}</b><span>创建时间</span><b>{activeTaskData.createdAt}</b><span>搜索条件</span><b>{activeTaskData.criteria}</b><span>AI 模型</span><b>{selectedModel}</b></div></div></div>:<><div className="lead-content-heading"><div><h2>搜索任务</h2><p>查看已创建的客户发现任务。</p></div><button className="lead-primary-button small" onClick={()=>{setTab('search');setShowPlan(false)}}><Plus size={15}/> 新建搜索</button></div>{tasks.length?<div className="lead-task-list">{tasks.map(task=><button className="lead-task-row" key={task.id} onClick={()=>setActiveTask(task.id)}><span className="lead-task-symbol"><Target size={18}/></span><span className="lead-task-copy"><b>{task.name}</b><small>{task.criteria} · {task.createdAt}</small></span><span className="lead-status pending">{task.status}</span><ArrowRight size={16}/></button>)}</div>:<div className="lead-empty-state"><span><Search size={24}/></span><h3>还没有搜索任务</h3><p>定义目标客户并生成 AI 搜索计划。</p><button className="lead-primary-button" onClick={()=>setTab('search')}>创建第一个搜索 <ArrowRight size={15}/></button></div>}</>}</div>}
+
+  {tab==='review'&&<div className="lead-content-panel"><div className="lead-content-heading"><div><h2>待处理线索</h2><p>搜索发现结果统一暂存于此，审核通过后才可转入正式业务目录。</p></div><span className="lead-status pending"><Inbox size={13}/> 0 条待审核</span></div><div className="lead-review-toolbar"><div className="lead-review-filters"><button className={reviewFilter==='all'?'selected':''} onClick={()=>setReviewFilter('all')}>全部</button><button className={reviewFilter==='companies'?'selected':''} onClick={()=>setReviewFilter('companies')}>企业</button><button className={reviewFilter==='contacts'?'selected':''} onClick={()=>setReviewFilter('contacts')}>联系人</button><button className={reviewFilter==='duplicates'?'selected':''} onClick={()=>setReviewFilter('duplicates')}>疑似重复</button></div><button className="lead-quiet-button" disabled><UserRoundCheck size={14}/> 批量转入（0）</button></div><div className="lead-empty-state"><span><Inbox size={25}/></span><h3>暂无待处理线索</h3><p>搜索任务发现的企业和联系人会先出现在这里。你可以检查来源证据、补充信息、合并重复记录，再手动转入企业数据库、联系人库或 CRM。</p><button className="lead-primary-button" onClick={()=>setTab('search')}>创建搜索任务 <ArrowRight size={15}/></button></div><div className="lead-review-flow"><span>搜索发现</span><ArrowRight size={14}/><b>待处理线索</b><ArrowRight size={14}/><span>人工审核 / 去重</span><ArrowRight size={14}/><span>手动转入正式目录</span></div></div>}
+
+  {tab==='sources'&&<div className="lead-content-panel"><div className="lead-content-heading"><div><h2>数据源目录</h2><p>浏览服务商能力与支持范围。API 凭证、连接测试和模型配置统一在系统集成中管理。</p></div><span className="lead-status pending"><Clock3 size={13}/> 连接状态以系统集成为准</span></div><div className="lead-provider-grid">{providers.map(provider=><div className="lead-provider-card" key={provider.name}><div className="lead-provider-top"><span className="lead-provider-logo">{provider.name.slice(0,1)}</span><span className="lead-status pending">能力目录</span></div><h3>{provider.name}</h3><span className="lead-provider-category">{provider.category}</span><p>{provider.description}</p><div className="lead-provider-channels">{provider.channels}</div></div>)}</div><div className="lead-security-note"><ShieldCheck size={17}/><span>此处只维护渠道与服务商能力映射，不提供 API Key 输入。所有连接配置统一由系统集成负责。</span></div></div>}
+ </div>
 }
