@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Check, ChevronDown, ExternalLink, HelpCircle, Loader2, MapPin, Search, ShieldCheck, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from 'react-leaflet'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import type { PathOptions } from 'leaflet'
 import { countries } from './countries'
@@ -11,6 +11,7 @@ type Props = { workspaceId: string; userId: string; onTaskCreated: () => void }
 type Actor = { id: string; name: string; username: string; title: string; description: string; url: string; stats?: { totalUsers?: number; actorReviewRating?: number; actorReviewCount?: number }; currentPricingInfo?: Record<string, unknown> }
 type SchemaField = { title?: string; description?: string; type?: string | string[]; editor?: string; default?: unknown; prefill?: unknown; example?: unknown; placeholderValue?: string; enum?: unknown[]; items?: SchemaField; properties?: Record<string, SchemaField>; required?: string[]; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; minItems?: number; maxItems?: number; pattern?: string; format?: string }
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
+type MapLocation = { lat:number; lon:number; label:string }
 const platformGroups = [
  { label: '搜索引擎与地图', items: [['google-maps','Google Maps','google maps business places'],['google-search','Google Search','google search results'],['bing','Bing','bing search results'],['yelp','Yelp','yelp business'] ] },
  { label: '社交媒体', items: [['instagram','Instagram','instagram profiles'],['facebook','Facebook','facebook pages'],['linkedin','LinkedIn','linkedin companies'],['tiktok','TikTok','tiktok profiles'],['youtube','YouTube','youtube channels'],['x','X / Twitter','twitter profiles'] ] },
@@ -52,31 +53,27 @@ const getDefaultValue = (field: SchemaField, required=false) => field.default ??
 const nominatim = async (params: Record<string,string>) => {
  const url = new URL('https://nominatim.openstreetmap.org/search')
  Object.entries({format:'jsonv2',addressdetails:'1',dedupe:'1',limit:'30',...params}).forEach(([k,v])=>url.searchParams.set(k,v))
- const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } })
+ const response = await fetch(url.toString(), { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(12000) })
  if (!response.ok) throw new Error('OpenStreetMap 地点服务暂时不可用')
- return await response.json() as Array<{ place_id:number; display_name:string; name?:string; address?:Record<string,string>; type?:string; class?:string; osm_type?:string; osm_id?:number }>
+ return await response.json() as Array<{ place_id:number; display_name:string; name?:string; lat?:string; lon?:string; address?:Record<string,string>; type?:string; class?:string; osm_type?:string; osm_id?:number }>
 }
 
 const osmRegions = async (countryCode:string,countryName:string) => {
- let areaId=0
- try {
-  const country=await nominatim({q:countryName,featureType:'country',limit:'1'})
-  const match=country.find(x=>x.osm_type==='relation'||x.osm_type==='way')
-  if(match?.osm_type==='relation'&&match.osm_id)areaId=3600000000+match.osm_id
-  else if(match?.osm_type==='way'&&match.osm_id)areaId=2400000000+match.osm_id
- } catch { /* ISO boundary fallback */ }
- const query=areaId
-  ? `[out:json][timeout:40];area(${areaId})->.country;(relation(area.country)["boundary"="administrative"]["admin_level"~"3|4|5"];);out tags center;`
-  : `[out:json][timeout:40];area["ISO3166-1"="${countryCode}"]["admin_level"="2"]->.country;(relation(area.country)["boundary"="administrative"]["admin_level"~"3|4|5"];);out tags center;`
+ const query = `[out:json][timeout:15];area["ISO3166-1"="${countryCode}"]["admin_level"="2"]->.country;(relation(area.country)["boundary"="administrative"]["admin_level"~"3|4|5|6"];way(area.country)["boundary"="administrative"]["admin_level"~"3|4|5|6"];);out tags center;`
  let lastError:unknown
- for(const endpoint of ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter']){
-  try {
-   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',Accept:'application/json'},body:new URLSearchParams({data:query}).toString()})
-   if(!response.ok)throw new Error('OpenStreetMap 地区服务暂时不可用')
-   const body=await response.json() as {elements?:Array<{id:number;tags?:Record<string,string>}>}
-   const unique=new Map<string,{place_id:number;name:string;display_name:string}>()
-   for(const item of body.elements||[]){const name=item.tags?.['name:en']||item.tags?.name;if(name&&!unique.has(name.toLocaleLowerCase()))unique.set(name.toLocaleLowerCase(),{place_id:item.id,name,display_name:name})}
-   return [...unique.values()].sort((a,b)=>a.name.localeCompare(b.name))
+ for(const endpoint of ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.nchc.org.tw/api/interpreter']){
+  try{
+   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',Accept:'application/json'},body:new URLSearchParams({data:query}).toString(),signal:AbortSignal.timeout(12000)})
+   if(!response.ok)throw new Error('OpenStreetMap 地区服务暂时不可用（HTTP '+response.status+'）')
+   const body=await response.json() as {elements?:Array<{id:number;tags?:Record<string,string>;center?:{lat:number;lon:number}}> }
+   const unique=new Map<string,{place_id:number;name:string;display_name:string;lat?:number;lon?:number}>()
+   for(const item of body.elements||[]){
+    const name=item.tags?.['name:zh']||item.tags?.['name:en']||item.tags?.name
+    if(name&&!unique.has(name.toLocaleLowerCase()))unique.set(name.toLocaleLowerCase(),{place_id:item.id,name,display_name:name,lat:item.center?.lat,lon:item.center?.lon})
+   }
+   const results=[...unique.values()].sort((a,b)=>a.name.localeCompare(b.name))
+   if(results.length)return results
+   throw new Error(countryName+' 暂无可用的行政区边界数据')
   }catch(error){lastError=error}
  }
  throw lastError instanceof Error?lastError:new Error('OpenStreetMap 地区数据暂时不可用')
