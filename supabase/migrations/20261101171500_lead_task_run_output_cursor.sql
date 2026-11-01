@@ -1,0 +1,1 @@
+alter table public.lead_task_runs add column if not exists output_cursor text;
