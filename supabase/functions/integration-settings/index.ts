@@ -152,6 +152,7 @@ Deno.serve(async (req: Request) => {
       secret_ref: secretRef,
       status: "configured",
       is_enabled: false,
+      verification_method: "not_tested",
       last_error: null,
       last_tested_at: null,
       updated_at: new Date().toISOString(),
