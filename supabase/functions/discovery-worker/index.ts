@@ -61,6 +61,7 @@ async function processItems(run:Record<string,unknown>,items:unknown[],admin:str
  return {companyCount,contactCount};
 }
 function retryableError(message:string){return /HTTP (408|425|429|500|502|503|504)|timeout|temporar|rate.?limit|network|fetch failed/i.test(message);}
+async function taskIsCancelled(taskId:string,workspaceId:string,admin:string){const response=await rest(`lead_search_tasks?select=status&id=eq.${encodeURIComponent(taskId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}&limit=1`,admin);if(!response.ok)throw new Error('Unable to verify task status before continuing');const rows=await response.json();return rows[0]?.status==='cancelled';}
 async function updateTaskSummary(taskId:string,workspaceId:string,admin:string){
  const [runsResponse,inboxResponse]=await Promise.all([
   rest(`lead_task_runs?select=status,actual_cost,estimated_cost,cost_currency&task_id=eq.${encodeURIComponent(taskId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}`,admin),
@@ -68,14 +69,15 @@ async function updateTaskSummary(taskId:string,workspaceId:string,admin:string){
  ]);
  const runs=runsResponse.ok?await runsResponse.json():[];const inbox=inboxResponse.ok?await inboxResponse.json():[];
  const pending=runs.some((r:Record<string,unknown>)=>r.status==="queued"||r.status==="running");const successes=runs.some((r:Record<string,unknown>)=>r.status==="completed");const status=pending?"running":successes?"completed":"failed";
- const taskCurrency=String((await (await rest(`lead_search_tasks?select=cost_currency&workspace_id=eq.${encodeURIComponent(workspaceId)}&id=eq.${encodeURIComponent(taskId)}&limit=1`,admin)).json())[0]?.cost_currency||"USD");const matchingCosts=runs.filter((r:Record<string,unknown>)=>r.cost_currency===taskCurrency&&r.actual_cost!==null);const cost=matchingCosts.reduce((sum:number,r:Record<string,unknown>)=>sum+(Number(r.actual_cost)||0),0);
+ const taskResponse=await rest(`lead_search_tasks?select=status,cost_currency&workspace_id=eq.${encodeURIComponent(workspaceId)}&id=eq.${encodeURIComponent(taskId)}&limit=1`,admin);const taskRows=taskResponse.ok?await taskResponse.json():[];if(taskRows[0]?.status==="cancelled")return;const taskCurrency=String(taskRows[0]?.cost_currency||"USD");const matchingCosts=runs.filter((r:Record<string,unknown>)=>r.cost_currency===taskCurrency&&r.actual_cost!==null);const cost=matchingCosts.reduce((sum:number,r:Record<string,unknown>)=>sum+(Number(r.actual_cost)||0),0);
  const companies=inbox.filter((r:Record<string,unknown>)=>r.record_type==="company"&&r.review_status!=="duplicate").length;
  const contacts=inbox.filter((r:Record<string,unknown>)=>r.record_type==="contact"&&r.review_status!=="duplicate").length;
  const sources=new Set(inbox.map((r:Record<string,unknown>)=>r.source_record_id).filter(Boolean));
  await rest(`lead_search_tasks?workspace_id=eq.${encodeURIComponent(workspaceId)}&id=eq.${encodeURIComponent(taskId)}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status,discovered_count:sources.size,unique_company_count:companies,unique_contact_count:contacts,actual_cost:matchingCosts.length?cost:null,completed_at:pending?null:new Date().toISOString(),updated_at:new Date().toISOString()})});
 }
 async function processRun(run:Record<string,unknown>,admin:string){
- const workspaceId=String(run.workspace_id);const provider=String(run.provider_key) as ProviderKey;const adapter=getProviderAdapter(provider);if(!adapter)throw new Error(`Unsupported provider adapter: ${provider}`);
+ const workspaceId=String(run.workspace_id);
+ if(await taskIsCancelled(String(run.task_id),workspaceId,admin)){await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status:'cancelled',locked_by:null,lease_expires_at:null,completed_at:new Date().toISOString(),updated_at:new Date().toISOString()})});return;}const provider=String(run.provider_key) as ProviderKey;const adapter=getProviderAdapter(provider);if(!adapter)throw new Error(`Unsupported provider adapter: ${provider}`);
  const connectionResponse=await rest(`integration_connections?select=secret_ref,status,is_enabled&workspace_id=eq.${encodeURIComponent(workspaceId)}&provider_key=eq.${encodeURIComponent(provider)}&limit=1`,admin);
  if(!connectionResponse.ok)throw new Error("Unable to read provider connection");const connection=(await connectionResponse.json())[0];
  if(!connection?.secret_ref||connection.status!=="connected"||connection.is_enabled!==true)throw new Error("Provider connection is not enabled");
@@ -87,6 +89,7 @@ async function processRun(run:Record<string,unknown>,admin:string){
   await adapter.validate(ctx);
   const started=await adapter.start(ctx);
   const usage=obj(started.usage);
+  if(await taskIsCancelled(String(run.task_id),workspaceId,admin)){await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status:'cancelled',provider_job_id:started.providerJobId,provider_status:'cancelled',locked_by:null,lease_expires_at:null,completed_at:new Date().toISOString(),updated_at:new Date().toISOString()})});return;}
   if(started.state==="completed"){
    const items=extractItems(started.raw);const counts=await processItems(run,items,admin);
    const costValue=usage.cost_usd??(usage.currency?usage.actual_cost??usage.cost:provider==="kuajingmofang"?usage.actual_cost??usage.cost:undefined);const cost=Number(costValue);const costCurrency=String(usage.currency||(usage.cost_usd?"USD":provider==="kuajingmofang"?"CNY":run.cost_currency||"USD"));
@@ -104,7 +107,7 @@ async function processRun(run:Record<string,unknown>,admin:string){
   await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:hasNext?"running":"completed",provider_status:hasNext?"fetching":"completed",output_cursor:page.nextCursor||null,records_found:recordsFound,completed_at:hasNext?null:now,lease_expires_at:hasNext?new Date(Date.now()+10000).toISOString():null,locked_by:null,last_polled_at:now,usage_metrics:usage,actual_cost:Number.isFinite(cost)&&cost>0?cost:run.actual_cost,cost_currency:costCurrency,result_summary:{...obj(run.result_summary),...counts,item_count:recordsFound},updated_at:now})});
   return;
  }
- const polled=await adapter.poll(ctx,jobId);const polledUsage=obj(polled.usage);const mergedPollUsage={...obj(run.usage_metrics),...polledUsage};const pollCostValue=polledUsage.cost_usd??(polledUsage.currency?polledUsage.actual_cost??polledUsage.cost:provider==="kuajingmofang"?polledUsage.actual_cost??polledUsage.cost:undefined);const pollCost=Number(pollCostValue);const pollCurrency=String(polledUsage.currency||(polledUsage.cost_usd?"USD":provider==="kuajingmofang"?"CNY":run.cost_currency||"USD"));
+ const polled=await adapter.poll(ctx,jobId);if(await taskIsCancelled(String(run.task_id),workspaceId,admin)){await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status:'cancelled',locked_by:null,lease_expires_at:null,completed_at:new Date().toISOString(),updated_at:new Date().toISOString()})});return;}const polledUsage=obj(polled.usage);const mergedPollUsage={...obj(run.usage_metrics),...polledUsage};const pollCostValue=polledUsage.cost_usd??(polledUsage.currency?polledUsage.actual_cost??polledUsage.cost:provider==="kuajingmofang"?polledUsage.actual_cost??polledUsage.cost:undefined);const pollCost=Number(pollCostValue);const pollCurrency=String(polledUsage.currency||(polledUsage.cost_usd?"USD":provider==="kuajingmofang"?"CNY":run.cost_currency||"USD"));
  if(polled.state==="failed")throw new Error(`Provider job failed: ${JSON.stringify(polled.raw).slice(0,1000)}`);
  if(polled.state==="completed"&&provider==="texau"){
   const items=extractItems(polled.raw);const counts=await processItems(run,items,admin);
