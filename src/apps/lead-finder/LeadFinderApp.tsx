@@ -6,12 +6,15 @@ import type { Layer, PathOptions } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './LeadFinderApp.css'
 import { countries as countryCatalog } from './countries'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../lib/auth'
 
 type Tab = 'search' | 'tasks' | 'review' | 'sources'
 type TargetType = 'companies' | 'contacts' | 'both'
 type Country = { code:string; name:string; flag:string; geoName:string }
 type Channel = { id:string; name:string; detail:string; logo:string; providers:string[]; status:string }
 type ChannelGroup = { id:string; title:string; description:string; channels:Channel[] }
+type InboxRecord = { id:string; record_type:'company'|'contact'; review_status:string; display_name:string; country_name:string|null; website:string|null; email:string|null; phone:string|null; job_title:string|null; ai_score:number|null; ai_summary:string|null; discovered_at:string; normalized_domain:string|null; normalized_email:string|null; source_record_id:string|null; lead_source_records?:{provider_key:string;channel_key:string;source_url:string|null;source_title:string|null}|null }
 
 const countries:Country[] = countryCatalog
 
@@ -126,6 +129,11 @@ function CountryMap({selected}:{selected:Country[]}) {
 }
 
 export default function LeadFinderApp() {
+ const { user, workspace } = useAuth()
+ const [inboxRecords,setInboxRecords] = useState<InboxRecord[]>([])
+ const [inboxLoading,setInboxLoading] = useState(false)
+ const [inboxError,setInboxError] = useState('')
+ const [duplicateCandidates,setDuplicateCandidates] = useState<{id:string;record_id:string;candidate_record_id:string;match_type:string;confidence:number;resolution:string}[]>([])
  const [tab,setTab] = useState<Tab>('search')
  const [product,setProduct] = useState('')
  const [industry,setIndustry] = useState('')
@@ -143,6 +151,37 @@ export default function LeadFinderApp() {
  const [tasks,setTasks] = useState<{id:string;name:string;criteria:string;createdAt:string;channels:number;status:string}[]>([])
  const [activeTask,setActiveTask] = useState<string|null>(null)
  const [reviewFilter,setReviewFilter] = useState('all')
+ const refreshInbox = async()=>{
+  if(!supabase||!workspace)return
+  setInboxLoading(true);setInboxError('')
+  const [recordsResult,duplicatesResult]=await Promise.all([
+   supabase.from('lead_inbox_records').select('id,record_type,review_status,display_name,country_name,website,email,phone,job_title,ai_score,ai_summary,discovered_at,normalized_domain,normalized_email,source_record_id,lead_source_records(provider_key,channel_key,source_url,source_title)').eq('workspace_id',workspace.id).order('discovered_at',{ascending:false}).limit(500),
+   supabase.from('lead_inbox_duplicate_candidates').select('id,record_id,candidate_record_id,match_type,confidence,resolution').eq('workspace_id',workspace.id).eq('resolution','unresolved').order('confidence',{ascending:false}).limit(500)
+  ])
+  if(recordsResult.error)setInboxError(recordsResult.error.message);else setInboxRecords((recordsResult.data||[]) as unknown as InboxRecord[])
+  if(!duplicatesResult.error)setDuplicateCandidates((duplicatesResult.data||[]) as typeof duplicateCandidates)
+  setInboxLoading(false)
+ }
+ useEffect(()=>{if(tab==='review')void refreshInbox()},[tab,workspace?.id])
+ const reviewRecord = async(record:InboxRecord,status:'approved'|'rejected'|'duplicate',action:'approve'|'reject'|'mark_duplicate')=>{
+  if(!supabase||!workspace||!user)return
+  const {error}=await supabase.from('lead_inbox_records').update({review_status:status,reviewed_by:user.id,reviewed_at:new Date().toISOString()}).eq('id',record.id).eq('workspace_id',workspace.id)
+  if(error){setInboxError(error.message);return}
+  await supabase.from('lead_inbox_review_events').insert({workspace_id:workspace.id,record_id:record.id,actor_id:user.id,action})
+  await refreshInbox()
+ }
+ const promoteRecord = async(record:InboxRecord)=>{
+  if(!supabase)return
+  const {error}=await supabase.rpc('promote_lead_inbox_record',{p_record_id:record.id})
+  if(error){setInboxError(error.message);return}
+  await refreshInbox()
+ }
+ const resolveDuplicate = async(id:string,resolution:'same_entity'|'different_entity')=>{
+  if(!supabase||!user)return
+  const {error}=await supabase.from('lead_inbox_duplicate_candidates').update({resolution,resolved_by:user.id,resolved_at:new Date().toISOString()}).eq('id',id)
+  if(error){setInboxError(error.message);return}
+  await refreshInbox()
+ }
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
  const selectedNames = useMemo(()=>channelGroups.flatMap(g=>g.channels).filter(c=>selectedChannels.includes(c.id)).map(c=>c.name),[selectedChannels])
  const activeTaskData = tasks.find(t=>t.id===activeTask)
@@ -160,7 +199,7 @@ export default function LeadFinderApp() {
   <div className="lead-tabs" role="tablist" aria-label="潜在客户搜索导航">
    <button className={tab==='search'?'active':''} onClick={()=>{setTab('search');setActiveTask(null)}}><Target size={16}/> 创建搜索</button>
    <button className={tab==='tasks'?'active':''} onClick={()=>{setTab('tasks');setActiveTask(null)}}><Workflow size={16}/> 搜索任务 <span>{tasks.length}</span></button>
-   <button className={tab==='review'?'active':''} onClick={()=>{setTab('review');setActiveTask(null)}}><Inbox size={16}/> 待处理线索 <span>0</span></button>
+   <button className={tab==='review'?'active':''} onClick={()=>{setTab('review');setActiveTask(null)}}><Inbox size={16}/> 待处理线索 <span>{inboxRecords.filter(r=>r.review_status!=='promoted').length}</span></button>
    <button className={tab==='sources'?'active':''} onClick={()=>setTab('sources')}><Database size={16}/> 数据源目录</button>
   </div>
 
@@ -194,7 +233,7 @@ export default function LeadFinderApp() {
 
   {tab==='tasks'&&<div className="lead-content-panel">{activeTaskData?<div className="lead-task-detail"><button className="lead-back-button" onClick={()=>setActiveTask(null)}><ArrowLeft size={15}/> 返回任务列表</button><div className="lead-task-title-row"><div><span className="lead-step">SEARCH TASK</span><h2>{activeTaskData.name}</h2><p>{activeTaskData.criteria}</p></div><span className="lead-status pending"><Clock3 size={13}/> {activeTaskData.status}</span></div><div className="lead-notice"><CircleHelp size={18}/><div><b>任务已创建，尚未开始真实采集</b><p>连接 API、任务队列与数据存储后才会启动真实搜索；所有结果将先进入待处理线索。</p></div></div><div className="lead-task-metrics"><div><b>0</b><span>发现记录</span></div><div><b>0</b><span>唯一企业</span></div><div><b>0</b><span>联系人</span></div><div><b>{activeTaskData.channels}</b><span>选择渠道</span></div></div><div className="lead-card"><h3>任务信息</h3><div className="lead-summary-list"><span>任务编号</span><b>{activeTaskData.id}</b><span>创建时间</span><b>{activeTaskData.createdAt}</b><span>搜索条件</span><b>{activeTaskData.criteria}</b><span>AI 模型</span><b>{selectedModel}</b></div></div></div>:<><div className="lead-content-heading"><div><h2>搜索任务</h2><p>查看已创建的客户发现任务。</p></div><button className="lead-primary-button small" onClick={()=>{setTab('search');setShowPlan(false)}}><Plus size={15}/> 新建搜索</button></div>{tasks.length?<div className="lead-task-list">{tasks.map(task=><button className="lead-task-row" key={task.id} onClick={()=>setActiveTask(task.id)}><span className="lead-task-symbol"><Target size={18}/></span><span className="lead-task-copy"><b>{task.name}</b><small>{task.criteria} · {task.createdAt}</small></span><span className="lead-status pending">{task.status}</span><ArrowRight size={16}/></button>)}</div>:<div className="lead-empty-state"><span><Search size={24}/></span><h3>还没有搜索任务</h3><p>定义目标客户并生成 AI 搜索计划。</p><button className="lead-primary-button" onClick={()=>setTab('search')}>创建第一个搜索 <ArrowRight size={15}/></button></div>}</>}</div>}
 
-  {tab==='review'&&<div className="lead-content-panel"><div className="lead-content-heading"><div><h2>待处理线索</h2><p>搜索发现结果统一暂存于此，审核通过后才可转入正式业务目录。</p></div><span className="lead-status pending"><Inbox size={13}/> 0 条待审核</span></div><div className="lead-review-toolbar"><div className="lead-review-filters"><button className={reviewFilter==='all'?'selected':''} onClick={()=>setReviewFilter('all')}>全部</button><button className={reviewFilter==='companies'?'selected':''} onClick={()=>setReviewFilter('companies')}>企业</button><button className={reviewFilter==='contacts'?'selected':''} onClick={()=>setReviewFilter('contacts')}>联系人</button><button className={reviewFilter==='duplicates'?'selected':''} onClick={()=>setReviewFilter('duplicates')}>疑似重复</button></div><button className="lead-quiet-button" disabled><UserRoundCheck size={14}/> 批量转入（0）</button></div><div className="lead-empty-state"><span><Inbox size={25}/></span><h3>暂无待处理线索</h3><p>搜索任务发现的企业和联系人会先出现在这里。你可以检查来源证据、补充信息、合并重复记录，再手动转入企业数据库、联系人库或 CRM。</p><button className="lead-primary-button" onClick={()=>setTab('search')}>创建搜索任务 <ArrowRight size={15}/></button></div><div className="lead-review-flow"><span>搜索发现</span><ArrowRight size={14}/><b>待处理线索</b><ArrowRight size={14}/><span>人工审核 / 去重</span><ArrowRight size={14}/><span>手动转入正式目录</span></div></div>}
+  {tab==='review'&&<div className="lead-content-panel"><div className="lead-content-heading"><div><h2>待处理线索</h2><p>真实数据库记录。审核、去重后，只有你主动转入才会创建正式企业或联系人。</p></div><span className="lead-status pending"><Inbox size={13}/> {inboxRecords.filter(r=>r.review_status==='pending').length} 条待审核</span></div><div className="lead-review-toolbar"><div className="lead-review-filters"><button className={reviewFilter==='all'?'selected':''} onClick={()=>setReviewFilter('all')}>全部（{inboxRecords.length}）</button><button className={reviewFilter==='companies'?'selected':''} onClick={()=>setReviewFilter('companies')}>企业</button><button className={reviewFilter==='contacts'?'selected':''} onClick={()=>setReviewFilter('contacts')}>联系人</button><button className={reviewFilter==='duplicates'?'selected':''} onClick={()=>setReviewFilter('duplicates')}>疑似重复（{duplicateCandidates.length}）</button><button className={reviewFilter==='approved'?'selected':''} onClick={()=>setReviewFilter('approved')}>已审核</button></div><button className="lead-quiet-button" onClick={()=>void refreshInbox()}><Database size={14}/> 刷新</button></div>{inboxError&&<div className="lead-review-error">{inboxError}</div>}{inboxLoading?<div className="lead-empty-state"><span><Clock3 size={24}/></span><h3>正在读取待处理线索…</h3></div>:<div className="lead-inbox-list">{inboxRecords.filter(r=>reviewFilter==='all'?r.review_status!=='promoted':reviewFilter==='companies'?r.record_type==='company'&&r.review_status!=='promoted':reviewFilter==='contacts'?r.record_type==='contact'&&r.review_status!=='promoted':reviewFilter==='duplicates'?duplicateCandidates.some(d=>d.record_id===r.id||d.candidate_record_id===r.id)||r.review_status==='duplicate':reviewFilter==='approved'?r.review_status==='approved':true).map(record=>{const related=duplicateCandidates.filter(d=>d.record_id===record.id||d.candidate_record_id===record.id);const source=record.lead_source_records;return <article className="lead-inbox-card" key={record.id}><div className="lead-inbox-card-head"><span className="lead-inbox-type">{record.record_type==='company'?<Building2 size={14}/>:<Users size={14}/>} {record.record_type==='company'?'企业':'联系人'}</span><span className={'lead-inbox-status '+record.review_status}>{record.review_status==='pending'?'待审核':record.review_status==='approved'?'已通过':record.review_status==='rejected'?'已拒绝':record.review_status==='duplicate'?'疑似重复':'已转入'}</span><time>{new Date(record.discovered_at).toLocaleString()}</time></div><div className="lead-inbox-main"><div><h3>{record.display_name}</h3><p>{[record.job_title,record.country_name,record.website].filter(Boolean).join(' · ')||'暂无补充信息'}</p><div className="lead-inbox-details">{record.email&&<span>{record.email}</span>}{record.phone&&<span>{record.phone}</span>}{record.normalized_domain&&<span>{record.normalized_domain}</span>}</div><small className="lead-inbox-source">来源：{source?source.provider_key+' / '+source.channel_key:'待关联来源证据'} {source?.source_url&&<a href={source.source_url} target="_blank" rel="noreferrer">查看原始来源</a>}</small></div>{record.ai_score!==null&&<span className="lead-inbox-score">{Math.round(record.ai_score)}<small>AI 分</small></span>}</div>{related.length>0&&<div className="lead-inbox-duplicates"><b><ShieldCheck size={13}/> {related.length} 条疑似重复关系</b>{related.map(d=><div key={d.id}><span>{d.match_type} · 匹配度 {Math.round(d.confidence)}%</span><button onClick={()=>void resolveDuplicate(d.id,'same_entity')}>确认重复</button><button onClick={()=>void resolveDuplicate(d.id,'different_entity')}>不是重复</button></div>)}</div>}<div className="lead-inbox-actions">{record.review_status==='pending'&&<><button onClick={()=>void reviewRecord(record,'approved','approve')}><CheckCircle2 size={13}/> 审核通过</button><button onClick={()=>void reviewRecord(record,'rejected','reject')}>拒绝</button><button onClick={()=>void reviewRecord(record,'duplicate','mark_duplicate')}>标记重复</button></>}{record.review_status==='approved'&&<button className="promote" onClick={()=>void promoteRecord(record)}><UserRoundCheck size={13}/> 手动转入{record.record_type==='company'?'企业目录':'联系人库'}</button>}</div></article>})}{!inboxRecords.some(r=>reviewFilter==='all'?r.review_status!=='promoted':reviewFilter==='companies'?r.record_type==='company'&&r.review_status!=='promoted':reviewFilter==='contacts'?r.record_type==='contact'&&r.review_status!=='promoted':reviewFilter==='duplicates'?duplicateCandidates.some(d=>d.record_id===r.id||d.candidate_record_id===r.id)||r.review_status==='duplicate':reviewFilter==='approved'?r.review_status==='approved':true)&&<div className="lead-empty-state"><span><Inbox size={25}/></span><h3>暂无符合条件的线索</h3><p>搜索任务产生的记录会保存在这里。当前没有演示数据；接入搜索适配器后将自动写入待审核队列。</p><button className="lead-primary-button" onClick={()=>setTab('search')}>创建搜索任务 <ArrowRight size={15}/></button></div>}</div>}<div className="lead-review-flow"><span>搜索发现</span><ArrowRight size={14}/><b>待处理线索</b><ArrowRight size={14}/><span>人工审核 / 去重</span><ArrowRight size={14}/><span>手动转入正式目录</span></div></div>}
 
   {tab==='sources'&&<div className="lead-content-panel"><div className="lead-content-heading"><div><h2>数据源目录</h2><p>浏览服务商能力与支持范围。API 凭证、连接测试和模型配置统一在系统集成中管理。</p></div><span className="lead-status pending"><Clock3 size={13}/> 连接状态以系统集成为准</span></div><div className="lead-provider-grid">{providers.map(provider=><div className="lead-provider-card" key={provider.name}><div className="lead-provider-top"><span className="lead-provider-logo">{provider.name.slice(0,1)}</span><span className="lead-status pending">能力目录</span></div><h3>{provider.name}</h3><span className="lead-provider-category">{provider.category}</span><p>{provider.description}</p><div className="lead-provider-channels">{provider.channels}</div></div>)}</div><div className="lead-security-note"><ShieldCheck size={17}/><span>此处只维护渠道与服务商能力映射，不提供 API Key 输入。所有连接配置统一由系统集成负责。</span></div></div>}
  </div>
