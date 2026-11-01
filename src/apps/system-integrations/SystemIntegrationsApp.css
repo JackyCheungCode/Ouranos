@@ -88,3 +88,15 @@
 .apify-save-inputs{margin-top:9px;padding:7px 10px;border:1px solid var(--int-border);border-radius:4px;background:var(--int-soft);color:#80657d;font-size:8px;font-weight:700;cursor:pointer}
 .apify-save-inputs:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:650px){.apify-input-grid{grid-template-columns:1fr}}
+
+.manual-adapter-manager{margin:16px 0;padding:15px;border:1px solid var(--int-border);border-radius:8px;background:var(--int-panel)}
+.manual-adapter-form{padding:11px;border:1px solid var(--int-border);border-radius:6px;background:var(--int-soft)}
+.manual-adapter-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-bottom:10px}
+.manual-adapter-form label{display:flex;flex-direction:column;gap:5px;color:var(--int-text);font-size:9px;font-weight:700}
+.manual-adapter-form input,.manual-adapter-form select,.manual-adapter-form textarea{width:100%;min-height:32px;padding:7px 9px;border:1px solid var(--int-border);border-radius:4px;background:var(--int-panel);color:var(--int-text);font:400 9px 'DM Sans','Microsoft YaHei'}
+.manual-adapter-form textarea{min-height:60px;font:400 8px/1.5 ui-monospace,monospace;resize:vertical}
+.manual-adapter-hint{display:block;margin:0 0 10px;color:var(--int-muted);font-size:8px;line-height:1.5}
+.manual-adapter-form>.manual-adapter-grid label textarea{min-height:65px}
+.manual-adapter-form>label{margin:8px 0}
+.dark .manual-adapter-form{background:#20232c}
+@media(max-width:650px){.manual-adapter-grid{grid-template-columns:1fr}}
