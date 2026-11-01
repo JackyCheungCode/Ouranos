@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { getProviderAdapter, type AdapterContext, type ProviderKey } from "../_shared/provider-adapters.ts";
 
+const WORKER_SECRET_ID="8052bb93-5044-4e23-a0ac-481bfb7fbadf";
 function serviceKey(){const legacy=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");if(legacy)return legacy;const keys=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")??"{}");return keys.default as string|undefined;}
 async function rest(path:string,key:string,init:RequestInit={}){const url=Deno.env.get("SUPABASE_URL");if(!url)throw new Error("Supabase URL missing");const headers=new Headers(init.headers);headers.set("apikey",key);headers.set("Authorization",`Bearer ${key}`);headers.set("Content-Type","application/json");return fetch(`${url}/rest/v1/${path}`,{...init,headers});}
 async function readSecret(secretRef:string,admin:string){const response=await rest("rpc/integration_secret_read",admin,{method:"POST",body:JSON.stringify({p_secret_id:secretRef})});if(!response.ok)throw new Error("Unable to read provider credentials from Vault");const value=await response.json();if(typeof value!=="string"||!value)throw new Error("Provider credentials are empty");try{const parsed=JSON.parse(value);if(parsed&&typeof parsed==="object")return parsed as Record<string,unknown>;}catch{}return {api_key:value};}
@@ -115,7 +116,7 @@ async function processRun(run:Record<string,unknown>,admin:string){
 Deno.serve(async(req:Request)=>{
  if(req.method!=="POST")return new Response("Method not allowed",{status:405});
  try{
-  const admin=serviceKey();const authorization=req.headers.get("authorization");if(!admin||authorization!==`Bearer ${admin}`)return new Response("Unauthorized",{status:401});
+  const admin=serviceKey();if(!admin)return new Response("Worker is not configured",{status:500});const supplied=req.headers.get("x-worker-secret");const secretResponse=await rest("rpc/integration_secret_read",admin,{method:"POST",body:JSON.stringify({p_secret_id:WORKER_SECRET_ID})});if(!secretResponse.ok)return new Response("Worker secret unavailable",{status:500});const expected=await secretResponse.json();if(typeof expected!=="string"||!supplied||supplied!==expected)return new Response("Unauthorized",{status:401});
   const body=await req.json().catch(()=>({}));const limit=Math.min(50,Math.max(1,Number(body.limit)||10));const workerId=String(body.worker_id||crypto.randomUUID());
   const claim=await rest("rpc/claim_lead_task_runs",admin,{method:"POST",body:JSON.stringify({p_limit:limit,p_worker_id:workerId})});if(!claim.ok)throw new Error("Unable to claim lead task runs");
   const runs=await claim.json();let completed=0;let errors=0;
