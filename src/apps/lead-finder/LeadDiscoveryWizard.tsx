@@ -277,6 +277,42 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    <small className="ldw-field-key">Actor 原始字段：{key}</small>{fieldErrors.map(([path,message])=><small className="ldw-field-error" key={path}>{path===key?'':schemaPathLabel(schema||{},path)+'：'}{message}</small>)}{showHelp&&<small className="ldw-field-help">{localizeDescription(key,field)}</small>}
   </label>
  }
+ const analyzeActorInput = async () => {
+  if(!supabase||!actor||!schema){setAiError('请先选择 Actor 并成功读取 Schema。');return}
+  setAiBusy(true);setAiError('');setAiGenerated(null);setAiApplied(false)
+  try{
+   const {data:sessionData,error:sessionError}=await supabase.auth.getSession()
+   if(sessionError||!sessionData.session?.access_token)throw new Error('登录状态已失效，请重新登录。')
+   const response=await fetch('https://ouranos-ai-assistant.xg-y.workers.dev',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+sessionData.session.access_token},
+    body:JSON.stringify({
+     model:aiModel,user_request:aiRequest,channel,
+     actor_id:actor.username+'~'+actor.name,actor_name:actor.title,
+     actor_schema:schema,
+     market:{countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},
+     task_limits:{task_name:taskName,product,industry,keywords,target_type:targetType,target_count:Number(targetCount),max_cost_usd:Number(maxCost)}
+    })
+   })
+   const result=await response.json()
+   if(!response.ok||!result?.ok)throw new Error(result?.error||'AI 分析失败，请稍后重试。')
+   setAiGenerated(result.actor_input as Record<string,unknown>)
+   setAiSummary(String(result.summary||''));setAiStrategy(String(result.strategy||''))
+   setAiWarnings(Array.isArray(result.warnings)?result.warnings.map(String):[])
+  }catch(e){setAiError(e instanceof Error?e.message:'AI 分析失败，请稍后重试。')}
+  finally{setAiBusy(false)}
+ }
+ const applyAiGenerated = () => {
+  if(!aiGenerated||!schema)return
+  const mapped=Object.fromEntries(Object.entries(aiGenerated).map(([key,value])=>{
+   const field=schema.properties?.[key];const type=field?fieldType(field):'string'
+   if(type==='array'&&field?.editor==='stringList')return [key,Array.isArray(value)?value:[]]
+   if(type==='array'||type==='object')return [key,JSON.stringify(value,null,2)]
+   return [key,value]
+  }))
+  setValues(current=>({...current,...mapped}));setAiApplied(true)
+  setNotice('AI 参数已填入 Schema 表单。请检查最终 JSON 和必填项校验结果。')
+ }
  const startSearch = async () => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
