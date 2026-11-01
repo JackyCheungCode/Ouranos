@@ -4,3 +4,5 @@
 .ldw-map-wrap{grid-column:1/-1}.ldw-map{border:1px solid var(--border,#e8e3e9);border-radius:10px;overflow:hidden}.ldw-map>div:last-child{font-size:9px;color:var(--muted-foreground,#817984);padding:6px 9px}
 
 .ldw-city-search-row{display:flex;gap:6px}.ldw-city-search-row input{min-width:0;flex:1}.ldw-city-search-row button{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border,#ded9e1);background:var(--muted,#f5f3f6);border-radius:8px;padding:7px 9px;font-size:10px;white-space:nowrap;color:inherit}.ldw-city-search-row button:disabled{opacity:.5}
+
+.ldw-target-types{display:flex;gap:5px;flex-wrap:wrap}.ldw-target-types button{border:1px solid var(--border,#ded9e1);background:var(--background,#fff);border-radius:7px;padding:7px 9px;font-size:10px;color:inherit}.ldw-target-types button.selected{border-color:var(--primary,#76556f);background:color-mix(in srgb,var(--primary,#76556f) 8%,transparent)}
