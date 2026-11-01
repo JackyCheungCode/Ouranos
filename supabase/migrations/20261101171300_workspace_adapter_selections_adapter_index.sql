@@ -1,0 +1,1 @@
+create index if not exists workspace_adapter_selections_adapter_key_idx on public.workspace_adapter_selections(adapter_key);
