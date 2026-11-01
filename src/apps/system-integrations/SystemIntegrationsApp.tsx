@@ -88,7 +88,7 @@ export default function SystemIntegrationsApp() {
       </div>
       <div className="int-header-actions">
         <span className="int-security-chip"><ShieldCheck size={14}/> 服务端凭证管理</span>
-        <button className="int-primary" onClick={() => chooseSection(section)}>管理配置 <span>＋</span></button>
+        
       </div>
     </div>
 
