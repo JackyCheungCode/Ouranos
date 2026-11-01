@@ -125,6 +125,15 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [schema,setSchema] = useState<JsonSchema|null>(null)
  const [schemaBusy,setSchemaBusy] = useState(false)
  const [values,setValues] = useState<Record<string,unknown>>({})
+ const [aiModel,setAiModel] = useState('@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+ const [aiRequest,setAiRequest] = useState('')
+ const [aiBusy,setAiBusy] = useState(false)
+ const [aiGenerated,setAiGenerated] = useState<Record<string,unknown>|null>(null)
+ const [aiSummary,setAiSummary] = useState('')
+ const [aiStrategy,setAiStrategy] = useState('')
+ const [aiWarnings,setAiWarnings] = useState<string[]>([])
+ const [aiError,setAiError] = useState('')
+ const [aiApplied,setAiApplied] = useState(false)
  const [keywords,setKeywords] = useState('')
  const [product,setProduct] = useState('')
  const [industry,setIndustry] = useState('')
@@ -225,7 +234,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  const selectActor = async (item: Actor) => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
-  setActor(item);setSchema(null);setValues({});setSchemaBusy(true);setError('');setNotice('')
+  setActor(item);setSchema(null);setValues({});setAiGenerated(null);setAiSummary('');setAiStrategy('');setAiWarnings([]);setAiApplied(false);setAiError('');setSchemaBusy(true);setError('');setNotice('')
   const actorId=item.username+'~'+item.name
   const {data,error:invokeError}=await supabase.functions.invoke('apify-actor-schema',{body:{workspace_id:workspaceId,actor_id:actorId,channel_key:channel}})
   if(invokeError||data?.error){setError(data?.error||invokeError?.message||'读取 Actor Schema 失败');setActor(null);setSchemaBusy(false);return}
