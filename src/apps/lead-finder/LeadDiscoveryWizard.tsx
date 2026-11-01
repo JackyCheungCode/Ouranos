@@ -137,7 +137,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [aiError,setAiError] = useState('')
  const [aiApplied,setAiApplied] = useState(false)
  const [aiAnalyzedContext,setAiAnalyzedContext] = useState('')
- const aiContextKey=useMemo(()=>stableStringify({channel,provider,actor_id:actor?.id||'',schema,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost}),[channel,provider,actor?.id,schema,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost])
  const [keywords,setKeywords] = useState('')
  const [product,setProduct] = useState('')
  const [industry,setIndustry] = useState('')
@@ -150,6 +149,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [error,setError] = useState('')
  const [notice,setNotice] = useState('')
  const [showRequestPreview,setShowRequestPreview] = useState(true)
+ const aiContextKey=useMemo(()=>stableStringify({channel,provider,actor_id:actor?.id||'',schema,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost}),[channel,provider,actor?.id,schema,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost])
  const schemaValidation=useMemo(()=>{
   const errors:Record<string,string>={}
   const payload:Record<string,unknown>={}
