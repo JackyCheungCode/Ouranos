@@ -48,7 +48,7 @@ export default function SystemIntegrationsApp() {
   const [section, setSection] = useState<Section>('data')
   const [selectedKey, setSelectedKey] = useState('apify')
   const [query, setQuery] = useState('')
-  const [showDisabledHint, setShowDisabledHint] = useState(false)
+  
   const refreshConnections = async()=>{
     if(!supabase||!workspace)return
     setDbLoading(true);setDbError('')
@@ -77,7 +77,6 @@ export default function SystemIntegrationsApp() {
     setSection(next)
     setSelectedKey(next === 'ai' ? 'works-ai' : 'apify')
     setQuery('')
-    setShowDisabledHint(false)
   }
 
   return <div className="integrations-app">
@@ -89,7 +88,7 @@ export default function SystemIntegrationsApp() {
       </div>
       <div className="int-header-actions">
         <span className="int-security-chip"><ShieldCheck size={14}/> 服务端凭证管理</span>
-        <button className="int-primary" onClick={() => setShowDisabledHint(true)}>新增集成 <span>＋</span></button>
+        <button className="int-primary" onClick={() => chooseSection(section)}>管理配置 <span>＋</span></button>
       </div>
     </div>
 
@@ -114,7 +113,7 @@ export default function SystemIntegrationsApp() {
         </div>
         <div className="int-list-labels"><span>服务商</span><span>连接状态</span><span>配置</span></div>
         <div className="int-provider-list">
-          {filtered.map(provider => {const connection=provider.key==='works-ai'?null:provider.group==='ai'?aiConfigs.find(item=>item.provider_key===provider.key&&item.is_default)||aiConfigs.find(item=>item.provider_key===provider.key):dataConnections.find(item=>item.provider_key===provider.key);const status=provider.key==='works-ai'?'built-in':connection?.status||'not_configured';return <button key={provider.key} className={'int-provider-row ' + (selectedKey === provider.key ? 'selected' : '')} onClick={() => {setSelectedKey(provider.key);setShowDisabledHint(false)}}>
+          {filtered.map(provider => {const connection=provider.key==='works-ai'?null:provider.group==='ai'?aiConfigs.find(item=>item.provider_key===provider.key&&item.is_default)||aiConfigs.find(item=>item.provider_key===provider.key):dataConnections.find(item=>item.provider_key===provider.key);const status=provider.key==='works-ai'?'built-in':connection?.status||'not_configured';return <button key={provider.key} className={'int-provider-row ' + (selectedKey === provider.key ? 'selected' : '')} onClick={() => setSelectedKey(provider.key)}>
             <span className={'int-provider-icon ' + (provider.group === 'ai' ? 'ai' : '')}>{provider.group === 'ai' ? <Bot size={17}/> : <Cloud size={17}/>}</span>
             <span className="int-provider-main"><b>{provider.name}</b><small>{provider.category}</small></span>
             <span className={status==='connected'?'int-connected':status==='configured'?'int-configured':provider.key==='works-ai'?'int-connected':'int-not-connected'}><i/> {status==='connected'?'已连接':status==='configured'?'已配置':status==='error'?'连接异常':provider.key==='works-ai'?'内置默认':'未配置'}</span>
@@ -159,8 +158,6 @@ export default function SystemIntegrationsApp() {
       {!integrationLogs.length&&<div className="int-log-empty"><Activity size={22}/><b>暂无集成日志</b><span>凭证保存、删除和连接测试记录会显示在这里。</span></div>}
     </section>}
 
-    {showDisabledHint && <div className="int-hint-overlay" role="dialog" aria-modal="true" aria-label="连接配置说明">
-      <div className="int-hint-dialog"><button className="int-hint-close" onClick={() => setShowDisabledHint(false)} aria-label="关闭"><X size={17}/></button><span className="int-hint-icon"><KeyRound size={21}/></span><h3>安全凭证服务正在接入</h3><p>登录和工作空间上下文已接通，当前页面已读取真实连接配置。下一阶段将开放服务端 API Key 保存、更新、删除与连接测试；密钥始终只保存在 Supabase Vault，不会返回浏览器。</p><div className="int-hint-checks"><span><CheckCircle2 size={14}/> 数据库配置结构已建立</span><span><CheckCircle2 size={14}/> Vault 服务端密钥接口已部署</span><span><Workflow size={14}/> 用户认证与连接测试待接入</span></div><button className="int-primary full" onClick={() => setShowDisabledHint(false)}>知道了</button></div>
-    </div>}
+
   </div>
 }
