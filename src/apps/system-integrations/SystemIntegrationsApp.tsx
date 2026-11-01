@@ -20,6 +20,7 @@ const dataProviders: Provider[] = [
 ]
 
 const aiProviders: Provider[] = [
+  { key:'works-ai', name:'Works AI', category:'Ouranos 内置 AI', description:'Ouranos 默认 AI 服务入口，用于搜索计划、线索分析与工作流编排。具体模型路由由平台运行环境提供。', channels:'Works AI 默认模型', docs:'', group:'ai' },
   { key:'openai', name:'OpenAI', category:'大语言模型', description:'用于客户画像理解、搜索计划、企业摘要与线索评分。', channels:'GPT 系列模型', docs:'https://platform.openai.com/docs', group:'ai' },
   { key:'anthropic', name:'Anthropic', category:'大语言模型', description:'用于复杂企业研究、信息归纳和多步骤推理。', channels:'Claude 系列模型', docs:'https://docs.anthropic.com/', group:'ai' },
   { key:'google-ai', name:'Google AI', category:'大语言模型', description:'用于文本理解、信息抽取和多模态分析。', channels:'Gemini 系列模型', docs:'https://ai.google.dev/gemini-api/docs', group:'ai' },
@@ -41,7 +42,7 @@ export default function SystemIntegrationsApp() {
   const filtered = providers.filter(item => (item.name + item.category + item.description + item.channels).toLowerCase().includes(query.toLowerCase()))
   const chooseSection = (next: Section) => {
     setSection(next)
-    setSelectedKey(next === 'ai' ? 'openai' : 'apify')
+    setSelectedKey(next === 'ai' ? 'works-ai' : 'apify')
     setQuery('')
     setShowDisabledHint(false)
   }
@@ -61,7 +62,7 @@ export default function SystemIntegrationsApp() {
 
     <div className="int-stat-strip">
       <div><span>数据服务商</span><b>07</b><small>计划接入</small></div>
-      <div><span>AI 服务商</span><b>05</b><small>可配置模型</small></div>
+      <div><span>AI 服务商</span><b>06</b><small>可配置模型</small></div>
       <div><span>已连接服务</span><b>00</b><small>尚未配置凭证</small></div>
       <div><span>最近连接测试</span><b>—</b><small>暂无测试记录</small></div>
     </div>
@@ -83,7 +84,7 @@ export default function SystemIntegrationsApp() {
           {filtered.map(provider => <button key={provider.key} className={'int-provider-row ' + (selectedKey === provider.key ? 'selected' : '')} onClick={() => {setSelectedKey(provider.key);setShowDisabledHint(false)}}>
             <span className={'int-provider-icon ' + (provider.group === 'ai' ? 'ai' : '')}>{provider.group === 'ai' ? <Bot size={17}/> : <Cloud size={17}/>}</span>
             <span className="int-provider-main"><b>{provider.name}</b><small>{provider.category}</small></span>
-            <span className="int-not-connected"><i/> 未连接</span>
+            <span className={provider.key === "works-ai" ? "int-connected" : "int-not-connected"}><i/> {provider.key === "works-ai" ? "内置默认" : "未连接"}</span>
             <ChevronRight size={15} className="int-row-chevron"/>
           </button>)}
           {!filtered.length && <div className="int-no-results">没有匹配的服务商</div>}
@@ -98,7 +99,7 @@ export default function SystemIntegrationsApp() {
               <span className={'int-detail-icon ' + (selected.group === 'ai' ? 'ai' : '')}>{selected.group === 'ai' ? <Bot size={23}/> : <Cloud size={23}/>}</span>
               <div><div className="int-eyebrow">{selected.group === 'ai' ? 'AI PROVIDER' : 'DATA PROVIDER'}</div><h2>{selected.name}</h2><p>{selected.category}</p></div>
             </div>
-            <span className="int-status"><i/> 未连接</span>
+            <span className={selected.key === "works-ai" ? "int-status built-in" : "int-status"}><i/> {selected.key === "works-ai" ? "内置默认" : "未连接"}</span>
           </div>
           <p className="int-description">{selected.description}</p>
           <div className="int-detail-tabs"><span className="active">连接信息</span><span>高级设置</span><span>使用记录</span></div>
@@ -107,15 +108,15 @@ export default function SystemIntegrationsApp() {
             <div className="int-config-row"><span>服务商</span><b>{selected.name}</b></div>
             <div className="int-config-row"><span>支持渠道 / 能力</span><b>{selected.channels}</b></div>
             {selected.group === 'ai' && <><div className="int-config-row"><span>模型名称</span><b>连接后选择模型</b></div><div className="int-config-row"><span>默认模型</span><b>未设置</b></div></>}
-            <div className="int-config-row"><span>API 凭证</span><b className="int-credential-state"><KeyRound size={13}/> 尚未配置</b></div>
-            <div className="int-config-row"><span>密钥存储</span><b>Supabase Vault（服务端）</b></div>
+            {selected.key !== "works-ai" && <div className="int-config-row"><span>API 凭证</span><b className="int-credential-state"><KeyRound size={13}/> 尚未配置</b></div>}
+            {selected.key !== "works-ai" && <div className="int-config-row"><span>密钥存储</span><b>Supabase Vault（服务端）</b></div>}
             <div className="int-config-row"><span>最近测试</span><b>从未测试</b></div>
           </div>
           <div className="int-connection-actions">
-            <button className="int-primary" onClick={() => setShowDisabledHint(true)}>配置连接 <ArrowRight size={14}/></button>
+            {selected.key !== "works-ai" && <button className="int-primary" onClick={() => setShowDisabledHint(true)}>配置连接 <ArrowRight size={14}/></button>}
             {selected.docs && <a href={selected.docs} target="_blank" rel="noreferrer">查看官方文档 <ExternalLink size={13}/></a>}
           </div>
-          <div className="int-info-box"><ShieldCheck size={17}/><span>API Key 不会存入浏览器或前端代码。凭证录入、加密保存和连接测试将在服务端密钥管理接口完成后开放。</span></div>
+          <div className="int-info-box"><ShieldCheck size={17}/><span>{selected.key === "works-ai" ? "Works AI 是 Ouranos 默认模型入口，无需在此录入第三方 API Key。可在 AI 搜索计划中直接选用。" : "API Key 不会存入浏览器或前端代码。凭证录入、加密保存和连接测试将在服务端密钥管理接口完成后开放。"}</span></div>
         </>}
       </section>
     </div> : <section className="int-log-panel">
