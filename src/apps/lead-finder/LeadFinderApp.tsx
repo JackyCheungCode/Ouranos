@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Bot, Building2, Check, CheckCircle2, ChevronDown, CircleHelp, Clock3, Database, Globe2, Plus, Search, Settings2, ShieldCheck, Sparkles, Target, Users, Workflow, Inbox, UserRoundCheck } from 'lucide-react'
-import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import type { Layer, PathOptions } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
