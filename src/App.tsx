@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Activity, ChevronDown, ChevronRight, CircleHelp, Home, Layers3, Menu, Moon, Search, Settings, Sun, X } from 'lucide-react'
+import { Activity, ChevronDown, ChevronRight, CircleHelp, Home, Layers3, Menu, Moon, Search, Settings, Sun } from 'lucide-react'
 import { apps, groups, initialFavorites, recentIds } from './apps/registry'
 import type { AppItem } from './apps/types'
 import AppTile from './apps/components/AppTile'
@@ -8,8 +8,9 @@ import './index.css'
 export default function App() {
   const [active, setActive] = useState<AppItem | null>(null)
   const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
   const [dark, setDark] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [favorites, setFavorites] = useState(initialFavorites)
   const [recent, setRecent] = useState(recentIds)
   const [filter, setFilter] = useState('all')
@@ -19,27 +20,33 @@ export default function App() {
   }), [filter, favorites, recent, query])
   const groupedApps = groups.map(group => ({ ...group, apps: filtered.filter(app => app.group === group.id) })).filter(group => group.apps.length > 0)
   const toggleFavorite = (id: string) => setFavorites(value => value.includes(id) ? value.filter(item => item !== id) : [...value, id])
-  const openApp = (app: AppItem) => { setActive(app); setRecent(value => [app.id, ...value.filter(id => id !== app.id)].slice(0, 8)) }
+  const openApp = (app: AppItem) => { setActive(app); setRecent(value => [app.id, ...value.filter(id => id !== app.id)].slice(0, 8)); setSidebarOpen(false) }
+  const selectFilter = (nextFilter: string) => { setActive(null); setFilter(nextFilter); setSidebarOpen(false) }
   const Icon = active?.icon
   const pageTitle = filter === 'all' ? '全部应用' : filter === 'favorites' ? '我的收藏' : filter === 'recent' ? '最近使用' : groups.find(group => group.id === filter)?.title
   return <div className={dark ? 'ouranos dark' : 'ouranos'}>
     <header className="topbar">
-      <button className="menu-toggle" title={sidebarOpen ? '隐藏侧边栏' : '展开侧边栏'} aria-label={sidebarOpen ? '隐藏侧边栏' : '展开侧边栏'} onClick={() => setSidebarOpen(value => !value)}>{sidebarOpen ? <Menu size={21}/> : <Menu size={21}/>}</button>
+      <button className="menu-toggle" title={sidebarOpen ? '隐藏侧边栏' : '展开侧边栏'} aria-label={sidebarOpen ? '隐藏侧边栏' : '展开侧边栏'} aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(value => !value)}><Menu size={21}/></button>
       <div className="brand"><div className="brand-mark"><span/><span/><span/></div><span>ouranos</span><span className="brand-edition">企业版</span></div>
-      <div className="top-search"><Search size={17}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索应用、公司、联系人..."/></div>
+      <div className={'top-search ' + (searchOpen ? 'is-open' : '')}>
+        {searchOpen && <input autoFocus value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => {if(event.key === 'Escape') setSearchOpen(false)}} placeholder="搜索应用、公司、联系人..."/>}
+        <button className="search-toggle" title={searchOpen ? '关闭搜索' : '搜索'} aria-label={searchOpen ? '关闭搜索' : '搜索'} onClick={() => {setSearchOpen(value => !value); if(searchOpen) setQuery('')}}><Search size={19}/></button>
+      </div>
       <div className="top-actions"><button className="icon-button" title="帮助"><CircleHelp size={18}/></button><button className="icon-button" title="切换主题" onClick={() => setDark(value => !value)}>{dark ? <Sun size={18}/> : <Moon size={18}/>}</button><button className="profile"><span>J</span><span className="profile-name">管理员</span><ChevronDown size={14}/></button></div>
     </header>
     <div className={'layout ' + (!sidebarOpen ? 'sidebar-collapsed' : '')}>
-      {sidebarOpen && <aside className="sidebar">
-        <button className="workspace-switch"><span className="workspace-avatar">O</span><span className="workspace-text"><b>Ouranos 工作空间</b><small>企业版</small></span><ChevronDown size={15}/></button>
-        <div className="side-label">工作空间</div>
-        <button className={'side-link ' + (!active && filter === 'all' ? 'selected' : '')} onClick={() => {setActive(null);setFilter('all')}}><Home size={17}/><span>全部应用</span><span className="side-count">{apps.length}</span></button>
-        <button className={'side-link ' + (filter === 'favorites' ? 'selected' : '')} onClick={() => {setActive(null);setFilter('favorites')}}><Layers3 size={17}/><span>我的收藏</span></button>
-        <button className={'side-link ' + (filter === 'recent' ? 'selected' : '')} onClick={() => {setActive(null);setFilter('recent')}}><Activity size={17}/><span>最近使用</span></button>
-        <div className="side-label side-label-spaced">应用分类</div>
-        {groups.map(group => <button key={group.id} className={'side-link ' + (filter === group.id ? 'selected' : '')} onClick={() => {setActive(null);setFilter(group.id)}}><span className="category-dot"/><span>{group.title}</span></button>)}
-        <div className="sidebar-bottom"><button className="side-link" onClick={() => {setActive(apps.find(app => app.id === 'settings') ?? null)}}><Settings size={17}/><span>设置</span></button></div>
-      </aside>}
+      {sidebarOpen && <>
+        <button className="sidebar-backdrop" aria-label="关闭侧边栏" onClick={() => setSidebarOpen(false)}/>
+        <aside className="sidebar">
+          <div className="side-label">工作空间</div>
+          <button className={'side-link ' + (!active && filter === 'all' ? 'selected' : '')} onClick={() => selectFilter('all')}><Home size={17}/><span>全部应用</span><span className="side-count">{apps.length}</span></button>
+          <button className={'side-link ' + (filter === 'favorites' ? 'selected' : '')} onClick={() => selectFilter('favorites')}><Layers3 size={17}/><span>我的收藏</span></button>
+          <button className={'side-link ' + (filter === 'recent' ? 'selected' : '')} onClick={() => selectFilter('recent')}><Activity size={17}/><span>最近使用</span></button>
+          <div className="side-label side-label-spaced">应用分类</div>
+          {groups.map(group => <button key={group.id} className={'side-link ' + (filter === group.id ? 'selected' : '')} onClick={() => selectFilter(group.id)}><span className="category-dot"/><span>{group.title}</span></button>)}
+          <div className="sidebar-bottom"><button className="side-link" onClick={() => {setActive(apps.find(app => app.id === 'settings') ?? null);setSidebarOpen(false)}}><Settings size={17}/><span>设置</span></button></div>
+        </aside>
+      </>}
       <main className="main">
         {active ? <div className="module-page">
           <div className="breadcrumbs"><button onClick={() => setActive(null)}><Layers3 size={15}/> 全部应用</button><ChevronRight size={14}/><span>{active.name}</span></div>
