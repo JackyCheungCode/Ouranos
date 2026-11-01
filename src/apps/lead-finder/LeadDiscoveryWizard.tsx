@@ -44,6 +44,10 @@ const outputMapping = (schema: Record<string, unknown>) => {
   phone: pick(['phone','phoneNumber','phone_number','telephone'], 'phone'),
   country_name: pick(['country','countryName','country_name'], 'country'),
   address: pick(['address','fullAddress','full_address','streetAddress'], 'address'),
+  contact_name: pick(['contactName','fullName','full_name','personName','person_name'], 'fullName'),
+  job_title: pick(['jobTitle','job_title','position','role'], 'jobTitle'),
+  contact_email: pick(['contactEmail','email','emailAddress'], 'email'),
+  contact_phone: pick(['contactPhone','phone','phoneNumber'], 'phone'),
   source_url: pick(['url','website','websiteUrl','link'], 'url')
  }
 }
@@ -224,7 +228,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspaceId,created_by:userId,name:taskTitle,status:'draft',target_profile:profile,selected_channels:[channel],target_count:Number(targetCount)}).select('id').single()
    if(taskError)throw new Error(taskError.message)
    const adapterKey='apify-'+channel+'-'+(actor.username+'-'+actor.name).toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,110)
-   const config={input_defaults:actorInput,input_mapping:{},field_mapping:mapping,max_cost:0}
+   const finalMapping={...mapping}
+   if(targetType==='contacts'){finalMapping.company_name='';finalMapping.contact_name=finalMapping.contact_name||'fullName'}
+   const config={input_defaults:actorInput,input_mapping:{},field_mapping:finalMapping,max_cost:0}
    const {error:selectionError}=await supabase.from('workspace_adapter_selections').upsert({workspace_id:workspaceId,adapter_key:adapterKey,channel_key:channel,is_enabled:true,priority:10,config,created_by:userId,updated_at:new Date().toISOString()},{onConflict:'workspace_id,adapter_key'})
    if(selectionError)throw new Error('搜索任务已保存，但适配器配置失败：'+selectionError.message)
    const {data:queued,error:queueError}=await supabase.functions.invoke('enqueue-lead-search',{body:{workspace_id:workspaceId,task_id:task.id,confirm_cost:true}})
