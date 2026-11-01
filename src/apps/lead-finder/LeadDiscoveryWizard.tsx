@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Check, ChevronDown, ExternalLink, HelpCircle, Loader2, MapPin, Search, ShieldCheck, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from 'react-leaflet'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
+import { divIcon } from 'leaflet'
 import type { PathOptions } from 'leaflet'
 import { countries } from './countries'
 import './LeadDiscoveryWizard.css'
@@ -11,6 +12,8 @@ type Props = { workspaceId: string; userId: string; onTaskCreated: () => void }
 type Actor = { id: string; name: string; username: string; title: string; description: string; url: string; stats?: { totalUsers?: number; actorReviewRating?: number; actorReviewCount?: number }; currentPricingInfo?: Record<string, unknown> }
 type SchemaField = { title?: string; description?: string; type?: string | string[]; editor?: string; default?: unknown; prefill?: unknown; example?: unknown; placeholderValue?: string; enum?: unknown[]; items?: SchemaField; properties?: Record<string, SchemaField>; required?: string[]; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; minItems?: number; maxItems?: number; pattern?: string; format?: string }
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
+type MapLocation = { lat:number; lon:number; label:string }
+const marketMarkerIcon=divIcon({className:'ldw-map-marker',html:'<span></span>',iconSize:[22,22],iconAnchor:[11,11]})
 const platformGroups = [
  { label: '搜索引擎与地图', items: [['google-maps','Google Maps','google maps business places'],['google-search','Google Search','google search results'],['bing','Bing','bing search results'],['yelp','Yelp','yelp business'] ] },
  { label: '社交媒体', items: [['instagram','Instagram','instagram profiles'],['facebook','Facebook','facebook pages'],['linkedin','LinkedIn','linkedin companies'],['tiktok','TikTok','tiktok profiles'],['youtube','YouTube','youtube channels'],['x','X / Twitter','twitter profiles'] ] },
@@ -52,39 +55,41 @@ const getDefaultValue = (field: SchemaField, required=false) => field.default ??
 const nominatim = async (params: Record<string,string>) => {
  const url = new URL('https://nominatim.openstreetmap.org/search')
  Object.entries({format:'jsonv2',addressdetails:'1',dedupe:'1',limit:'30',...params}).forEach(([k,v])=>url.searchParams.set(k,v))
- const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } })
+ const response = await fetch(url.toString(), { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(12000) })
  if (!response.ok) throw new Error('OpenStreetMap 地点服务暂时不可用')
- return await response.json() as Array<{ place_id:number; display_name:string; name?:string; address?:Record<string,string>; type?:string; class?:string; osm_type?:string; osm_id?:number }>
+ return await response.json() as Array<{ place_id:number; display_name:string; name?:string; lat?:string; lon?:string; address?:Record<string,string>; type?:string; class?:string; osm_type?:string; osm_id?:number }>
 }
 
 const osmRegions = async (countryCode:string,countryName:string) => {
- let areaId=0
- try {
-  const country=await nominatim({q:countryName,featureType:'country',limit:'1'})
-  const match=country.find(x=>x.osm_type==='relation'||x.osm_type==='way')
-  if(match?.osm_type==='relation'&&match.osm_id)areaId=3600000000+match.osm_id
-  else if(match?.osm_type==='way'&&match.osm_id)areaId=2400000000+match.osm_id
- } catch { /* ISO boundary fallback */ }
- const query=areaId
-  ? `[out:json][timeout:40];area(${areaId})->.country;(relation(area.country)["boundary"="administrative"]["admin_level"~"3|4|5"];);out tags center;`
-  : `[out:json][timeout:40];area["ISO3166-1"="${countryCode}"]["admin_level"="2"]->.country;(relation(area.country)["boundary"="administrative"]["admin_level"~"3|4|5"];);out tags center;`
+ const query = `[out:json][timeout:15];area["ISO3166-1"="${countryCode}"]["admin_level"="2"]->.country;(relation(area.country)["boundary"="administrative"]["admin_level"~"3|4|5|6"];way(area.country)["boundary"="administrative"]["admin_level"~"3|4|5|6"];);out tags center;`
  let lastError:unknown
- for(const endpoint of ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter']){
-  try {
-   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',Accept:'application/json'},body:new URLSearchParams({data:query}).toString()})
-   if(!response.ok)throw new Error('OpenStreetMap 地区服务暂时不可用')
-   const body=await response.json() as {elements?:Array<{id:number;tags?:Record<string,string>}>}
-   const unique=new Map<string,{place_id:number;name:string;display_name:string}>()
-   for(const item of body.elements||[]){const name=item.tags?.['name:en']||item.tags?.name;if(name&&!unique.has(name.toLocaleLowerCase()))unique.set(name.toLocaleLowerCase(),{place_id:item.id,name,display_name:name})}
-   return [...unique.values()].sort((a,b)=>a.name.localeCompare(b.name))
+ for(const endpoint of ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.nchc.org.tw/api/interpreter']){
+  try{
+   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',Accept:'application/json'},body:new URLSearchParams({data:query}).toString(),signal:AbortSignal.timeout(12000)})
+   if(!response.ok)throw new Error('OpenStreetMap 地区服务暂时不可用（HTTP '+response.status+'）')
+   const body=await response.json() as {elements?:Array<{id:number;tags?:Record<string,string>;center?:{lat:number;lon:number}}> }
+   const unique=new Map<string,{place_id:number;name:string;display_name:string;lat?:number;lon?:number}>()
+   for(const item of body.elements||[]){
+    const name=item.tags?.['name:zh']||item.tags?.['name:en']||item.tags?.name
+    if(name&&!unique.has(name.toLocaleLowerCase()))unique.set(name.toLocaleLowerCase(),{place_id:item.id,name,display_name:name,lat:item.center?.lat,lon:item.center?.lon})
+   }
+   const results=[...unique.values()].sort((a,b)=>a.name.localeCompare(b.name))
+   if(results.length)return results
+   throw new Error(countryName+' 暂无可用的行政区边界数据')
   }catch(error){lastError=error}
  }
  throw lastError instanceof Error?lastError:new Error('OpenStreetMap 地区数据暂时不可用')
 }
 
-function MarketMap({selected}:{selected:typeof countries}) {
+function MapFocus({location}:{location:MapLocation|null}) {
+ const map=useMap()
+ useEffect(()=>{if(location)map.flyTo([location.lat,location.lon],location.label?7:2,{duration:.7})},[map,location])
+ return null
+}
+
+function MarketMap({selected,location}:{selected:typeof countries;location:MapLocation|null}) {
  const [geo,setGeo]=useState<FeatureCollection<Geometry>|null>(null)
- useEffect(()=>{let active=true;fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json()).then(data=>{if(active)setGeo(data)}).catch(()=>{if(active)setGeo(null)});return()=>{active=false}},[])
+ useEffect(()=>{let active=true;fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',{signal:AbortSignal.timeout(15000)}).then(r=>{if(!r.ok)throw new Error('country boundary unavailable');return r.json()}).then(data=>{if(active)setGeo(data)}).catch(()=>{if(active)setGeo(null)});return()=>{active=false}},[])
  const codes=new Set(selected.map(c=>c.code))
  const style=(feature?:Feature):PathOptions=>{
   const p=feature?.properties as Record<string,string>|undefined
@@ -92,7 +97,7 @@ function MarketMap({selected}:{selected:typeof countries}) {
   const picked=codes.has(code)
   return {color:picked?'#76556f':'#c9c4ca',weight:picked?1.5:.55,fillColor:picked?'#a887a0':'#e9e6ea',fillOpacity:picked?.72:.3}
  }
- return <div className="ldw-map"><MapContainer center={[24,5]} zoom={1.25} minZoom={1} maxZoom={6} scrollWheelZoom={false} worldCopyJump style={{height:220,width:'100%'}}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>{geo&&<GeoJSON key={selected.map(c=>c.code).sort().join(',')} data={geo} style={style}/>}</MapContainer><div>OpenStreetMap · 已选国家 / 地区边界</div></div>
+ return <div className="ldw-map"><MapContainer center={location?[location.lat,location.lon]:[24,5]} zoom={location?5:1.25} minZoom={1} maxZoom={12} scrollWheelZoom={false} worldCopyJump style={{height:220,width:'100%'}}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>{geo&&<GeoJSON key={selected.map(c=>c.code).sort().join(',')} data={geo} style={style}/>}<MapFocus location={location}/>{location&&<Marker position={[location.lat,location.lon]} icon={marketMarkerIcon}><Popup>{location.label}</Popup></Marker>}</MapContainer><div>{location?'地图已定位：'+location.label:'OpenStreetMap · 选择城市或行政区后自动定位'}</div></div>
 }
 
 export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated }: Props) {
@@ -103,13 +108,16 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [countryQuery,setCountryQuery] = useState('')
  const [countryOpen,setCountryOpen] = useState(false)
  const [region,setRegion] = useState('__all__')
+ const [regionManual,setRegionManual] = useState('')
+ const [regionLoadError,setRegionLoadError] = useState('')
+ const [mapLocation,setMapLocation] = useState<MapLocation|null>(null)
  const [expandedPlatformGroup,setExpandedPlatformGroup] = useState('搜索引擎与地图')
  const [showAllActors,setShowAllActors] = useState(false)
  const [expandedHelp,setExpandedHelp] = useState<Record<string,boolean>>({})
  const [city,setCity] = useState('')
  const [cityQuery,setCityQuery] = useState('')
- const [cityResults,setCityResults] = useState<Array<{place_id:number;display_name:string;name?:string}>>([])
- const [regionResults,setRegionResults] = useState<Array<{place_id:number;display_name:string;name?:string}>>([])
+ const [cityResults,setCityResults] = useState<Array<{place_id:number;display_name:string;name?:string;lat?:string;lon?:string}>>([])
+ const [regionResults,setRegionResults] = useState<Array<{place_id:number;display_name:string;name?:string;lat?:number;lon?:number}>>([])
  const [locationBusy,setLocationBusy] = useState(false)
  const [citySearchBusy,setCitySearchBusy] = useState(false)
  const [actorQuery,setActorQuery] = useState('')
@@ -119,6 +127,17 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [schema,setSchema] = useState<JsonSchema|null>(null)
  const [schemaBusy,setSchemaBusy] = useState(false)
  const [values,setValues] = useState<Record<string,unknown>>({})
+ const [aiModel,setAiModel] = useState('@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+ const [aiRequest,setAiRequest] = useState('')
+ const [aiBusy,setAiBusy] = useState(false)
+ const [aiGenerated,setAiGenerated] = useState<Record<string,unknown>|null>(null)
+ const [aiSummary,setAiSummary] = useState('')
+ const [aiStrategy,setAiStrategy] = useState('')
+ const [aiWarnings,setAiWarnings] = useState<string[]>([])
+ const [aiError,setAiError] = useState('')
+ const [aiApplied,setAiApplied] = useState(false)
+ const [aiAnalyzedContext,setAiAnalyzedContext] = useState('')
+ const aiContextKey=useMemo(()=>stableStringify({channel,provider,actor_id:actor?.id||'',schema,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost}),[channel,provider,actor?.id,schema,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost])
  const [keywords,setKeywords] = useState('')
  const [product,setProduct] = useState('')
  const [industry,setIndustry] = useState('')
@@ -157,6 +176,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   for(const group of requirements.atLeastOneGroups){if(group.every(key=>isEmptyRequired(payload[key]))){errors[group[0]]='搜索入口至少填写一项：'+group.map(key=>localizeTitle(key,schema?.properties?.[key]||{})).join(' / ')}}
   return {errors,payload,valid:Object.keys(errors).length===0}
  },[schema,values])
+ useEffect(()=>{if(aiGenerated&&aiAnalyzedContext&&aiAnalyzedContext!==aiContextKey){setAiApplied(false);setAiError('市场或搜索任务配置已变化。之前的 AI 分析不能直接应用，请重新分析。')}},[aiContextKey])
  const availableProviders = providerByPlatform[channel] || ['Apify']
  const selectedCountry = countries.find(c=>c.code===countryCode)
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
@@ -172,22 +192,32 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label)},[channel])
  useEffect(()=>{
   let active=true
-  if(!countryCode){setRegionResults([]);setRegion('__all__');setCity('');return}
-  setLocationBusy(true);setRegion('');setCity('');setCityQuery('')
+  if(!countryCode){setRegionResults([]);setRegion('__all__');setRegionManual('');setCity('');setMapLocation(null);setRegionLoadError('');setLocationBusy(false);return}
+  const countryName=selectedCountry?.geoName||selectedCountry?.name||countryCode
+  setLocationBusy(true);setRegion('__all__');setRegionManual('');setCity('');setCityQuery('');setMapLocation(null);setRegionLoadError('')
   const timer=setTimeout(async()=>{
-   try {const results=await osmRegions(countryCode,selectedCountry?.geoName||selectedCountry?.name||countryCode);if(active){setRegionResults(results);setRegion('__all__')}}
-   catch(e){if(active)setError(e instanceof Error?e.message:'地区列表加载失败')}
-   finally{if(active)setLocationBusy(false)}
-  },350)
+   const [regions,geocode]=await Promise.allSettled([
+    osmRegions(countryCode,countryName),
+    nominatim({q:countryName,featureType:'country',limit:'1'})
+   ])
+   if(active){
+    if(regions.status==='fulfilled'){setRegionResults(regions.value);setRegion('__all__')}
+    else{setRegionResults([]);setRegion('__all__');setRegionLoadError(regions.reason instanceof Error?regions.reason.message:'行政区加载失败，可手动输入。')}
+    if(geocode.status==='fulfilled'&&geocode.value[0]?.lat&&geocode.value[0]?.lon){
+     const item=geocode.value[0];setMapLocation({lat:Number(item.lat),lon:Number(item.lon),label:countryName})
+    }else setMapLocation(null)
+    setLocationBusy(false)
+   }
+  },250)
   return()=>{active=false;clearTimeout(timer)}
  },[countryCode])
  const searchCities = async () => {
   if(!cityQuery.trim()||!countryCode)return
   setCitySearchBusy(true);setError('')
   try {
-   const q=[cityQuery,region,selectedCountry?.geoName].filter(Boolean).join(', ')
+   const q=[cityQuery,region!=='__all__'?region:'',selectedCountry?.geoName].filter(Boolean).join(', ')
    const results=await nominatim({q,countrycodes:countryCode.toLowerCase(),featureType:'city',limit:'8'})
-   setCityResults(results.slice(0,8).map(x=>({place_id:x.place_id,display_name:x.display_name,name:x.name||x.display_name.split(',')[0]})))
+   setCityResults(results.slice(0,8).map(x=>({place_id:x.place_id,display_name:x.display_name,name:x.name||x.display_name.split(',')[0],lat:x.lat,lon:x.lon})))
    if(!results.length)setNotice('OpenStreetMap 没有找到匹配城市，请调整名称再搜索。')
   }catch(e){setError(e instanceof Error?e.message:'城市搜索失败')}
   finally{setCitySearchBusy(false)}
@@ -209,7 +239,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  const selectActor = async (item: Actor) => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
-  setActor(item);setSchema(null);setValues({});setSchemaBusy(true);setError('');setNotice('')
+  setActor(item);setSchema(null);setValues({});setAiGenerated(null);setAiSummary('');setAiStrategy('');setAiWarnings([]);setAiApplied(false);setAiError('');setSchemaBusy(true);setError('');setNotice('')
   const actorId=item.username+'~'+item.name
   const {data,error:invokeError}=await supabase.functions.invoke('apify-actor-schema',{body:{workspace_id:workspaceId,actor_id:actorId,channel_key:channel}})
   if(invokeError||data?.error){setError(data?.error||invokeError?.message||'读取 Actor Schema 失败');setActor(null);setSchemaBusy(false);return}
@@ -252,10 +282,48 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    <small className="ldw-field-key">Actor 原始字段：{key}</small>{fieldErrors.map(([path,message])=><small className="ldw-field-error" key={path}>{path===key?'':schemaPathLabel(schema||{},path)+'：'}{message}</small>)}{showHelp&&<small className="ldw-field-help">{localizeDescription(key,field)}</small>}
   </label>
  }
+ const analyzeActorInput = async () => {
+  if(!supabase||!actor||!schema){setAiError('请先选择 Actor 并成功读取 Schema。');return}
+  setAiBusy(true);setAiError('');setAiGenerated(null);setAiApplied(false)
+  try{
+   const {data:sessionData,error:sessionError}=await supabase.auth.getSession()
+   if(sessionError||!sessionData.session?.access_token)throw new Error('登录状态已失效，请重新登录。')
+   const response=await fetch('https://ouranos-ai-assistant.xg-y.workers.dev',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+sessionData.session.access_token},
+    body:JSON.stringify({
+     model:aiModel,user_request:aiRequest,channel,
+     actor_id:actor.username+'~'+actor.name,actor_name:actor.title,
+     actor_schema:schema,
+     market:{countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},
+     task_limits:{task_name:taskName,product,industry,keywords,target_type:targetType,target_count:Number(targetCount),max_cost_usd:Number(maxCost)}
+    })
+   })
+   const result=await response.json()
+   if(!response.ok||!result?.ok)throw new Error(result?.error||'AI 分析失败，请稍后重试。')
+   setAiGenerated(result.actor_input as Record<string,unknown>)
+   setAiSummary(String(result.summary||''));setAiStrategy(String(result.strategy||''))
+   setAiWarnings(Array.isArray(result.warnings)?result.warnings.map(String):[]);setAiAnalyzedContext(aiContextKey)
+  }catch(e){setAiError(e instanceof Error?e.message:'AI 分析失败，请稍后重试。')}
+  finally{setAiBusy(false)}
+ }
+ const applyAiGenerated = () => {
+  if(!aiGenerated||!schema)return
+  if(aiAnalyzedContext!==aiContextKey){setAiError('市场或搜索任务配置已变化，请重新运行 AI 分析后再填入参数。');return}
+  const mapped=Object.fromEntries(Object.entries(aiGenerated).map(([key,value])=>{
+   const field=schema.properties?.[key];const type=field?fieldType(field):'string'
+   if(type==='array'&&field?.editor==='stringList')return [key,Array.isArray(value)?value:[]]
+   if(type==='array'||type==='object')return [key,JSON.stringify(value,null,2)]
+   return [key,value]
+  }))
+  setValues(current=>({...current,...mapped}));setAiApplied(true)
+  setNotice('AI 参数已填入 Schema 表单。请检查最终 JSON 和必填项校验结果。')
+ }
  const startSearch = async () => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
   if(!schema||!actor||!costConsent)return
+  if(aiApplied&&aiAnalyzedContext!==aiContextKey){setError('市场或搜索任务配置已变化，之前的 AI 参数已过期。请重新分析并确认参数，或重新检查后再提交。');return}
   if(!schemaValidation.valid){setError('请先修正 Schema 字段中的 '+Object.keys(schemaValidation.errors).length+' 项校验问题。');return}
   if(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0){setError('请设置大于 0 的单次费用上限。');return}
   setBusy(true);setError('')
@@ -264,7 +332,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     const taskTitle=taskName.trim()||product.trim()||keywords.trim()||actor.title
    const actorId=actor.username+'~'+actor.name
     const schemaHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stableStringify(schema))).then(d=>[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''))
-    const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region,city},source_channel:channel}
+    const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel,ai_analysis:aiGenerated?{model:aiModel,user_request:aiRequest,summary:aiSummary,strategy:aiStrategy,actor_input:aiGenerated,analyzed_at:new Date().toISOString()}:null}
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspaceId,created_by:userId,name:taskTitle,status:'draft',target_profile:profile,selected_channels:[channel],target_count:Number(targetCount)}).select('id').single()
    if(taskError)throw new Error(taskError.message)
    const adapterKey='apify-'+channel+'-'+(actor.username+'-'+actor.name).toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,110)
@@ -286,8 +354,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   return model+price
  }
  return <div className="ldw-shell">
-  <div className="ldw-intro"><div><span className="ldw-eyebrow">LEAD DISCOVERY WORKSPACE</span><h2>发现潜在客户</h2><p>先选择客户来源，再选择供应商和采集器。参数表单会根据采集器 Schema 自动生成。</p></div><span className="ldw-status"><Sparkles size={14}/> 动态采集配置</span></div>
-  <div className="ldw-odoo-flow" aria-label="潜客发现流程">{[['01','来源平台'],['02','数据供应商'],['03','目标市场'],['04','采集器与参数'],['05','任务设置']].map(([n,label])=><div className="ldw-odoo-flow-item" key={n}><span>{n}</span><b>{label}</b></div>)}</div>
+  <div className="ldw-intro"><div><span className="ldw-eyebrow">LEAD DISCOVERY WORKSPACE</span><h2>发现潜在客户</h2><p>先定义目标市场和搜索任务，再选择采集器；AI 将依据真实 Schema 生成参数。</p></div><span className="ldw-status"><Sparkles size={14}/> 动态采集配置</span></div>
+  <div className="ldw-odoo-flow" aria-label="潜客发现流程">{[['01','来源平台'],['02','数据供应商'],['03','目标市场'],['04','搜索任务限制'],['05','选择 Actor'],['06','AI 分析与参数']].map(([n,label])=><div className="ldw-odoo-flow-item" key={n}><span>{n}</span><b>{label}</b></div>)}</div>
   <div className="ldw-step-grid">
    <section className="ldw-card"><div className="ldw-step-title"><span>01</span><div><h3>选择客户来源平台</h3><p>先确定你要从哪里发现潜在客户。按类别收纳，点击展开。</p></div></div>
     <div className="ldw-platform-groups">{platformGroups.map(group=><div className="ldw-platform-group" key={group.label}>
@@ -305,26 +373,14 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     <div className="ldw-field ldw-country-field"><span>目标国家 / 地区</span><button type="button" className="ldw-country-trigger" onClick={()=>setCountryOpen(v=>!v)}><span>{selectedCountryItems.length?selectedCountryItems.map(c=>c.flag).join(' ')+'  '+selectedCountryItems.length+' 个国家 / 地区':'全球（不限制）'}</span><ChevronDown size={14}/></button>
      {countryOpen&&<div className="ldw-country-popover"><div className="ldw-country-search"><Search size={13}/><input value={countryQuery} onChange={e=>setCountryQuery(e.target.value)} placeholder="搜索国家或地区"/></div><div className="ldw-country-actions"><button type="button" onClick={()=>{setSelectedCountries([]);setCountryCode('');setRegion('');setCity('')}}>清空</button><button type="button" onClick={()=>setSelectedCountries(countries.map(c=>c.code))}>选择列表全部</button></div><div className="ldw-country-list">{countries.filter(c=>(c.name+c.code+c.geoName).toLowerCase().includes(countryQuery.toLowerCase())).map(c=><button type="button" key={c.code} className={selectedCountries.includes(c.code)?'selected':''} onClick={()=>toggleCountry(c.code)}><span>{c.flag}</span><span>{c.name}</span>{selectedCountries.includes(c.code)&&<Check size={13}/>}</button>)}</div><small>支持多国筛选；地区和城市范围由下方指定的国家联动。</small></div>}
     </div>
-    <div className="ldw-map-wrap"><MarketMap selected={selectedCountryItems}/></div>
-    <label className="ldw-field"><span>地区所属国家</span><select value={countryCode} onChange={e=>{setCountryCode(e.target.value);setRegion('');setCity('');setCityQuery('')}} disabled={!selectedCountries.length}><option value="">选择国家</option>{selectedCountryItems.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select><small>可从已选国家中指定一个国家筛选州 / 省和城市。</small></label>
-    <label className="ldw-field"><span>州 / 省 / 行政区</span><select value={region} onChange={e=>{setRegion(e.target.value);setCity('');setCityQuery('')}} disabled={!countryCode||locationBusy}><option value="__all__">{locationBusy?'正在从 OpenStreetMap 加载…':'全部（不限制州 / 省 / 行政区）'}</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select><small>{locationBusy?'正在读取该国家的行政区划…':regionResults.length?'已从 OpenStreetMap 读取 '+regionResults.length+' 个地区。':'地区暂不可用时仍可选择全部。'}</small></label>
-    <div className="ldw-field ldw-city-field"><span>城市</span><div className="ldw-city-search-row"><input disabled={!countryCode} value={cityQuery||city} onChange={e=>{setCityQuery(e.target.value);setCity('')}} onKeyDown={e=>{if(e.key==='Enter')void searchCities()}} placeholder="输入城市名称…"/><button type="button" disabled={!countryCode||citySearchBusy||!cityQuery.trim()} onClick={()=>void searchCities()}><Search size={12}/>{citySearchBusy?'搜索中':'搜索'}</button></div>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{setCity(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}<small>选择国家和地区后，点击搜索查询 OpenStreetMap 城市。</small></div>
+    <div className="ldw-map-wrap"><MarketMap selected={selectedCountryItems} location={mapLocation}/></div>
+    <label className="ldw-field"><span>地区所属国家</span><select value={countryCode} onChange={e=>{setCountryCode(e.target.value);setRegion('__all__');setRegionManual('');setCity('');setCityQuery('');setMapLocation(null)}} disabled={!selectedCountries.length}><option value="">选择国家</option>{selectedCountryItems.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select><small>可从已选国家中指定一个国家筛选州 / 省和城市。</small></label>
+    <label className="ldw-field"><span>州 / 省 / 行政区</span><select value={region} onChange={e=>{const next=e.target.value;setRegion(next);setRegionManual('');setCity('');setCityQuery('');const found=regionResults.find(r=>(r.name||r.display_name)===next);if(found?.lat&&found?.lon)setMapLocation({lat:found.lat,lon:found.lon,label:next})}} disabled={!countryCode||locationBusy}><option value="__all__">{locationBusy?'正在加载行政区…':'全部（不限制州 / 省 / 行政区）'}</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select><input value={regionManual||(region!=='__all__'?region:'')} onChange={e=>{setRegionManual(e.target.value);setRegion(e.target.value);setMapLocation(null)}} disabled={!countryCode} placeholder="也可以手动输入州 / 省 / 行政区"/><small>{locationBusy?'正在读取行政区划…':regionResults.length?'已读取 '+regionResults.length+' 个地区；也可以手动输入。':regionLoadError?regionLoadError+' 可手动输入，不影响继续创建任务。':'行政区服务暂不可用时，可手动输入。'}</small></label>
+    <div className="ldw-field ldw-city-field"><span>城市</span><div className="ldw-city-search-row"><input disabled={!countryCode} value={cityQuery||city} onChange={e=>{setCityQuery(e.target.value);setCity('')}} onKeyDown={e=>{if(e.key==='Enter')void searchCities()}} placeholder="输入城市名称…"/><button type="button" disabled={!countryCode||citySearchBusy||!cityQuery.trim()} onClick={()=>void searchCities()}><Search size={12}/>{citySearchBusy?'搜索中':'搜索'}</button></div>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{setCity(item.name||item.display_name);if(item.lat&&item.lon)setMapLocation({lat:Number(item.lat),lon:Number(item.lon),label:item.display_name});setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}<small>选择国家和地区后，点击搜索查询 OpenStreetMap 城市。</small></div>
    </div>
    <div className="ldw-osm-credit">地点数据 © OpenStreetMap contributors · Nominatim · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">数据与使用政策</a></div>
   </section>
-  <section className="ldw-card"><div className="ldw-step-title"><span>04</span><div><h3>选择 Actor / 采集器</h3><p>Apify Store 提供公开 Actor 搜索；选择后读取该 Actor 的真实输入 Schema。</p></div></div>
-   {provider==='Apify'?<><div className="ldw-actor-search"><input value={actorQuery} onChange={e=>setActorQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void searchActors()}} placeholder={'搜索 '+(searchTerms[channel]||channel)+'…'}/><button onClick={()=>void searchActors()} disabled={actorBusy}><Search size={14}/>{actorBusy?'搜索中…':'搜索 Apify Actors'}</button></div>
-    {actors.length>0&&<><div className="ldw-actor-result-summary"><span>找到 {actors.length} 个 Actor · 默认显示前 4 个</span><button type="button" onClick={()=>setShowAllActors(v=>!v)}>{showAllActors?'收起列表':'显示全部 Actor'} <ChevronDown size={13}/></button></div><div className="ldw-actor-list">{(showAllActors?actors:actors.slice(0,4)).map(item=><article key={item.id} className={'ldw-actor-card '+(actor?.id===item.id?'selected':'')}><div><b>{item.title||item.name}</b><small>{item.username}/{item.name}</small><p>{item.description||'暂无描述'}</p><small>评分 {item.stats?.actorReviewRating??'—'} · {item.stats?.actorReviewCount??0} 条评价 · 用户 {item.stats?.totalUsers??'—'} · {pricingLabel(item)}</small></div><button onClick={()=>void selectActor(item)} disabled={schemaBusy}>{actor?.id===item.id?'已选择':'选择此 Actor'} <ArrowRight size={13}/></button><a href={item.url||'https://apify.com/'+item.username+'/'+item.name} target="_blank" rel="noreferrer" aria-label="打开 Actor 页面"><ExternalLink size={13}/></a></article>)}</div></>}
-   </>:<div className="ldw-provider-note">选择 Apify 时可以直接搜索 Actor Store 并读取 Schema。其他供应商将使用各自的模板 / 数据集 / Action 目录，不能把 Actor 机制混用。</div>}
-   {schemaBusy&&<div className="ldw-loading"><Loader2 size={16}/> 正在读取 Actor Schema…</div>}
-   {schema&&actor&&<div className="ldw-schema-panel">
-    <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个动态输入字段 · Schema 来自 Actor 最新构建 · {pricingLabel(actor)}</small><small>{Number(actor.currentPricingInfo?.pricePerUnitUsd)>0 ? `按 ${targetCount} 条估算约 $${(Number(actor.currentPricingInfo?.pricePerUnitUsd)*Number(targetCount)).toFixed(2)}` : '最终费用以 Actor 计费模型和实际使用量为准'}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
-    {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段；修正后错误会自动消失。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span><small>原始字段：{path}</small></li>)}</ol></div>}
-    <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div><div className="ldw-request-preview"><button type="button" onClick={()=>setShowRequestPreview(v=>!v)}><span><b>请求参数预览</b><small>{Object.keys(schemaValidation.payload).length} 个字段 · {Object.keys(schemaValidation.errors).length} 项校验问题</small></span><span>{showRequestPreview?'收起':'展开'} <ChevronDown size={13}/></span></button>{showRequestPreview&&<><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过，可以提交':`请修正 ${Object.keys(schemaValidation.errors).length} 个字段错误后再提交`}</div></>}</div>
-    
-   </div>}
-  </section>
-  <section className="ldw-card"><div className="ldw-step-title"><span>05</span><div><h3>搜索任务设置</h3><p>确认关键词、数量和收费授权后才会创建执行任务。</p></div></div>
+  <section className="ldw-card"><div className="ldw-step-title"><span>04</span><div><h3>搜索任务设置</h3><p>确认关键词、数量和收费授权后才会创建执行任务。</p></div></div>
    <div className="ldw-location-grid">
     <label className="ldw-field"><span>任务名称</span><input value={taskName} onChange={e=>setTaskName(e.target.value)} placeholder="例如：美国加州牙科诊所潜客"/></label>
     <label className="ldw-field"><span>产品 / 服务</span><input value={product} onChange={e=>setProduct(e.target.value)} placeholder="例如：工业泵、汽车配件、牙科服务"/></label>
@@ -336,7 +392,35 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    </div>
    <label className="ldw-consent"><input type="checkbox" checked={costConsent} onChange={e=>setCostConsent(e.target.checked)}/><span>我确认已查看所选 Actor 的价格和使用政策，并授权启动采集；本次预算设置为 ${maxCost||'0'}（按 Actor 支持的计费模型执行限额）。</span></label>
    {error&&<div className="ldw-error">{error}</div>}{notice&&<div className="ldw-notice">{notice}</div>}
-   <div className="ldw-submit-row"><span>创建任务不会自动推广为正式客户；结果先进入待审核线索。</span><button disabled={!schema||!actor||!costConsent||busy} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认并启动搜索'} <ArrowRight size={15}/></button></div>
   </section>
+  <section className="ldw-card"><div className="ldw-step-title"><span>05</span><div><h3>选择 Actor / 采集器</h3><p>Apify Store 提供公开 Actor 搜索；选择后读取该 Actor 的真实输入 Schema。</p></div></div>
+   {provider==='Apify'?<><div className="ldw-actor-search"><input value={actorQuery} onChange={e=>setActorQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void searchActors()}} placeholder={'搜索 '+(searchTerms[channel]||channel)+'…'}/><button onClick={()=>void searchActors()} disabled={actorBusy}><Search size={14}/>{actorBusy?'搜索中…':'搜索 Apify Actors'}</button></div>
+    {actors.length>0&&<><div className="ldw-actor-result-summary"><span>找到 {actors.length} 个 Actor · 默认显示前 4 个</span><button type="button" onClick={()=>setShowAllActors(v=>!v)}>{showAllActors?'收起列表':'显示全部 Actor'} <ChevronDown size={13}/></button></div><div className="ldw-actor-list">{(showAllActors?actors:actors.slice(0,4)).map(item=><article key={item.id} className={'ldw-actor-card '+(actor?.id===item.id?'selected':'')}><div><b>{item.title||item.name}</b><small>{item.username}/{item.name}</small><p>{item.description||'暂无描述'}</p><small>评分 {item.stats?.actorReviewRating??'—'} · {item.stats?.actorReviewCount??0} 条评价 · 用户 {item.stats?.totalUsers??'—'} · {pricingLabel(item)}</small></div><button onClick={()=>void selectActor(item)} disabled={schemaBusy}>{actor?.id===item.id?'已选择':'选择此 Actor'} <ArrowRight size={13}/></button><a href={item.url||'https://apify.com/'+item.username+'/'+item.name} target="_blank" rel="noreferrer" aria-label="打开 Actor 页面"><ExternalLink size={13}/></a></article>)}</div></>}
+   </>:<div className="ldw-provider-note">选择 Apify 时可以直接搜索 Actor Store 并读取 Schema。其他供应商将使用各自的模板 / 数据集 / Action 目录，不能把 Actor 机制混用。</div>}
+   {schemaBusy&&<div className="ldw-loading"><Loader2 size={16}/> 正在读取 Actor Schema…</div>}
+   {schema&&actor&&<div className="ldw-schema-panel">
+    <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个动态输入字段 · Schema 来自 Actor 最新构建 · {pricingLabel(actor)}</small><small>{Number(actor.currentPricingInfo?.pricePerUnitUsd)>0 ? `按 ${targetCount} 条估算约 $${(Number(actor.currentPricingInfo?.pricePerUnitUsd)*Number(targetCount)).toFixed(2)}` : '最终费用以 Actor 计费模型和实际使用量为准'}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
+    {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段；修正后错误会自动消失。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span><small>原始字段：{path}</small></li>)}</ol></div>}
+    <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div><div className="ldw-request-preview"><button type="button" onClick={()=>setShowRequestPreview(v=>!v)}><span><b>请求参数预览</b><small>{Object.keys(schemaValidation.payload).length} 个字段 · {Object.keys(schemaValidation.errors).length} 项校验问题</small></span><span>{showRequestPreview?'收起':'展开'} <ChevronDown size={13}/></span></button>{showRequestPreview&&<><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过，可以提交':`请修正 ${Object.keys(schemaValidation.errors).length} 个字段错误后再提交`}</div></>}</div>
+    
+   </div>}
+  </section> 
+  <section className="ldw-card ldw-ai-step"><div className="ldw-step-title"><span>06</span><div><h3>AI 智能分析与 Schema 参数生成</h3><p>AI 综合目标市场、搜索限制、补充要求和当前 Actor 的真实 Schema，先总结需求，再生成参数。</p></div></div>
+   <label className="ldw-field"><span>AI 模型</span><select value={aiModel} onChange={e=>setAiModel(e.target.value)}><option value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">Cloudflare Workers AI · Llama 3.3 70B（默认）</option><option value="@cf/deepseek-ai/deepseek-r1-distill-qwen-32b">Cloudflare Workers AI · DeepSeek R1 Qwen 32B</option></select><small>模型在服务端运行，不会向浏览器暴露 Cloudflare API 凭证。</small></label>
+   <label className="ldw-field"><span>补充抓取需求（自然语言）</span><textarea rows={4} value={aiRequest} onChange={e=>setAiRequest(e.target.value)} placeholder="例如：优先寻找真实经营的 USB Cable 批发商和制造商，尽可能获取企业官网、公开邮箱和联系电话；排除零售店和无关结果。也可以留空，AI 将根据上方配置分析。"/></label>
+   {aiError&&<div className="ldw-error">{aiError}</div>}
+   <div className="ldw-ai-actions"><button type="button" onClick={()=>void analyzeActorInput()} disabled={!schema||!actor||aiBusy}>{aiBusy?<><Loader2 size={14}/> 正在分析并生成参数…</>:<><Sparkles size={14}/> AI 分析需求并生成参数</>}</button></div>
+   {aiGenerated&&<div className="ldw-ai-result">
+    <div className="ldw-ai-result-heading"><b>AI 需求分析结果</b><span>{aiModel}</span></div>
+    <div className="ldw-ai-summary"><b>需求总结</b><p>{aiSummary||'AI 已完成需求分析。'}</p></div>
+    <div className="ldw-ai-summary"><b>建议采集策略</b><p>{aiStrategy||'按当前市场和 Actor Schema 执行。'}</p></div>
+    {aiWarnings.length>0&&<div className="ldw-ai-warnings"><b>需要注意</b><ul>{aiWarnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul></div>}
+    <div className="ldw-ai-actions"><button type="button" onClick={applyAiGenerated}><Check size={14}/> 确认分析结果并填入 Schema</button></div>
+   </div>}
+   {aiApplied&&<div className="ldw-validation-ok">已将 AI 生成的参数填入 Schema。请检查动态表单和最终 JSON，必要时可以手动调整。</div>}
+   <div className="ldw-ai-manual-note">AI 生成结果不会直接提交。确认后才会填入 Schema；所有参数仍需通过 Actor Schema 校验，最终提交内容以请求参数预览为准。也可以跳过 AI，手动填写 Schema。</div>
+   <div className="ldw-submit-row"><span>创建后将由所选 Actor 执行。只有通过 Schema 校验且已确认费用授权，才能启动任务。</span><button disabled={!schema||!actor||!costConsent||busy||!schemaValidation.valid} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认并启动搜索'} <ArrowRight size={15}/></button></div>
+  </section>
+
  </div>
 }
