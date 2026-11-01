@@ -218,6 +218,14 @@ export default function LeadFinderApp() {
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
  const selectedNames = useMemo(()=>channelGroups.flatMap(g=>g.channels).filter(c=>selectedChannels.includes(c.id)).map(c=>c.name),[selectedChannels])
  const activeTaskData = tasks.find(t=>t.id===activeTask)
+ const launchTaskData=tasks.find(t=>t.id===launchTaskId)
+ const confirmLaunch=async()=>{
+  if(!supabase||!workspace||!launchTaskId||!launchConsent)return
+  setLaunchBusy(true);setLaunchError('')
+  const {data,error}=await supabase.functions.invoke('enqueue-lead-search',{body:{workspace_id:workspace.id,task_id:launchTaskId,confirm_cost:true}})
+  if(error||data?.error){setLaunchError(data?.error||error?.message||'无法启动搜索任务');setLaunchBusy(false);return}
+  setLaunchTaskId(null);setLaunchConsent(false);setLaunchBusy(false);await refreshTasks()
+ }
  const toggleCountry = (code:string)=>setSelectedCountries(current=>current.includes(code)?current.filter(c=>c!==code):[...current,code])
  const toggleChannel = (id:string)=>setSelectedChannels(current=>current.includes(id)?current.filter(c=>c!==id):[...current,id])
  const canPlan = Boolean(product.trim()||industry.trim()||keywords.trim())
@@ -232,7 +240,7 @@ export default function LeadFinderApp() {
    selected_channels:selectedChannels,target_count:quantity==='custom'?500:Number(quantity)
   }).select('id,name,status,selected_channels,created_at').single()
   if(error){setTaskError(error.message);setTaskSubmitting(false);return}
-  const task={id:data.id,name:data.name,criteria,createdAt:new Date(data.created_at).toLocaleString(),channels:(data.selected_channels||[]).length,status:'草稿 / 待配置数据源'}
+  const task:SearchTask={id:data.id,name:data.name,criteria,createdAt:new Date(data.created_at).toLocaleString(),channels:(data.selected_channels||[]).length,status:'草稿 / 待配置数据源',statusKey:'draft',discoveredCount:0,companyCount:0,contactCount:0,actualCost:null,modelName:selectedModel}
   setTasks(current=>[task,...current]);setActiveTask(task.id);setShowPlan(false);setTab('tasks');setTaskSubmitting(false)
  }
  const visibleChannels = channelGroups.map(g=>({...g,channels:g.channels.filter(c=>(c.name+c.detail+c.providers.join('')).toLowerCase().includes(channelQuery.toLowerCase()))})).filter(g=>g.channels.length)
