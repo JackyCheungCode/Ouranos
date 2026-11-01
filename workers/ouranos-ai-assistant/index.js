@@ -203,6 +203,16 @@ async function runFieldBatch(env, model, shared, schema, entries, depth = 0) {
       const right = await runFieldBatch(env, model, shared, schema, entries.slice(midpoint), depth + 1);
       return mergeBatchResults(left, right);
     }
+    if (isContextLimitError(error) && entries.length === 1 && depth < 8) {
+      // Last-resort retry: keep the current field and its previous value, but reduce history and narrative context.
+      const reduced = {
+        ...shared,
+        user_request: clip(shared.user_request, 1400),
+        conversation: (shared.conversation || []).slice(-2).map(item => ({ ...item, content: clip(item.content, 380) })),
+        actor: { ...shared.actor, description: clip(shared.actor?.description || "", 220) },
+      };
+      return runFieldBatch(env, model, reduced, schema, entries, depth + 1);
+    }
     if (isContextLimitError(error)) throw new Error("AI_CONTEXT_BUDGET_EXCEEDED");
     throw error;
   }
@@ -240,6 +250,8 @@ async function runConversation(env, model, body, origin) {
   for (const entries of batches) {
     const result = await runFieldBatch(env, model, shared, compact, entries);
     combined = mergeBatchResults(combined, result);
+    // Make earlier generated values available to later groups for cross-field dependencies.
+    shared.previous_actor_input = { ...(shared.previous_actor_input || {}), ...result.actor_input };
   }
   const unknown = rejectUnknownKeys(combined.actor_input, schema);
   if (unknown.length) return json({ error: "AI 生成了 Schema 不支持的字段，已阻止填入", details: unknown }, 422, origin);
