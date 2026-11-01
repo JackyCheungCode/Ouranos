@@ -33,3 +33,29 @@
 .dark .partner-type-choice button.active{background:#3b303b}.dark .partner-type.company{background:#3b303b;color:#d5b9d0}.dark .partner-type.person{background:#26364a;color:#b8cce8}
 @media(max-width:900px){.partner-record{grid-template-columns:1fr}.partner-chatter{border-left:0;border-top:1px solid var(--line);padding:15px 0 0}.partner-main-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.partner-heading{align-items:flex-start}.partner-heading h1{font-size:17px}.partner-control{flex-wrap:wrap}.partner-search{flex-basis:100%;max-width:none}.partner-main-grid{grid-template-columns:1fr}.partner-address{border-left:0;border-top:1px solid var(--line);padding:12px 0 0}.partner-fields,.partner-detail-grid{grid-template-columns:1fr 1fr}.partner-record{padding:12px 2px}.partner-record-footer{flex-direction:column}}
+
+
+/* Odoo-inspired global backend chrome */
+.ouranos .topbar{height:52px;padding:0 22px;background:#714b67;border-bottom:1px solid #5d3d55;color:#fff;box-shadow:0 1px 2px #24172218}
+.ouranos .menu-toggle{width:32px;height:32px;color:#fff;border-radius:4px}
+.ouranos .menu-toggle:hover{background:#ffffff1c}
+.ouranos .brand{min-width:215px;color:#fff;font-size:19px;letter-spacing:-.7px}
+.ouranos .brand-mark span{background:#fff}
+.ouranos .brand-edition{background:#ffffff20;color:#fff;border:1px solid #ffffff28;border-radius:3px;padding:4px 6px}
+.ouranos .workspace-label{color:#f0e7ee;font-size:10px;font-weight:500;letter-spacing:0}
+.ouranos .top-search input{background:#ffffff18;border:1px solid #ffffff36;border-radius:4px;color:#fff}
+.ouranos .top-search input::placeholder{color:#f1e9ef}
+.ouranos .search-toggle,.ouranos .icon-button{color:#fff;border-radius:4px}
+.ouranos .search-toggle:hover,.ouranos .icon-button:hover{background:#ffffff1c;color:#fff}
+.ouranos .profile{color:#fff;border-radius:4px}
+.ouranos .profile:hover{background:#ffffff15}
+.ouranos .profile>span:first-child{background:#f0e7ee;color:#714b67;width:27px;height:27px;border-radius:3px}
+.ouranos .layout{min-height:calc(100vh - 52px)}
+.ouranos .sidebar{top:52px}
+.ouranos .sidebar-backdrop{top:52px;height:calc(100% - 52px)}
+.ouranos .module-page{padding:25px 34px 24px}
+.ouranos .breadcrumbs{margin-bottom:18px;font-size:10px}
+.ouranos .breadcrumbs button{font-size:10px}
+.ouranos.dark .topbar{background:#593b53;border-bottom-color:#493044}
+.ouranos.dark .brand-mark span{background:#fff}
+@media(max-width:760px){.ouranos .topbar{padding:0 12px;gap:8px}.ouranos .brand{min-width:0;font-size:17px}.ouranos .brand-edition,.ouranos .workspace-label{display:none}.ouranos .module-page{padding:17px 14px 20px}}
