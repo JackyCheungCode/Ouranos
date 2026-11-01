@@ -39,30 +39,13 @@ const schemaKeys = (schema: JsonSchema) => Object.entries(schema.properties || {
 const stableStringify=(value:unknown):string=>Array.isArray(value)?'['+value.map(stableStringify).join(',')+']':value&&typeof value==='object'?'{'+Object.keys(value as Record<string,unknown>).sort().map(k=>JSON.stringify(k)+':'+stableStringify((value as Record<string,unknown>)[k])).join(',')+'}':JSON.stringify(value)??'null'
 const fieldTitleZh:Record<string,string>={searchStringsArray:'搜索关键词',searchString:'搜索关键词',searchTerms:'搜索关键词',searchQuery:'搜索查询',query:'搜索查询',locationQuery:'搜索地点',location:'搜索地点',categoryFilterWords:'商家类别关键词',startUrls:'起始网址',customGeolocation:'自定义地理位置',maxCrawledPlacesPerSearch:'每个搜索词最大采集数量',maxResults:'最大结果数量',maxItems:'最大采集数量',includeNearbyPlaces:'包含附近地点',scrapeContacts:'采集联系方式',proxyConfiguration:'代理配置',language:'语言',country:'国家',countryCode:'国家代码',city:'城市',state:'州 / 省',region:'地区'}
 const titlePhraseZh:Record<string,string>={'search terms':'搜索关键词','search term':'搜索关键词','search query':'搜索查询','location':'搜索地点','maximum results':'最大结果数量','max results':'最大结果数量','max crawled places per search':'每个搜索词最大采集数量','start urls':'起始网址','place categories':'商家类别','include nearby places':'包含附近地点','scrape contacts':'采集联系方式','custom geolocation':'自定义地理位置','proxy configuration':'代理配置'}
-const localizeTitle=(key:string,field:SchemaField)=>fieldTitleZh[key]||titlePhraseZh[String(field.title||'').toLowerCase()]||titlePhraseZh[key.replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[_-]+/g,' ').toLowerCase()]||('采集参数：'+(field.title||key))
+const keyTokenZh:Record<string,string>={search:'搜索',string:'文本',strings:'关键词',term:'关键词',terms:'关键词',keyword:'关键词',keywords:'关键词',query:'查询',location:'地点',country:'国家',code:'代码',city:'城市',state:'州省',region:'地区',category:'类别',categories:'类别',filter:'筛选',words:'词语',start:'起始',urls:'网址',url:'网址',max:'最大',maximum:'最大',number:'数量',count:'数量',crawled:'采集',places:'商家',place:'商家',per:'每',include:'包含',nearby:'附近',scrape:'采集',contacts:'联系方式',contact:'联系人',custom:'自定义',geo:'地理',geolocation:'地理位置',proxy:'代理',configuration:'配置',language:'语言',results:'结果',items:'项目',pages:'页面',page:'页面',limit:'上限',radius:'半径',distance:'距离',sort:'排序',order:'顺序',date:'日期',website:'网站',email:'邮箱',phone:'电话',company:'公司',business:'企业',name:'名称',type:'类型',format:'格式',output:'输出',input:'输入',review:'评价',rating:'评分',stars:'星级',coordinates:'坐标',latitude:'纬度',longitude:'经度',requests:'请求',request:'请求',concurrency:'并发',timeout:'超时',depth:'深度',browser:'浏览器',cookies:'Cookie',headers:'请求头',selector:'选择器',extract:'提取',fields:'字段',proxy:'代理',results:'结果'}
+const localizeTitle=(key:string,field:SchemaField)=>{const title=String(field.title||'').trim();const exact=fieldTitleZh[key]||titlePhraseZh[title.toLowerCase()]||titlePhraseZh[key.replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[_-]+/g,' ').toLowerCase()];if(exact)return exact;const source=title||key;const phrase=source.replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[_-]+/g,' ').toLowerCase();const translated=phrase.split(/\\s+/).map(token=>keyTokenZh[token]).filter(Boolean);return translated.length?translated.join(''):'Actor 参数'}
 const localizeDescription=(key:string,field:SchemaField)=>({searchStringsArray:'请输入需要搜索的关键词。',locationQuery:'请输入采集目标所在的国家、城市或具体地区。',maxCrawledPlacesPerSearch:'设置每个搜索关键词最多采集的商家数量。',categoryFilterWords:'填写用于筛选商家类别的关键词。',startUrls:'填写 Actor 开始访问的网页地址。',customGeolocation:'按 Actor 要求填写自定义地理范围或坐标。',includeNearbyPlaces:'设置是否同时采集指定地点附近的商家。',scrapeContacts:'设置是否采集商家公开联系方式。'} as Record<string,string>)[key]||('请根据该字段的要求填写。'+(field.description?' 原始说明：'+field.description:'' ))
 const localizeEnum=(value:unknown)=>({true:'是',false:'否',daily:'每天',weekly:'每周',monthly:'每月',popular:'热门',relevance:'相关度',newest:'最新',oldest:'最早',ascending:'升序',descending:'降序'} as Record<string,string>)[String(value).toLowerCase()]||String(value)
 const fieldType=(field:SchemaField)=>Array.isArray(field.type)?field.type.find(x=>x!=='null')||'string':field.type||'string'
 const isEmptyRequired=(value:unknown)=>value===undefined||value===null||value===''||(Array.isArray(value)&&value.length===0)||(typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value as object).length===0)
 const getDefaultValue = (field: SchemaField, required=false) => field.default ?? (fieldType(field)==='boolean' ? false : fieldType(field)==='array' ? (required?'':'[]') : fieldType(field)==='object' ? (required?'':'{}') : '')
-const outputMapping = (schema: Record<string, unknown>) => {
- const props = ((schema.properties || {}) as Record<string, unknown>)
- const keys = Object.keys(props)
- const pick = (candidates: string[], fallback: string) => candidates.find(k => keys.includes(k)) || fallback
- return {
-  company_name: pick(['companyName','company_name','businessName','business_name','name','title'], 'name'),
-  website: pick(['website','websiteUrl','website_url','url','domain'], 'website'),
-  email: pick(['email','emails','businessEmail'], 'email'),
-  phone: pick(['phone','phoneNumber','phone_number','telephone'], 'phone'),
-  country_name: pick(['country','countryName','country_name'], 'country'),
-  address: pick(['address','fullAddress','full_address','streetAddress'], 'address'),
-  contact_name: pick(['contactName','fullName','full_name','personName','person_name','name'], 'name'),
-  job_title: pick(['jobTitle','job_title','position','role'], 'jobTitle'),
-  contact_email: pick(['contactEmail','email','emailAddress'], 'email'),
-  contact_phone: pick(['contactPhone','phone','phoneNumber'], 'phone'),
-  source_url: pick(['url','website','websiteUrl','link'], 'url')
- }
-}
 const nominatim = async (params: Record<string,string>) => {
  const url = new URL('https://nominatim.openstreetmap.org/search')
  Object.entries({format:'jsonv2',addressdetails:'1',dedupe:'1',limit:'30',...params}).forEach(([k,v])=>url.searchParams.set(k,v))
@@ -133,7 +116,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [schema,setSchema] = useState<JsonSchema|null>(null)
  const [schemaBusy,setSchemaBusy] = useState(false)
  const [values,setValues] = useState<Record<string,unknown>>({})
- const [mapping,setMapping] = useState<Record<string,string>>({})
  const [keywords,setKeywords] = useState('')
  const [product,setProduct] = useState('')
  const [industry,setIndustry] = useState('')
@@ -181,7 +163,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
 
  useEffect(()=>{ setProvider(availableProviders[0] || 'Apify'); setActor(null); setSchema(null); setActors([]); setValues({});  setError(''); setNotice('') },[channel])
- useEffect(()=>{ setActor(null);setSchema(null);setValues({});setMapping({});setError('');setNotice('') },[provider])
+ useEffect(()=>{ setActor(null);setSchema(null);setValues({});setError('');setNotice('') },[provider])
  useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label)},[channel])
  useEffect(()=>{
   let active=true
@@ -222,7 +204,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  const selectActor = async (item: Actor) => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
-  setActor(item);setSchema(null);setValues({});setMapping({});setSchemaBusy(true);setError('');setNotice('')
+  setActor(item);setSchema(null);setValues({});setSchemaBusy(true);setError('');setNotice('')
   const actorId=item.username+'~'+item.name
   const {data,error:invokeError}=await supabase.functions.invoke('apify-actor-schema',{body:{workspace_id:workspaceId,actor_id:actorId,channel_key:channel}})
   if(invokeError||data?.error){setError(data?.error||invokeError?.message||'读取 Actor Schema 失败');setActor(null);setSchemaBusy(false);return}
