@@ -15,6 +15,7 @@ type Country = { code:string; name:string; flag:string; geoName:string }
 type Channel = { id:string; name:string; detail:string; logo:string; providers:string[]; status:string }
 type ChannelGroup = { id:string; title:string; description:string; channels:Channel[] }
 type AvailableAiModel = {provider_key:string;provider_name:string;model_name:string;is_default:boolean}
+type SearchTask = {id:string;name:string;criteria:string;createdAt:string;channels:number;status:string;statusKey:string;discoveredCount:number;companyCount:number;contactCount:number;actualCost:number|null;modelName:string}
 type InboxRecord = { id:string; record_type:'company'|'contact'; review_status:string; display_name:string; country_name:string|null; website:string|null; email:string|null; phone:string|null; job_title:string|null; ai_score:number|null; ai_summary:string|null; discovered_at:string; normalized_domain:string|null; normalized_email:string|null; source_record_id:string|null; lead_source_records?:{provider_key:string;channel_key:string;source_url:string|null;source_title:string|null}|null }
 
 const countries:Country[] = countryCatalog
@@ -160,23 +161,25 @@ export default function LeadFinderApp() {
   })
   return ()=>{alive=false}
  },[workspace?.id])
- const [tasks,setTasks] = useState<{id:string;name:string;criteria:string;createdAt:string;channels:number;status:string}[]>([])
+ const [tasks,setTasks] = useState<SearchTask[]>([])
  const [tasksLoading,setTasksLoading] = useState(false)
  const [taskError,setTaskError] = useState('')
  const [taskSubmitting,setTaskSubmitting] = useState(false)
+ const [launchTaskId,setLaunchTaskId] = useState<string|null>(null)
+ const [launchBusy,setLaunchBusy] = useState(false)
+ const [launchConsent,setLaunchConsent] = useState(false)
+ const [launchError,setLaunchError] = useState('')
  const [activeTask,setActiveTask] = useState<string|null>(null)
  const [reviewFilter,setReviewFilter] = useState('all')
- useEffect(()=>{
+ const refreshTasks=async()=>{
   if(!supabase||!workspace){setTasks([]);return}
-  let alive=true;setTasksLoading(true)
-  supabase.from('lead_search_tasks').select('id,name,status,target_profile,selected_channels,created_at').eq('workspace_id',workspace.id).order('created_at',{ascending:false}).limit(100).then(({data,error})=>{
-   if(!alive)return
-   if(error)setTaskError(error.message)
-   else setTasks((data||[]).map(row=>{const profile=(row.target_profile||{}) as Record<string,unknown>;return {id:row.id,name:row.name,criteria:String(profile.criteria||''),createdAt:new Date(row.created_at).toLocaleString(),channels:(row.selected_channels||[]).length,status:row.status==='draft'?'草稿 / 待配置数据源':row.status==='queued'?'排队中':row.status==='running'?'执行中':row.status==='completed'?'已完成':row.status==='failed'?'失败':row.status==='cancelled'?'已取消':'已暂停'}}))
-   setTasksLoading(false)
-  })
-  return ()=>{alive=false}
- },[workspace?.id])
+  setTasksLoading(true);setTaskError('')
+  const {data,error}=await supabase.from('lead_search_tasks').select('id,name,status,target_profile,selected_channels,discovered_count,unique_company_count,unique_contact_count,actual_cost,created_at').eq('workspace_id',workspace.id).order('created_at',{ascending:false}).limit(100)
+  if(error)setTaskError(error.message)
+  else setTasks((data||[]).map(row=>{const profile=(row.target_profile||{}) as Record<string,unknown>;const statusKey=row.status;return {id:row.id,name:row.name,criteria:String(profile.criteria||''),createdAt:new Date(row.created_at).toLocaleString(),channels:(row.selected_channels||[]).length,statusKey,status:statusKey==='draft'?'草稿 / 待配置数据源':statusKey==='queued'?'排队中':statusKey==='running'?'执行中':statusKey==='completed'?'已完成':statusKey==='failed'?'失败':statusKey==='cancelled'?'已取消':'已暂停',discoveredCount:row.discovered_count||0,companyCount:row.unique_company_count||0,contactCount:row.unique_contact_count||0,actualCost:row.actual_cost,modelName:String(profile.ai_model||defaultModel)}}))
+  setTasksLoading(false)
+ }
+ useEffect(()=>{void refreshTasks()},[workspace?.id])
  const refreshInbox = async()=>{
   if(!supabase||!workspace)return
   setInboxLoading(true);setInboxError('')
