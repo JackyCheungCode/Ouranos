@@ -1,0 +1,1 @@
+create index if not exists lead_search_tasks_cost_approved_by_idx on public.lead_search_tasks(cost_approved_by) where cost_approved_by is not null;
