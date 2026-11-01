@@ -44,6 +44,7 @@ const localizeTitle=(key:string,field:SchemaField)=>{const title=String(field.ti
 const localizeDescription=(key:string,field:SchemaField)=>({searchStringsArray:'请输入需要搜索的关键词。',locationQuery:'请输入采集目标所在的国家、城市或具体地区。',maxCrawledPlacesPerSearch:'设置每个搜索关键词最多采集的商家数量。',categoryFilterWords:'填写用于筛选商家类别的关键词。',startUrls:'填写 Actor 开始访问的网页地址。',customGeolocation:'按 Actor 要求填写自定义地理范围或坐标。',includeNearbyPlaces:'设置是否同时采集指定地点附近的商家。',scrapeContacts:'设置是否采集商家公开联系方式。'} as Record<string,string>)[key]||('请根据该字段的要求填写。'+(field.description?' 原始说明：'+field.description:'' ))
 const localizeEnum=(value:unknown)=>({true:'是',false:'否',daily:'每天',weekly:'每周',monthly:'每月',popular:'热门',relevance:'相关度',newest:'最新',oldest:'最早',ascending:'升序',descending:'降序'} as Record<string,string>)[String(value).toLowerCase()]||String(value)
 const fieldType=(field:SchemaField)=>Array.isArray(field.type)?field.type.find(x=>x!=='null')||'string':field.type||'string'
+const deriveSchemaRequirements=(schema:JsonSchema)=>{const requiredFields=new Set<string>(schema.required||[]);const props=schema.properties||{};const searchEntryPattern=/^(searchstringsarray|searchterms?|searchstrings?|searchqueries?|searchquery|keywords?|categoryfilterwords|placecategories|categories|starturls?|googlemapsurls)$/i;const searchEntries=Object.keys(props).filter(key=>searchEntryPattern.test(key));const atLeastOneGroups:string[][]=[];if(searchEntries.length>1)atLeastOneGroups.push(searchEntries);else if(searchEntries.length===1)requiredFields.add(searchEntries[0]);for(const [key,field] of Object.entries(props)){const description=(key+' '+String(field.title||'')+' '+String(field.description||'')).toLowerCase();if(/^(location|locationquery|location_query|searchlocation)$/i.test(key)&&/geographic area to search|location to search|search location/.test(description))requiredFields.add(key);if(/required|must provide|cannot be empty|is mandatory/.test(description))requiredFields.add(key);}return {requiredFields,atLeastOneGroups}}
 const isEmptyRequired=(value:unknown)=>value===undefined||value===null||value===''||(Array.isArray(value)&&value.length===0)||(typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value as object).length===0)
 const getDefaultValue = (field: SchemaField, required=false) => field.default ?? (fieldType(field)==='boolean' ? false : fieldType(field)==='array' ? (required?'':'[]') : fieldType(field)==='object' ? (required?'':'{}') : '')
 const nominatim = async (params: Record<string,string>) => {
@@ -150,6 +151,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    return value
   }
   for(const [key,field] of schemaKeys(schema||{})){const value=validateField(field,values[key],key,(schema?.required||[]).includes(key));if(!errors[key]&&!isEmptyRequired(value))payload[key]=value}
+  for(const group of requirements.atLeastOneGroups){if(group.every(key=>isEmptyRequired(payload[key]))){errors[group[0]]='搜索入口至少填写一项：'+group.map(key=>localizeTitle(key,schema?.properties?.[key]||{})).join(' / ')}}
   return {errors,payload,valid:Object.keys(errors).length===0}
  },[schema,values])
  const availableProviders = providerByPlatform[channel] || ['Apify']
@@ -209,15 +211,18 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const {data,error:invokeError}=await supabase.functions.invoke('apify-actor-schema',{body:{workspace_id:workspaceId,actor_id:actorId,channel_key:channel}})
   if(invokeError||data?.error){setError(data?.error||invokeError?.message||'读取 Actor Schema 失败');setActor(null);setSchemaBusy(false);return}
   const nextSchema=(data.input_schema || {}) as JsonSchema
-  const initial=Object.fromEntries(schemaKeys(nextSchema).map(([key,field])=>[key,getDefaultValue(field,(nextSchema.required||[]).includes(key))]))
+  const requirements=deriveSchemaRequirements(nextSchema)
+   const initial=Object.fromEntries(schemaKeys(nextSchema).map(([key,field])=>[key,getDefaultValue(field,requirements.requiredFields.has(key))]))
   setSchema(nextSchema);setValues(initial);
   setNotice('已读取 Actor 最新输入 Schema。以下字段由 Actor 定义，尚未启动采集。')
   setSchemaBusy(false)
  }
  const renderField = ([key,field]:[string,SchemaField]) => {
   const type=fieldType(field)
-  const value=values[key] ?? getDefaultValue(field,(schema?.required||[]).includes(key))
-  const required=schema?.required?.includes(key)
+  const requirements=deriveSchemaRequirements(schema||{})
+  const required=requirements.requiredFields.has(key)
+  const groupRequired=requirements.atLeastOneGroups.some(group=>group.includes(key))
+  const value=values[key] ?? getDefaultValue(field,required)
   const set=(v:unknown)=>setValues(current=>({...current,[key]:v}))
   const enumValues=field.enum || []
   const semantic=key.toLowerCase()
@@ -229,7 +234,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const fieldError=schemaValidation.errors[key]
   const constraints=[field.minimum!==undefined?'≥ '+field.minimum:'',field.maximum!==undefined?'≤ '+field.maximum:'',field.minLength!==undefined?'最少 '+field.minLength+' 字符':'',field.maxLength!==undefined?'最多 '+field.maxLength+' 字符':'',field.minItems!==undefined?'至少 '+field.minItems+' 项':'',field.maxItems!==undefined?'最多 '+field.maxItems+' 项':'',field.pattern?'正则格式':'',field.format?field.format:''].filter(Boolean)
   return <label className={'ldw-field ldw-schema-field '+(fieldError?'has-error':'')} key={key}>
-   <span className="ldw-field-heading"><span className="ldw-field-label">{localizeTitle(key,field)}{required&&<b> * 必填</b>}</span><small className="ldw-field-type">{Array.isArray(field.type)?field.type.join(' / '):(field.type||'text')}</small>{constraints.length>0&&<small className="ldw-constraint-chip">{constraints.join(' · ')}</small>}<button type="button" className="ldw-help-button" aria-expanded={showHelp} onClick={e=>{e.preventDefault();setExpandedHelp(current=>({...current,[key]:!current[key]}))}}><HelpCircle size={13}/>{showHelp?'收起说明':'字段说明'}</button></span>
+   <span className="ldw-field-heading"><span className="ldw-field-label">{localizeTitle(key,field)}{required&&<b> * 必填</b>}{groupRequired&&<b> * 至少填写一项</b>}</span><small className="ldw-field-type">{Array.isArray(field.type)?field.type.join(' / '):(field.type||'text')}</small>{constraints.length>0&&<small className="ldw-constraint-chip">{constraints.join(' · ')}</small>}<button type="button" className="ldw-help-button" aria-expanded={showHelp} onClick={e=>{e.preventDefault();setExpandedHelp(current=>({...current,[key]:!current[key]}))}}><HelpCircle size={13}/>{showHelp?'收起说明':'字段说明'}</button></span>
    {enumValues.length>0?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">请选择</option>{enumValues.map(option=><option key={String(option)} value={String(option)}>{localizeEnum(option)}</option>)}</select>
    :countryField?<select value={String(value)} onChange={e=>{const next=e.target.value;set(next);const found=countries.find(c=>c.code===next||c.geoName===next);if(found){setCountryCode(found.code);setSelectedCountries(current=>current.includes(found.code)?current:[...current,found.code])}}}><option value="">选择国家</option>{countries.map(c=><option key={c.code} value={/code/.test(semantic)?c.code:c.geoName}>{c.flag} {c.name}</option>)}</select>
    :regionField?<select value={String(value)} onChange={e=>set(e.target.value)} disabled={!countryCode||locationBusy}><option value="">全部地区（不限制）</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select>
