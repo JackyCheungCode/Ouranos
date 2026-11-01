@@ -97,9 +97,13 @@ Deno.serve(async (req: Request) => {
     const kind = body.kind === "ai_model" ? "ai_model" : body.kind === "data_source" ? "data_source" : "";
     const providerKey = String(body.provider_key ?? "").toLowerCase();
     const providerName = String(body.provider_name ?? "").trim();
-    const apiKey = String(body.api_key ?? "");
+    const credentialInput = body.credentials && typeof body.credentials === "object" && !Array.isArray(body.credentials) ? body.credentials as Record<string, unknown> : { api_key: body.api_key };
+    const apiKey = String(credentialInput.api_key ?? "");
+    const username = String(credentialInput.username ?? "");
+    const password = String(credentialInput.password ?? "");
+    const credentialValue = JSON.stringify(Object.fromEntries(Object.entries(credentialInput).filter(([key,value]) => typeof value === "string" && value.length > 0)));
     const modelName = String(body.model_name ?? "").trim();
-    if (!workspaceId || !kind || !/^[a-z0-9-]{2,64}$/.test(providerKey) || !providerName || apiKey.trim().length < 8 || apiKey.length > 8192) {
+    if (!workspaceId || !kind || !/^[a-z0-9-]{2,64}$/.test(providerKey) || !providerName || credentialValue.length > 12000 || !((apiKey.trim().length >= 8 && apiKey.length <= 8192) || (username.length >= 2 && password.length >= 8))) {
       return json({ error: "Invalid integration configuration" }, 400, origin);
     }
     if (kind === "ai_model" && !modelName) return json({ error: "Model name is required" }, 400, origin);
@@ -132,8 +136,8 @@ Deno.serve(async (req: Request) => {
     const secretDescription = `Ouranos ${kind} credential for ${providerName} in workspace ${workspaceId}`;
     const rpcName = existing?.secret_ref ? "integration_secret_update" : "integration_secret_create";
     const rpcBody = existing?.secret_ref
-      ? { p_secret_id: existing.secret_ref, p_secret: apiKey, p_name: secretName, p_description: secretDescription }
-      : { p_secret: apiKey, p_name: secretName, p_description: secretDescription };
+      ? { p_secret_id: existing.secret_ref, p_secret: credentialValue, p_name: secretName, p_description: secretDescription }
+      : { p_secret: credentialValue, p_name: secretName, p_description: secretDescription };
     const secretResponse = await rest(`rpc/${rpcName}`, adminKey, { method: "POST", body: JSON.stringify(rpcBody) });
     if (!secretResponse.ok) {
       const message = await secretResponse.text();
@@ -176,6 +180,7 @@ Deno.serve(async (req: Request) => {
     if (!saveResponse.ok) {
       return json({ error: "Credential saved, but integration metadata could not be updated" }, 500, origin);
     }
+    await rest("integration_events", adminKey, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ workspace_id: workspaceId, provider_key: providerKey, provider_name: providerName, action: "save", status: "success", message: "凭证已安全写入 Supabase Vault", created_by: user.id }) });
     return json({ ok: true, kind, provider_key: providerKey, status: "configured", enabled: false, credential_stored: true }, 200, origin);
   } catch (_error) {
     return json({ error: "Unexpected integration settings error" }, 500, origin);
