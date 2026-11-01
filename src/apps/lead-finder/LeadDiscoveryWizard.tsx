@@ -132,6 +132,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const schemaValidation=useMemo(()=>{
   const errors:Record<string,string>={}
   const payload:Record<string,unknown>={}
+  const requirements=deriveSchemaRequirements(schema||{})
   const validateField=(field:SchemaField,value:unknown,path:string,required:boolean):unknown=>{
    if(isEmptyRequired(value)){if(required)errors[path]='此字段为必填项，不能为空';return undefined}
    const type=fieldType(field)
@@ -150,7 +151,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    if(type==='object'&&field.properties){const obj=value as Record<string,unknown>;for(const [key,child] of Object.entries(field.properties))validateField(child,obj[key],path+'.'+key,(field.required||[]).includes(key))}
    return value
   }
-  for(const [key,field] of schemaKeys(schema||{})){const value=validateField(field,values[key],key,(schema?.required||[]).includes(key));if(!errors[key]&&!isEmptyRequired(value))payload[key]=value}
+  for(const [key,field] of schemaKeys(schema||{})){const value=validateField(field,values[key],key,requirements.requiredFields.has(key));if(!errors[key]&&!isEmptyRequired(value))payload[key]=value}
   for(const group of requirements.atLeastOneGroups){if(group.every(key=>isEmptyRequired(payload[key]))){errors[group[0]]='搜索入口至少填写一项：'+group.map(key=>localizeTitle(key,schema?.properties?.[key]||{})).join(' / ')}}
   return {errors,payload,valid:Object.keys(errors).length===0}
  },[schema,values])
