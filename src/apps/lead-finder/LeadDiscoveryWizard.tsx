@@ -9,7 +9,7 @@ import './LeadDiscoveryWizard.css'
 
 type Props = { workspaceId: string; userId: string; onTaskCreated: () => void }
 type Actor = { id: string; name: string; username: string; title: string; description: string; url: string; stats?: { totalUsers?: number; actorReviewRating?: number; actorReviewCount?: number }; currentPricingInfo?: Record<string, unknown> }
-type SchemaField = { title?: string; description?: string; type?: string | string[]; default?: unknown; enum?: unknown[]; items?: unknown; properties?: Record<string, SchemaField>; minimum?: number; maximum?: number; format?: string }
+type SchemaField = { title?: string; description?: string; type?: string | string[]; default?: unknown; enum?: unknown[]; items?: unknown; properties?: Record<string, SchemaField>; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; pattern?: string; format?: string }
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
 const platformGroups = [
  { label: '搜索引擎与地图', items: [['google-maps','Google Maps','google maps business places'],['google-search','Google Search','google search results'],['bing','Bing','bing search results'],['yelp','Yelp','yelp business'] ] },
@@ -137,6 +137,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [busy,setBusy] = useState(false)
  const [error,setError] = useState('')
  const [notice,setNotice] = useState('')
+ const [showRequestPreview,setShowRequestPreview] = useState(true)
+ const schemaValidation=useMemo(()=>{const errors:Record<string,string>={};const payload:Record<string,unknown>={};for(const [key,field] of schemaKeys(schema||{})){let value=values[key];if(value===undefined||value===null||value===''){if(schema?.required?.includes(key))errors[key]='此字段为必填项';continue}if(field.type==='array'||field.type==='object'){if(typeof value==='string'){try{value=JSON.parse(value)}catch{errors[key]=field.type==='array'?'请输入有效 JSON 数组':'请输入有效 JSON 对象';continue}}if(field.type==='array'&&!Array.isArray(value)){errors[key]='必须是数组';continue}if(field.type==='object'&&(!value||typeof value!=='object'||Array.isArray(value))){errors[key]='必须是 JSON 对象';continue}}if((field.type==='number'||field.type==='integer')&&value!==''){const n=Number(value);if(!Number.isFinite(n))errors[key]='必须是有效数字';else if(field.type==='integer'&&!Number.isInteger(n))errors[key]='必须是整数';else if(field.minimum!==undefined&&n<field.minimum)errors[key]='不能小于 '+field.minimum;else if(field.maximum!==undefined&&n>field.maximum)errors[key]='不能大于 '+field.maximum;value=n}if(typeof value==='string'){if(field.minLength!==undefined&&value.length<field.minLength)errors[key]='至少 '+field.minLength+' 个字符';else if(field.maxLength!==undefined&&value.length>field.maxLength)errors[key]='最多 '+field.maxLength+' 个字符';else if(field.pattern){try{if(!new RegExp(field.pattern).test(value))errors[key]='格式不符合要求（'+field.pattern+'）'}catch{}}if(!errors[key]&&field.format==='uri'&&!/^https?:\/\//i.test(value))errors[key]='请输入有效网址（http:// 或 https://）';if(!errors[key]&&field.format==='email'&&!/^\S+@\S+\.\S+$/.test(value))errors[key]='请输入有效邮箱地址'}if(field.enum?.length&&!field.enum.some(x=>String(x)===String(value)))errors[key]='请选择允许的枚举值';if(!errors[key])payload[key]=value}return {errors,payload,valid:Object.keys(errors).length===0}},[schema,values])
  const availableProviders = providerByPlatform[channel] || ['Apify']
  const selectedCountry = countries.find(c=>c.code===countryCode)
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
@@ -210,24 +212,27 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const cityField=/^city$|cityname|city_name/.test(semantic)
   const portField=/port|seaport|unlocode/.test(semantic)
   const showHelp=Boolean(expandedHelp[key])
-  return <label className="ldw-field" key={key}>
-   <span className="ldw-field-heading"><span className="ldw-field-label">{field.title || key}{required&&<b> *</b>}</span><small className="ldw-field-type">{Array.isArray(field.type)?field.type.join(' / '):(field.type||'text')}</small>{field.description&&<button type="button" className="ldw-help-button" aria-expanded={showHelp} onClick={e=>{e.preventDefault();setExpandedHelp(current=>({...current,[key]:!current[key]}))}}><HelpCircle size={13}/>{showHelp?'收起提示':'字段提示'}</button>}</span>
+  const fieldError=schemaValidation.errors[key]
+  const constraints=[field.minimum!==undefined?'≥ '+field.minimum:'',field.maximum!==undefined?'≤ '+field.maximum:'',field.minLength!==undefined?'最少 '+field.minLength+' 字符':'',field.maxLength!==undefined?'最多 '+field.maxLength+' 字符':'',field.pattern?'正则格式':'',field.format?field.format:''].filter(Boolean)
+  return <label className={'ldw-field ldw-schema-field '+(fieldError?'has-error':'')} key={key}>
+   <span className="ldw-field-heading"><span className="ldw-field-label">{field.title || key}{required&&<b> * 必填</b>}</span><small className="ldw-field-type">{Array.isArray(field.type)?field.type.join(' / '):(field.type||'text')}</small>{constraints.length>0&&<small className="ldw-constraint-chip">{constraints.join(' · ')}</small>}{field.description&&<button type="button" className="ldw-help-button" aria-expanded={showHelp} onClick={e=>{e.preventDefault();setExpandedHelp(current=>({...current,[key]:!current[key]}))}}><HelpCircle size={13}/>{showHelp?'收起提示':'字段提示'}</button>}</span>
    {enumValues.length>0?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">请选择</option>{enumValues.map(option=><option key={String(option)} value={String(option)}>{String(option)}</option>)}</select>
    :countryField?<select value={String(value)} onChange={e=>{const next=e.target.value;set(next);const found=countries.find(c=>c.code===next||c.geoName===next);if(found){setCountryCode(found.code);setSelectedCountries(current=>current.includes(found.code)?current:[...current,found.code])}}}><option value="">选择国家</option>{countries.map(c=><option key={c.code} value={/code/.test(semantic)?c.code:c.geoName}>{c.flag} {c.name}</option>)}</select>
    :regionField?<select value={String(value)} onChange={e=>set(e.target.value)} disabled={!countryCode||locationBusy}><option value="">全部地区（不限制）</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select>
    :cityField?<><div className="ldw-city-search-row"><input value={cityQuery||String(value)} onChange={e=>{setCityQuery(e.target.value);set('')}} placeholder="输入城市名称…"/><button type="button" onClick={()=>void searchCities()} disabled={!countryCode||citySearchBusy}><Search size={12}/>{citySearchBusy?'搜索中':'搜索'}</button></div>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{set(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}</>
    :portField?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">选择港口</option>{portCatalog.map(([code,name])=><option key={code} value={code}>{name} · {code}</option>)}</select>
    :field.type==='boolean'?<input type="checkbox" checked={Boolean(value)} onChange={e=>set(e.target.checked)}/>
-   :field.type==='integer'||field.type==='number'?<input type="number" min={field.minimum} max={field.maximum} value={String(value)} onChange={e=>set(e.target.value===''?'':Number(e.target.value))}/>
+    :field.type==='integer'||field.type==='number'?<input type="number" min={field.minimum} max={field.maximum} step={field.type==='integer'?1:'any'} value={String(value)} aria-invalid={Boolean(fieldError)} onChange={e=>set(e.target.value)}/>
    :field.type==='array'||field.type==='object'?<textarea rows={3} value={String(value)} onChange={e=>set(e.target.value)} placeholder={field.type==='array'?'[]':'{}'}/>
-   :<input type={field.format==='uri'?'url':'text'} value={String(value)} onChange={e=>set(e.target.value)}/>}
-   {showHelp&&field.description&&<small className="ldw-field-help">{field.description}</small>}
+    :<input type={field.format==='uri'?'url':'text'} minLength={field.minLength} maxLength={field.maxLength} pattern={field.pattern} value={String(value)} aria-invalid={Boolean(fieldError)} onChange={e=>set(e.target.value)}/>}
+   {fieldError&&<small className="ldw-field-error">{fieldError}</small>}{showHelp&&field.description&&<small className="ldw-field-help">{field.description}</small>}
   </label>
  }
  const startSearch = async () => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
   if(!schema||!actor||!costConsent)return
+  if(!schemaValidation.valid){setError('请先修正 Schema 字段中的 '+Object.keys(schemaValidation.errors).length+' 项校验问题。');return}
   if(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0){setError('请设置大于 0 的单次费用上限。');return}
   setBusy(true);setError('')
   try {
@@ -310,7 +315,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    {schemaBusy&&<div className="ldw-loading"><Loader2 size={16}/> 正在读取 Actor Schema…</div>}
    {schema&&actor&&<div className="ldw-schema-panel">
     <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个动态输入字段 · Schema 来自 Actor 最新构建 · {pricingLabel(actor)}</small><small>{Number(actor.currentPricingInfo?.pricePerUnitUsd)>0 ? `按 ${targetCount} 条估算约 $${(Number(actor.currentPricingInfo?.pricePerUnitUsd)*Number(targetCount)).toFixed(2)}` : '最终费用以 Actor 计费模型和实际使用量为准'}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
-    <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>
+    <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div><div className="ldw-request-preview"><button type="button" onClick={()=>setShowRequestPreview(v=>!v)}><span><b>请求参数预览</b><small>{Object.keys(schemaValidation.payload).length} 个字段 · {Object.keys(schemaValidation.errors).length} 项校验问题</small></span><span>{showRequestPreview?'收起':'展开'} <ChevronDown size={13}/></span></button>{showRequestPreview&&<><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过，可以提交':`请修正 ${Object.keys(schemaValidation.errors).length} 个字段错误后再提交`}</div></>}</div>
     <details className="ldw-mapping"><summary>高级设置：输出字段映射</summary><p>自动根据常见字段名称匹配企业名称、网站、电话等字段；如 Actor 输出字段特殊，可在这里调整。</p><div className="ldw-mapping-grid">{Object.entries(mapping).map(([key,value])=><label className="ldw-field" key={key}><span>{key}</span><input value={value} onChange={e=>setMapping(current=>({...current,[key]:e.target.value}))}/></label>)}</div></details>
    </div>}
   </section>
