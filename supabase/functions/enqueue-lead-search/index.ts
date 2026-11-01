@@ -6,6 +6,7 @@ function serviceKey(){const legacy=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");if(
 function publishableKey(){const legacy=Deno.env.get("SUPABASE_ANON_KEY");if(legacy)return legacy;const keys=JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS")??"{}");return keys.default as string|undefined;}
 async function rest(path:string,key:string,init:RequestInit={}){const url=Deno.env.get("SUPABASE_URL");if(!url)throw new Error("Supabase URL missing");const headers=new Headers(init.headers);headers.set("apikey",key);headers.set("Authorization",`Bearer ${key}`);headers.set("Content-Type","application/json");return fetch(`${url}/rest/v1/${path}`,{...init,headers});}
 function getPath(source:Record<string,unknown>,path:string){return path.split(".").reduce<unknown>((value,key)=>value&&typeof value==="object"?(value as Record<string,unknown>)[key]:undefined,source);}
+function setPath(target:Record<string,unknown>,path:string,value:unknown){const parts=path.split(".");let current=target;for(const part of parts.slice(0,-1)){const existing=current[part];if(!existing||typeof existing!=="object"||Array.isArray(existing))current[part]={};current=current[part] as Record<string,unknown>;}current[parts[parts.length-1]]=value;}
 async function hash(value:string){const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("");}
 Deno.serve(async(req:Request)=>{
  const origin=req.headers.get("origin");if(req.method==="OPTIONS")return new Response("ok",{headers:cors(origin)});if(req.method!=="POST")return json({error:"Method not allowed"},405,origin);
@@ -42,7 +43,7 @@ Deno.serve(async(req:Request)=>{
     if(!connection||connection.status!=="connected"||connection.is_enabled!==true)return json({error:`请先连接并启用服务商：${catalog.provider_key}`},409,origin);
     const config=(selection.config||{}) as Record<string,unknown>;const defaults=(config.input_defaults||{}) as Record<string,unknown>;const mapping=(config.input_mapping||{}) as Record<string,string>;const outputMapping=(config.field_mapping||catalog.field_mapping||{}) as Record<string,unknown>;if(!outputMapping.company_name&&!outputMapping.contact_name)return json({error:`渠道 ${selection.channel_key} 尚未映射企业名称或联系人姓名`,adapter_key:selection.adapter_key},422,origin);
     const input:Record<string,unknown>={...defaults};
-    for(const [inputField,profilePath] of Object.entries(mapping)){const value=getPath(searchProfile,profilePath);if(value!==undefined&&value!==null&&value!=="")input[inputField]=value;}
+    for(const [inputField,profilePath] of Object.entries(mapping)){const value=getPath(searchProfile,profilePath);if(value!==undefined&&value!==null&&value!=="")setPath(input,inputField,value);}
     const schema=(catalog.input_schema||{}) as Record<string,unknown>;const required=Array.isArray(schema.required)?schema.required as string[]:[];
     const missingFields=required.filter(field=>input[field]===undefined||input[field]===null||input[field]==="");
     if(missingFields.length)return json({error:`渠道 ${selection.channel_key} 的 Actor 缺少必填参数`,adapter_key:selection.adapter_key,missing_input_fields:missingFields},422,origin);
