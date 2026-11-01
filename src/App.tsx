@@ -11,6 +11,8 @@ import AuthScreen from './lib/auth-screen'
 
 function AuthenticatedApp() {
   const { user, workspace, signOut } = useAuth()
+  const currentUser = user!
+  const currentWorkspace = workspace!
   const [active, setActive] = useState<AppItem | null>(null)
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -32,12 +34,12 @@ function AuthenticatedApp() {
   return <div className={dark ? 'ouranos dark' : 'ouranos'}>
     <header className="topbar">
       <button className="menu-toggle" title={sidebarOpen ? '隐藏侧边栏' : '展开侧边栏'} aria-label={sidebarOpen ? '隐藏侧边栏' : '展开侧边栏'} aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(value => !value)}><Menu size={21}/></button>
-      <div className="brand"><div className="brand-mark"><span/><span/><span/></div><span>ouranos</span><span className="brand-edition">企业版</span><span className="workspace-label">{workspace.name}</span></div>
+      <div className="brand"><div className="brand-mark"><span/><span/><span/></div><span>ouranos</span><span className="brand-edition">企业版</span><span className="workspace-label">{currentWorkspace.name}</span></div>
       <div className={'top-search ' + (searchOpen ? 'is-open' : '')}>
         {searchOpen && <input autoFocus value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => {if(event.key === 'Escape') setSearchOpen(false)}} placeholder="搜索应用、公司、联系人..."/>}
         <button className="search-toggle" title={searchOpen ? '关闭搜索' : '搜索'} aria-label={searchOpen ? '关闭搜索' : '搜索'} onClick={() => {setSearchOpen(value => !value); if(searchOpen) setQuery('')}}><Search size={19}/></button>
       </div>
-      <div className="top-actions"><button className="icon-button" title="帮助"><CircleHelp size={18}/></button><button className="icon-button" title="切换主题" onClick={() => setDark(value => !value)}>{dark ? <Sun size={18}/> : <Moon size={18}/>}</button><button className="profile" title="点击退出登录" onClick={()=>void signOut()}><span>{(user.email||'U').slice(0,1).toUpperCase()}</span><span className="profile-name">{user.email||'账户'}</span><ChevronDown size={14}/></button></div>
+      <div className="top-actions"><button className="icon-button" title="帮助"><CircleHelp size={18}/></button><button className="icon-button" title="切换主题" onClick={() => setDark(value => !value)}>{dark ? <Sun size={18}/> : <Moon size={18}/>}</button><button className="profile" title="点击退出登录" onClick={()=>void signOut()}><span>{(currentUser.email||'U').slice(0,1).toUpperCase()}</span><span className="profile-name">{currentUser.email||'账户'}</span><ChevronDown size={14}/></button></div>
     </header>
     <div className={'layout ' + (!sidebarOpen ? 'sidebar-collapsed' : '')}>
       {sidebarOpen && <>
