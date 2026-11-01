@@ -165,7 +165,8 @@ export default function LeadFinderApp() {
  useEffect(()=>{if(tab==='review')void refreshInbox()},[tab,workspace?.id])
  const reviewRecord = async(record:InboxRecord,status:'approved'|'rejected'|'duplicate',action:'approve'|'reject'|'mark_duplicate'|'unmark_duplicate')=>{
   if(!supabase||!workspace||!user)return
-  const {error}=await supabase.from('lead_inbox_records').update({review_status:status,reviewed_by:user.id,reviewed_at:new Date().toISOString()}).eq('id',record.id).eq('workspace_id',workspace.id)
+  const updatePayload:Record<string,unknown>={review_status:status,reviewed_by:user.id,reviewed_at:new Date().toISOString()};if(status==='pending')updatePayload.duplicate_of=null
+  const {error}=await supabase.from('lead_inbox_records').update(updatePayload).eq('id',record.id).eq('workspace_id',workspace.id)
   if(error){setInboxError(error.message);return}
   await supabase.from('lead_inbox_review_events').insert({workspace_id:workspace.id,record_id:record.id,actor_id:user.id,action})
   await refreshInbox()
@@ -178,8 +179,10 @@ export default function LeadFinderApp() {
  }
  const resolveDuplicate = async(id:string,resolution:'same_entity'|'different_entity')=>{
   if(!supabase||!user)return
+  const candidate=duplicateCandidates.find(item=>item.id===id)
   const {error}=await supabase.from('lead_inbox_duplicate_candidates').update({resolution,resolved_by:user.id,resolved_at:new Date().toISOString()}).eq('id',id)
   if(error){setInboxError(error.message);return}
+  if(resolution==='same_entity'&&candidate){const {error:recordError}=await supabase.from('lead_inbox_records').update({review_status:'duplicate',duplicate_of:candidate.candidate_record_id,reviewed_by:user.id,reviewed_at:new Date().toISOString()}).eq('id',candidate.record_id).eq('workspace_id',workspace.id);if(recordError){setInboxError(recordError.message);return}await supabase.from('lead_inbox_review_events').insert({workspace_id:workspace.id,record_id:candidate.record_id,actor_id:user.id,action:'mark_duplicate',note:'人工确认与候选记录为同一主体'})}
   await refreshInbox()
  }
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
