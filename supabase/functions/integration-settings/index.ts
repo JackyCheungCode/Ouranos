@@ -46,14 +46,27 @@ async function rest(path: string, key: string, init: RequestInit = {}) {
   return fetch(`${url}/rest/v1/${path}`, { ...init, headers });
 }
 
+function sanitizeValue(value: unknown, depth = 0): unknown {
+  if (depth > 4) return undefined;
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.map(item => sanitizeValue(item, depth + 1)).filter(item => item !== undefined);
+  if (typeof value !== "object") return undefined;
+  const clean: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (/(secret|token|api.?key|password|credential|authorization|auth)/i.test(key)) continue;
+    const safe = sanitizeValue(item, depth + 1);
+    if (safe !== undefined) clean[key] = safe;
+  }
+  return clean;
+}
+
 function safeConfig(input: unknown) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return {};
   const allowed = ["base_url", "actor_id", "dataset_id", "region", "workspace", "api_endpoint", "options"];
   const result: Record<string, unknown> = {};
   for (const key of allowed) {
     const value = (input as Record<string, unknown>)[key];
-    if (value !== undefined && typeof value !== "string" && (typeof value !== "object" || value === null)) continue;
-    if (value !== undefined) result[key] = value;
+    if (value !== undefined) result[key] = sanitizeValue(value);
   }
   return result;
 }
