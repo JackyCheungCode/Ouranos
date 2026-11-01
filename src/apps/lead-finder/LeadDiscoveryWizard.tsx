@@ -3,6 +3,7 @@ import { ArrowRight, Check, ChevronDown, ExternalLink, HelpCircle, Loader2, MapP
 import { supabase } from '../../lib/supabase'
 import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from 'react-leaflet'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
+import { divIcon } from 'leaflet'
 import type { PathOptions } from 'leaflet'
 import { countries } from './countries'
 import './LeadDiscoveryWizard.css'
@@ -12,6 +13,7 @@ type Actor = { id: string; name: string; username: string; title: string; descri
 type SchemaField = { title?: string; description?: string; type?: string | string[]; editor?: string; default?: unknown; prefill?: unknown; example?: unknown; placeholderValue?: string; enum?: unknown[]; items?: SchemaField; properties?: Record<string, SchemaField>; required?: string[]; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; minItems?: number; maxItems?: number; pattern?: string; format?: string }
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
 type MapLocation = { lat:number; lon:number; label:string }
+const marketMarkerIcon=divIcon({className:'ldw-map-marker',html:'<span></span>',iconSize:[22,22],iconAnchor:[11,11]})
 const platformGroups = [
  { label: '搜索引擎与地图', items: [['google-maps','Google Maps','google maps business places'],['google-search','Google Search','google search results'],['bing','Bing','bing search results'],['yelp','Yelp','yelp business'] ] },
  { label: '社交媒体', items: [['instagram','Instagram','instagram profiles'],['facebook','Facebook','facebook pages'],['linkedin','LinkedIn','linkedin companies'],['tiktok','TikTok','tiktok profiles'],['youtube','YouTube','youtube channels'],['x','X / Twitter','twitter profiles'] ] },
@@ -95,7 +97,7 @@ function MarketMap({selected,location}:{selected:typeof countries;location:MapLo
   const picked=codes.has(code)
   return {color:picked?'#76556f':'#c9c4ca',weight:picked?1.5:.55,fillColor:picked?'#a887a0':'#e9e6ea',fillOpacity:picked?.72:.3}
  }
- return <div className="ldw-map"><MapContainer center={location?[location.lat,location.lon]:[24,5]} zoom={location?5:1.25} minZoom={1} maxZoom={12} scrollWheelZoom={false} worldCopyJump style={{height:220,width:'100%'}}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>{geo&&<GeoJSON key={selected.map(c=>c.code).sort().join(',')} data={geo} style={style}/>}<MapFocus location={location}/>{location&&<Marker position={[location.lat,location.lon]}><Popup>{location.label}</Popup></Marker>}</MapContainer><div>{location?'地图已定位：'+location.label:'OpenStreetMap · 选择城市或行政区后自动定位'}</div></div>
+ return <div className="ldw-map"><MapContainer center={location?[location.lat,location.lon]:[24,5]} zoom={location?5:1.25} minZoom={1} maxZoom={12} scrollWheelZoom={false} worldCopyJump style={{height:220,width:'100%'}}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>{geo&&<GeoJSON key={selected.map(c=>c.code).sort().join(',')} data={geo} style={style}/>}<MapFocus location={location}/>{location&&<Marker position={[location.lat,location.lon]} icon={marketMarkerIcon}><Popup>{location.label}</Popup></Marker>}</MapContainer><div>{location?'地图已定位：'+location.label:'OpenStreetMap · 选择城市或行政区后自动定位'}</div></div>
 }
 
 export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated }: Props) {
