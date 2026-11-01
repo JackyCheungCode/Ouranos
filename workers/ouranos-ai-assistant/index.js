@@ -64,7 +64,10 @@ function compactSchema(schema, depth = 0) {
     const entries = Object.entries(schema.properties);
     const required = new Set(Array.isArray(schema.required) ? schema.required : []);
     const ordered = [...entries.filter(([key]) => required.has(key)), ...entries.filter(([key]) => !required.has(key))];
-    const kept = ordered.slice(0, Math.max(50, required.size));
+    // Never truncate root Actor inputs: all top-level fields are split into separate AI batches.
+    // For deeply nested optional object properties, retain every required child and a generous optional sample.
+    const limit = depth === 0 ? entries.length : Math.max(80, required.size);
+    const kept = ordered.slice(0, limit);
     result.properties = Object.fromEntries(kept.map(([key, value]) => [key, compactSchema(value, depth + 1)]));
     if (kept.length < entries.length) result.properties_truncated_count = entries.length - kept.length;
   }
