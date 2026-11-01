@@ -132,3 +132,6 @@
 .ldw-request-preview pre{max-height:320px;overflow:auto;margin:0;padding:13px;background:#20232b;color:#e5e7eb;font:11px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
 .ldw-validation-ok,.ldw-validation-error{padding:8px 11px;font-size:10px;font-weight:650}
 .ldw-validation-ok{background:#edf7f0;color:#34764a}.ldw-validation-error{background:#fff0ef;color:#ad3932}
+
+
+.ldw-field-key{display:block;margin-top:2px;color:var(--odoo-muted,#817984);font-size:8px;line-height:1.35;overflow-wrap:anywhere}
