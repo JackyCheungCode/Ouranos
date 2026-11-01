@@ -7,6 +7,7 @@ import {
 import './SystemIntegrationsApp.css'
 import IntegrationCredentialManager from './IntegrationCredentialManager'
 import ApifyActorManager from './ApifyActorManager'
+import ManualAdapterManager from './ManualAdapterManager'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 
@@ -149,7 +150,7 @@ export default function SystemIntegrationsApp() {
             
             {selected.docs && <a href={selected.docs} target="_blank" rel="noreferrer">查看官方文档 <ExternalLink size={13}/></a>}
           </div>
-          {selected.key!=='works-ai'&&<IntegrationCredentialManager provider={selected} configured={Boolean(configuredConnection)} modelName={selectedDefaultAi?.model_name} isDefault={selectedDefaultAi?.is_default} onRefresh={refreshConnections}/>}{selected.key==='apify'&&<ApifyActorManager canSync={Boolean(selectedConnection)}/>} 
+          {selected.key!=='works-ai'&&<IntegrationCredentialManager provider={selected} configured={Boolean(configuredConnection)} modelName={selectedDefaultAi?.model_name} isDefault={selectedDefaultAi?.is_default} onRefresh={refreshConnections}/>}{selected.key==='apify'&&<ApifyActorManager canSync={Boolean(selectedConnection&&selectedConnection.status==='connected'&&selectedConnection.is_enabled)}/>} {selected.group==='data'&&selected.key!=='apify'&&<ManualAdapterManager provider={{key:selected.key,name:selected.name,group:selected.group}} canRegister={Boolean(selectedConnection&&selectedConnection.status==='connected'&&selectedConnection.is_enabled)}/>} 
           <div className="int-info-box"><ShieldCheck size={17}/><span>{selected.key === "works-ai" ? "Works AI 是 Ouranos 默认模型入口，无需在此录入第三方 API Key。可在 AI 搜索计划中直接选用。" : "凭证通过服务端写入 Supabase Vault；测试成功后才会标记为已连接。未提供无计费验证接口的服务商不会被误标为已连接。"}</span></div>
         </>}
       </section>
