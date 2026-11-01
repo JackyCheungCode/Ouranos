@@ -92,7 +92,7 @@ async function processRun(run:Record<string,unknown>,admin:string){
   const usage=obj(started.usage);
   if(await taskIsCancelled(String(run.task_id),workspaceId,admin)){await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status:'cancelled',provider_job_id:started.providerJobId,provider_status:'cancelled',locked_by:null,lease_expires_at:null,completed_at:new Date().toISOString(),updated_at:new Date().toISOString()})});return;}
   if(started.state==="completed"){
-   const items=extractItems(started.raw);const counts=await processItems(run,items,admin);
+   const items=extractItems(started.raw);const counts=await processItems(run,items,admin);await logTask(String(run.task_id),workspaceId,run,'completed','服务商同步返回结果，已完成线索解析与入库',admin,{item_count:items.length});
    const costValue=usage.cost_usd??(usage.currency?usage.actual_cost??usage.cost:provider==="kuajingmofang"?usage.actual_cost??usage.cost:undefined);const cost=Number(costValue);const costCurrency=String(usage.currency||(usage.cost_usd?"USD":provider==="kuajingmofang"?"CNY":run.cost_currency||"USD"));
    await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"completed",provider_job_id:started.providerJobId,provider_cursor:started.cursor||null,provider_status:"completed",records_found:items.length,completed_at:now,lease_expires_at:null,locked_by:null,usage_metrics:usage,billing_details:{...obj(run.billing_details),usage},actual_cost:Number.isFinite(cost)&&cost>0?cost:null,cost_currency:costCurrency,result_summary:{...counts,item_count:items.length},updated_at:now})});
   }else{
@@ -101,17 +101,17 @@ async function processRun(run:Record<string,unknown>,admin:string){
   return;
  }
  if(run.provider_status==="completed"||run.provider_status==="fetching"){
-  const page=await adapter.fetch(ctx,jobId,asText(run.output_cursor)||null);const counts=await processItems(run,page.items,admin);
+  await logTask(String(run.task_id),workspaceId,run,'fetching','正在从服务商数据集中读取结果页',admin,{provider_job_id:jobId});const page=await adapter.fetch(ctx,jobId,asText(run.output_cursor)||null);const counts=await processItems(run,page.items,admin);
   const recordsFound=Number(run.records_found||0)+page.items.length;const usage={...obj(run.usage_metrics),...obj(page.usage)};
   const costValue=usage.cost_usd??(usage.currency?usage.actual_cost??usage.cost:undefined);const cost=Number(costValue);const costCurrency=String(usage.currency||(usage.cost_usd?"USD":run.cost_currency||"USD"));
-  const hasNext=Boolean(page.nextCursor);
+  const hasNext=Boolean(page.nextCursor);if(!hasNext)await logTask(String(run.task_id),workspaceId,run,'completed','结果分页读取完成，线索已写入待审核队列',admin,{item_count:recordsFound});
   await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:hasNext?"running":"completed",provider_status:hasNext?"fetching":"completed",output_cursor:page.nextCursor||null,records_found:recordsFound,completed_at:hasNext?null:now,lease_expires_at:hasNext?new Date(Date.now()+10000).toISOString():null,locked_by:null,last_polled_at:now,usage_metrics:usage,actual_cost:Number.isFinite(cost)&&cost>0?cost:run.actual_cost,cost_currency:costCurrency,result_summary:{...obj(run.result_summary),...counts,item_count:recordsFound},updated_at:now})});
   return;
  }
  await logTask(String(run.task_id),workspaceId,run,'polling','正在查询服务商任务状态',admin,{provider_job_id:jobId});const polled=await adapter.poll(ctx,jobId);if(await taskIsCancelled(String(run.task_id),workspaceId,admin)){await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status:'cancelled',locked_by:null,lease_expires_at:null,completed_at:new Date().toISOString(),updated_at:new Date().toISOString()})});return;}const polledUsage=obj(polled.usage);const mergedPollUsage={...obj(run.usage_metrics),...polledUsage};const pollCostValue=polledUsage.cost_usd??(polledUsage.currency?polledUsage.actual_cost??polledUsage.cost:provider==="kuajingmofang"?polledUsage.actual_cost??polledUsage.cost:undefined);const pollCost=Number(pollCostValue);const pollCurrency=String(polledUsage.currency||(polledUsage.cost_usd?"USD":provider==="kuajingmofang"?"CNY":run.cost_currency||"USD"));
  if(polled.state==="failed")throw new Error(`Provider job failed: ${JSON.stringify(polled.raw).slice(0,1000)}`);if(polled.state==='completed')await logTask(String(run.task_id),workspaceId,run,'provider_completed','服务商报告采集完成，正在获取结果数据',admin,{provider_job_id:jobId});
  if(polled.state==="completed"&&provider==="texau"){
-  const items=extractItems(polled.raw);const counts=await processItems(run,items,admin);
+  const items=extractItems(polled.raw);const counts=await processItems(run,items,admin);await logTask(String(run.task_id),workspaceId,run,'completed','服务商任务完成，线索已解析并写入待审核队列',admin,{item_count:items.length});
   await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"completed",provider_status:"completed",records_found:items.length,completed_at:now,lease_expires_at:null,locked_by:null,last_polled_at:now,usage_metrics:mergedPollUsage,billing_details:{...obj(run.billing_details),usage:mergedPollUsage},actual_cost:Number.isFinite(pollCost)&&pollCost>0?pollCost:run.actual_cost,cost_currency:pollCurrency,result_summary:{...counts,item_count:items.length},updated_at:now})});
   return;
  }
