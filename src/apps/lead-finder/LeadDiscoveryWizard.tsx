@@ -325,7 +325,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     const taskTitle=taskName.trim()||product.trim()||keywords.trim()||actor.title
    const actorId=actor.username+'~'+actor.name
     const schemaHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stableStringify(schema))).then(d=>[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''))
-    const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel}
+    const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel,ai_analysis:aiGenerated?{model:aiModel,user_request:aiRequest,summary:aiSummary,strategy:aiStrategy,actor_input:aiGenerated,analyzed_at:new Date().toISOString()}:null}
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspaceId,created_by:userId,name:taskTitle,status:'draft',target_profile:profile,selected_channels:[channel],target_count:Number(targetCount)}).select('id').single()
    if(taskError)throw new Error(taskError.message)
    const adapterKey='apify-'+channel+'-'+(actor.username+'-'+actor.name).toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,110)
@@ -397,6 +397,22 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div><div className="ldw-request-preview"><button type="button" onClick={()=>setShowRequestPreview(v=>!v)}><span><b>请求参数预览</b><small>{Object.keys(schemaValidation.payload).length} 个字段 · {Object.keys(schemaValidation.errors).length} 项校验问题</small></span><span>{showRequestPreview?'收起':'展开'} <ChevronDown size={13}/></span></button>{showRequestPreview&&<><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过，可以提交':`请修正 ${Object.keys(schemaValidation.errors).length} 个字段错误后再提交`}</div></>}</div>
     
    </div>}
+  </section> 
+  <section className="ldw-card ldw-ai-step"><div className="ldw-step-title"><span>06</span><div><h3>AI 智能分析与 Schema 参数生成</h3><p>AI 综合目标市场、搜索限制、补充要求和当前 Actor 的真实 Schema，先总结需求，再生成参数。</p></div></div>
+   <label className="ldw-field"><span>AI 模型</span><select value={aiModel} onChange={e=>setAiModel(e.target.value)}><option value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">Cloudflare Workers AI · Llama 3.3 70B（默认）</option><option value="@cf/meta/llama-3.1-8b-instruct">Cloudflare Workers AI · Llama 3.1 8B</option><option value="@cf/deepseek-ai/deepseek-r1-distill-qwen-32b">Cloudflare Workers AI · DeepSeek R1 Qwen 32B</option></select><small>模型在服务端运行，不会向浏览器暴露 Cloudflare API 凭证。</small></label>
+   <label className="ldw-field"><span>补充抓取需求（自然语言）</span><textarea rows={4} value={aiRequest} onChange={e=>setAiRequest(e.target.value)} placeholder="例如：优先寻找真实经营的 USB Cable 批发商和制造商，尽可能获取企业官网、公开邮箱和联系电话；排除零售店和无关结果。也可以留空，AI 将根据上方配置分析。"/></label>
+   {aiError&&<div className="ldw-error">{aiError}</div>}
+   <div className="ldw-ai-actions"><button type="button" onClick={()=>void analyzeActorInput()} disabled={!schema||!actor||aiBusy}>{aiBusy?<><Loader2 size={14}/> 正在分析并生成参数…</>:<><Sparkles size={14}/> AI 分析需求并生成参数</>}</button></div>
+   {aiGenerated&&<div className="ldw-ai-result">
+    <div className="ldw-ai-result-heading"><b>AI 需求分析结果</b><span>{aiModel}</span></div>
+    <div className="ldw-ai-summary"><b>需求总结</b><p>{aiSummary||'AI 已完成需求分析。'}</p></div>
+    <div className="ldw-ai-summary"><b>建议采集策略</b><p>{aiStrategy||'按当前市场和 Actor Schema 执行。'}</p></div>
+    {aiWarnings.length>0&&<div className="ldw-ai-warnings"><b>需要注意</b><ul>{aiWarnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul></div>}
+    <div className="ldw-ai-actions"><button type="button" onClick={applyAiGenerated}><Check size={14}/> 确认分析结果并填入 Schema</button></div>
+   </div>}
+   {aiApplied&&<div className="ldw-validation-ok">已将 AI 生成的参数填入 Schema。请检查动态表单和最终 JSON，必要时可以手动调整。</div>}
+   <div className="ldw-ai-manual-note">AI 生成结果不会直接提交。确认后才会填入 Schema；所有参数仍需通过 Actor Schema 校验，最终提交内容以请求参数预览为准。也可以跳过 AI，手动填写 Schema。</div>
+   <div className="ldw-submit-row"><span>创建后将由所选 Actor 执行。只有通过 Schema 校验且已确认费用授权，才能启动任务。</span><button disabled={!schema||!actor||!costConsent||busy||!schemaValidation.valid} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认并启动搜索'} <ArrowRight size={15}/></button></div>
   </section>
 
  </div>
