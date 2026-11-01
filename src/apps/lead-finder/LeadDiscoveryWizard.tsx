@@ -134,6 +134,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [aiWarnings,setAiWarnings] = useState<string[]>([])
  const [aiError,setAiError] = useState('')
  const [aiApplied,setAiApplied] = useState(false)
+ const [aiAnalyzedContext,setAiAnalyzedContext] = useState('')
+ const aiContextKey=useMemo(()=>stableStringify({channel,provider,actor_id:actor?.id||'',schema,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost}),[channel,provider,actor?.id,schema,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost])
  const [keywords,setKeywords] = useState('')
  const [product,setProduct] = useState('')
  const [industry,setIndustry] = useState('')
@@ -172,6 +174,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   for(const group of requirements.atLeastOneGroups){if(group.every(key=>isEmptyRequired(payload[key]))){errors[group[0]]='搜索入口至少填写一项：'+group.map(key=>localizeTitle(key,schema?.properties?.[key]||{})).join(' / ')}}
   return {errors,payload,valid:Object.keys(errors).length===0}
  },[schema,values])
+ useEffect(()=>{if(aiGenerated&&aiAnalyzedContext&&aiAnalyzedContext!==aiContextKey){setAiApplied(false);setAiError('市场或搜索任务配置已变化。之前的 AI 分析不能直接应用，请重新分析。')}},[aiContextKey])
  const availableProviders = providerByPlatform[channel] || ['Apify']
  const selectedCountry = countries.find(c=>c.code===countryCode)
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
@@ -298,12 +301,13 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    if(!response.ok||!result?.ok)throw new Error(result?.error||'AI 分析失败，请稍后重试。')
    setAiGenerated(result.actor_input as Record<string,unknown>)
    setAiSummary(String(result.summary||''));setAiStrategy(String(result.strategy||''))
-   setAiWarnings(Array.isArray(result.warnings)?result.warnings.map(String):[])
+   setAiWarnings(Array.isArray(result.warnings)?result.warnings.map(String):[]);setAiAnalyzedContext(aiContextKey)
   }catch(e){setAiError(e instanceof Error?e.message:'AI 分析失败，请稍后重试。')}
   finally{setAiBusy(false)}
  }
  const applyAiGenerated = () => {
   if(!aiGenerated||!schema)return
+  if(aiAnalyzedContext!==aiContextKey){setAiError('市场或搜索任务配置已变化，请重新运行 AI 分析后再填入参数。');return}
   const mapped=Object.fromEntries(Object.entries(aiGenerated).map(([key,value])=>{
    const field=schema.properties?.[key];const type=field?fieldType(field):'string'
    if(type==='array'&&field?.editor==='stringList')return [key,Array.isArray(value)?value:[]]
@@ -317,6 +321,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
   if(!schema||!actor||!costConsent)return
+  if(aiApplied&&aiAnalyzedContext!==aiContextKey){setError('市场或搜索任务配置已变化，之前的 AI 参数已过期。请重新分析并确认参数，或重新检查后再提交。');return}
   if(!schemaValidation.valid){setError('请先修正 Schema 字段中的 '+Object.keys(schemaValidation.errors).length+' 项校验问题。');return}
   if(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0){setError('请设置大于 0 的单次费用上限。');return}
   setBusy(true);setError('')
