@@ -438,7 +438,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    <section className="ldw-card"><div className="ldw-step-title"><span>01</span><div><h3>选择客户来源平台</h3><p>先确定你要从哪里发现潜在客户。按类别收纳，点击展开。</p></div></div>
     <div className="ldw-platform-groups">{platformGroups.map(group=><div className="ldw-platform-group" key={group.label}>
      <button type="button" className="ldw-platform-group-trigger" aria-expanded={expandedPlatformGroup===group.label} onClick={()=>setExpandedPlatformGroup(current=>current===group.label?'':group.label)}><span><b>{group.label}</b><small>{group.items.length} 个渠道{group.items.some(([id])=>id===channel)?' · 当前选择':''}</small></span><ChevronDown size={15}/></button>
-     {expandedPlatformGroup===group.label&&<div className="ldw-platform-grid">{group.items.map(([id,name])=><button key={id} className={channel===id?'selected':''} onClick={()=>setChannel(id)}><img className="ldw-brand-logo" src={platformLogo(id)} alt="" loading="lazy"/><span>{name}</span>{channel===id&&<Check size={14}/>}</button>)}</div>}
+     {expandedPlatformGroup===group.label&&<div className="ldw-platform-grid">{group.items.map(([id,name])=><button key={id} className={channel===id?'selected':''} onClick={()=>{setChannel(id);setRecognizedPlatform(name)}}><img className="ldw-brand-logo" src={platformLogo(id)} alt="" loading="lazy"/><span>{name}</span>{channel===id&&<Check size={14}/>}</button>)}</div>}
     </div>)}</div>
    </section>
    <section className="ldw-card"><div className="ldw-step-title"><span>02</span><div><h3>选择数据供应商</h3><p>仅显示当前平台有对应产品的供应商。</p></div></div>
