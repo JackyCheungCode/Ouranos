@@ -23,7 +23,7 @@ export default function IntegrationCredentialManager({provider,configured,modelN
   const [busy,setBusy]=useState(false)
   const [message,setMessage]=useState('')
   const [error,setError]=useState('')
-  useEffect(()=>{setApiKey('');setUsername('');setPassword('');setCustomerId('');setZone('');setZoneUsername('');setZonePassword('');setModelName(initialModel||'');setMessage('');setError('')},[provider.key])
+  useEffect(()=>{setApiKey('');setUsername('');setPassword('');setCustomerId('');setZone('');setZoneUsername('');setZonePassword('');setModelName(initialModel||'');setMessage('');setError('')},[provider.key,initialModel])
   const kind=provider.group==='ai'?'ai_model':'data_source'
   const invoke=async(action:'save'|'test'|'delete')=>{
     if(!supabase||!workspace)return
