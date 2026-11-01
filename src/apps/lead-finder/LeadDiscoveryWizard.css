@@ -21,7 +21,7 @@
 .ldw-intro h2{font:700 25px Manrope,'Microsoft YaHei',sans-serif;letter-spacing:-.65px;color:var(--odoo-ink);margin:5px 0}
 .ldw-intro p,.ldw-step-title p{font-size:11px;line-height:1.55;color:var(--odoo-muted);margin:4px 0 0}
 .ldw-status{border:1px solid #e6dce5;border-radius:5px;background:#f8f4f7;color:#76566f;padding:7px 10px;font-size:10px;font-weight:650}
-.ldw-odoo-flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;background:var(--odoo-panel);border:1px solid var(--odoo-line);border-radius:7px;overflow:hidden}
+.ldw-odoo-flow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0;background:var(--odoo-panel);border:1px solid var(--odoo-line);border-radius:7px;overflow:hidden}
 .ldw-odoo-flow-item{position:relative;display:flex;align-items:center;gap:9px;min-width:0;padding:11px 13px;border-right:1px solid var(--odoo-line)}
 .ldw-odoo-flow-item:last-child{border-right:0}
 .ldw-odoo-flow-item>span{width:23px;height:23px;display:grid;place-items:center;flex:0 0 23px;border-radius:50%;background:#f1edf1;color:#80667c;font-size:10px;font-weight:700}
@@ -116,7 +116,7 @@
 .ldw-error,.ldw-notice{border-radius:4px;font-size:10px;padding:9px 11px}
 .ldw-loading{padding:13px;border:1px dashed var(--odoo-line);border-radius:5px;font-size:10px}
 @media(max-width:1050px){.ldw-step-grid{grid-template-columns:1fr 1fr}.ldw-platform-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ldw-location-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ldw-country-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ldw-country-field{grid-column:auto}.ldw-map-wrap{grid-column:1/-1;grid-row:auto}.ldw-map .leaflet-container{height:145px!important}}
-@media(max-width:720px){.ldw-step-grid{grid-template-columns:1fr}.ldw-odoo-flow{grid-template-columns:repeat(5,minmax(90px,1fr));overflow-x:auto}.ldw-odoo-flow-item{padding:9px 8px;gap:6px}.ldw-odoo-flow-item b{font-size:9px}.ldw-location-grid,.ldw-country-grid,.ldw-form-grid,.ldw-mapping-grid{grid-template-columns:1fr}.ldw-country-field{grid-column:auto}.ldw-map-wrap{grid-column:auto}.ldw-map .leaflet-container{height:135px!important}.ldw-intro{align-items:flex-start}.ldw-intro h2{font-size:22px}.ldw-card{padding:14px}.ldw-platform-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ldw-actor-card{grid-template-columns:minmax(0,1fr) auto}.ldw-actor-card>a{display:none}.ldw-submit-row{align-items:stretch;flex-direction:column}.ldw-submit-row button{width:100%}}
+@media(max-width:720px){.ldw-step-grid{grid-template-columns:1fr}.ldw-odoo-flow{grid-template-columns:repeat(6,minmax(90px,1fr));overflow-x:auto}.ldw-odoo-flow-item{padding:9px 8px;gap:6px}.ldw-odoo-flow-item b{font-size:9px}.ldw-location-grid,.ldw-country-grid,.ldw-form-grid,.ldw-mapping-grid{grid-template-columns:1fr}.ldw-country-field{grid-column:auto}.ldw-map-wrap{grid-column:auto}.ldw-map .leaflet-container{height:135px!important}.ldw-intro{align-items:flex-start}.ldw-intro h2{font-size:22px}.ldw-card{padding:14px}.ldw-platform-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ldw-actor-card{grid-template-columns:minmax(0,1fr) auto}.ldw-actor-card>a{display:none}.ldw-submit-row{align-items:stretch;flex-direction:column}.ldw-submit-row button{width:100%}}
 
 /* Dynamic schema validation and live request preview */
 .ldw-schema-field{padding:9px;border:1px solid transparent;border-radius:7px;background:#fff}
@@ -147,3 +147,21 @@
 .ldw-schema-error-summary li span,.ldw-schema-error-summary li small{display:block;margin-top:2px}
 .ldw-schema-error-summary li small{color:#98736f;font-size:9px;overflow-wrap:anywhere}
 .ldw-schema-field.has-error{scroll-margin-top:24px}
+
+/* AI-assisted schema generation and location fallback */
+.ldw-ai-step{display:grid;gap:12px}
+.ldw-ai-step textarea{width:100%;min-height:92px;padding:9px 11px;border:1px solid var(--odoo-line);border-radius:5px;background:var(--odoo-panel);color:var(--odoo-ink);font:400 11px/1.6 'DM Sans','Microsoft YaHei',sans-serif;resize:vertical}
+.ldw-ai-step select{min-height:36px;padding:7px 10px;border:1px solid var(--odoo-line);border-radius:5px;background:var(--odoo-panel);color:var(--odoo-ink);font-size:11px}
+.ldw-ai-actions{display:flex;justify-content:flex-start;gap:8px;flex-wrap:wrap}
+.ldw-ai-actions button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:8px 13px;border:1px solid #cbb7c8;border-radius:5px;background:#f5eff4;color:#684b63;font-size:10px;font-weight:700}
+.ldw-ai-actions button:disabled{opacity:.5;cursor:not-allowed}
+.ldw-ai-result{display:grid;gap:10px;padding:14px;border:1px solid #d8c8d5;border-radius:6px;background:#fcf9fb}
+.ldw-ai-result-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px}
+.ldw-ai-result-heading span{font-size:9px;color:var(--odoo-muted);overflow-wrap:anywhere}
+.ldw-ai-summary{padding:10px 11px;border:1px solid var(--odoo-line);border-radius:5px;background:white}
+.ldw-ai-summary b,.ldw-ai-warnings b{font-size:10px}
+.ldw-ai-summary p{margin:5px 0 0;font-size:10px;line-height:1.7;white-space:pre-wrap}
+.ldw-ai-warnings{padding:9px 11px;border:1px solid #e8d4a6;border-radius:5px;background:#fffaf0;color:#795b22;font-size:10px}
+.ldw-ai-warnings ul{margin:5px 0 0;padding-left:18px;line-height:1.6}
+.ldw-ai-manual-note{padding:9px 11px;border:1px solid var(--odoo-line);border-radius:5px;background:var(--odoo-soft);color:var(--odoo-muted);font-size:9px;line-height:1.6}
+.ldw-field input[placeholder="也可以手动输入州 / 省 / 行政区"]{margin-top:5px}
