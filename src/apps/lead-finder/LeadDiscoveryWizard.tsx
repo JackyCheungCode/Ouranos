@@ -9,7 +9,7 @@ import './LeadDiscoveryWizard.css'
 
 type Props = { workspaceId: string; userId: string; onTaskCreated: () => void }
 type Actor = { id: string; name: string; username: string; title: string; description: string; url: string; stats?: { totalUsers?: number; actorReviewRating?: number; actorReviewCount?: number }; currentPricingInfo?: Record<string, unknown> }
-type SchemaField = { title?: string; description?: string; type?: string | string[]; default?: unknown; enum?: unknown[]; items?: unknown; properties?: Record<string, SchemaField>; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; minItems?: number; maxItems?: number; pattern?: string; format?: string }
+type SchemaField = { title?: string; description?: string; type?: string | string[]; default?: unknown; enum?: unknown[]; items?: SchemaField; properties?: Record<string, SchemaField>; required?: string[]; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; minItems?: number; maxItems?: number; pattern?: string; format?: string }
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
 const platformGroups = [
  { label: '搜索引擎与地图', items: [['google-maps','Google Maps','google maps business places'],['google-search','Google Search','google search results'],['bing','Bing','bing search results'],['yelp','Yelp','yelp business'] ] },
@@ -145,7 +145,30 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [error,setError] = useState('')
  const [notice,setNotice] = useState('')
  const [showRequestPreview,setShowRequestPreview] = useState(true)
- const schemaValidation=useMemo(()=>{const errors:Record<string,string>={};const payload:Record<string,unknown>={};for(const [key,field] of schemaKeys(schema||{})){let value=values[key];if(value===undefined||value===null||value===''){if(schema?.required?.includes(key))errors[key]='此字段为必填项';continue}if(field.type==='array'||field.type==='object'){if(typeof value==='string'){try{value=JSON.parse(value)}catch{errors[key]=field.type==='array'?'请输入有效 JSON 数组':'请输入有效 JSON 对象';continue}}if(field.type==='array'&&!Array.isArray(value)){errors[key]='必须是数组';continue}if(field.type==='array'&&Array.isArray(value)){if(field.minItems!==undefined&&value.length<field.minItems){errors[key]='至少需要 '+field.minItems+' 项';continue}if(field.maxItems!==undefined&&value.length>field.maxItems){errors[key]='最多允许 '+field.maxItems+' 项';continue}}if(field.type==='object'&&(!value||typeof value!=='object'||Array.isArray(value))){errors[key]='必须是 JSON 对象';continue}}if((field.type==='number'||field.type==='integer')&&value!==''){const n=Number(value);if(!Number.isFinite(n))errors[key]='必须是有效数字';else if(field.type==='integer'&&!Number.isInteger(n))errors[key]='必须是整数';else if(field.minimum!==undefined&&n<field.minimum)errors[key]='不能小于 '+field.minimum;else if(field.maximum!==undefined&&n>field.maximum)errors[key]='不能大于 '+field.maximum;value=n}if(typeof value==='string'){if(field.minLength!==undefined&&value.length<field.minLength)errors[key]='至少 '+field.minLength+' 个字符';else if(field.maxLength!==undefined&&value.length>field.maxLength)errors[key]='最多 '+field.maxLength+' 个字符';else if(field.pattern){try{if(!new RegExp(field.pattern).test(value))errors[key]='格式不符合要求（'+field.pattern+'）'}catch{}}if(!errors[key]&&field.format==='uri'&&!/^https?:\/\//i.test(value))errors[key]='请输入有效网址（http:// 或 https://）';if(!errors[key]&&field.format==='email'&&!/^\S+@\S+\.\S+$/.test(value))errors[key]='请输入有效邮箱地址'}if(field.enum?.length&&!field.enum.some(x=>String(x)===String(value)))errors[key]='请选择允许的枚举值';if(!errors[key])payload[key]=value}return {errors,payload,valid:Object.keys(errors).length===0}},[schema,values])
+ const schemaValidation=useMemo(()=>{
+  const errors:Record<string,string>={}
+  const payload:Record<string,unknown>={}
+  const validateField=(field:SchemaField,value:unknown,path:string,required:boolean):unknown=>{
+   if(isEmptyRequired(value)){if(required)errors[path]='此字段为必填项，不能为空';return undefined}
+   const type=fieldType(field)
+   if(type==='array'||type==='object'){
+    if(typeof value==='string'){try{value=JSON.parse(value)}catch{errors[path]=type==='array'?'请输入有效 JSON 数组':'请输入有效 JSON 对象';return undefined}}
+    if(type==='array'&&!Array.isArray(value)){errors[path]='必须是 JSON 数组';return undefined}
+    if(type==='object'&&(!value||typeof value!=='object'||Array.isArray(value))){errors[path]='必须是 JSON 对象';return undefined}
+   }
+   if(isEmptyRequired(value)){if(required)errors[path]='必填内容不能为空';return undefined}
+   if(type==='string'&&typeof value!=='string'){errors[path]='必须填写文本';return undefined}
+   if(type==='boolean'&&typeof value!=='boolean'){errors[path]='必须选择是或否';return undefined}
+   if(type==='number'||type==='integer'){const n=Number(value);if(!Number.isFinite(n)){errors[path]='必须填写有效数字';return undefined}if(type==='integer'&&!Number.isInteger(n)){errors[path]='必须填写整数';return undefined}if(field.minimum!==undefined&&n<field.minimum){errors[path]='不能小于 '+field.minimum;return undefined}if(field.maximum!==undefined&&n>field.maximum){errors[path]='不能大于 '+field.maximum;return undefined}value=n}
+   if(typeof value==='string'){if(field.minLength!==undefined&&value.length<field.minLength){errors[path]='至少 '+field.minLength+' 个字符';return undefined}if(field.maxLength!==undefined&&value.length>field.maxLength){errors[path]='最多 '+field.maxLength+' 个字符';return undefined}if(field.pattern){try{if(!new RegExp(field.pattern).test(value)){errors[path]='格式不符合要求';return undefined}}catch{errors[path]='Schema 格式规则无效';return undefined}}if(field.format==='uri'&&!/^https?:\\/\\//i.test(value)){errors[path]='请输入有效网址';return undefined}if(field.format==='email'&&!/^\\S+@\\S+\\.\\S+$/.test(value)){errors[path]='请输入有效邮箱地址';return undefined}}
+   if(field.enum?.length&&!field.enum.some(option=>JSON.stringify(option)===JSON.stringify(value))){errors[path]='请选择有效选项';return undefined}
+   if(Array.isArray(value)){if(field.minItems!==undefined&&value.length<field.minItems){errors[path]='至少需要 '+field.minItems+' 项';return undefined}if(field.maxItems!==undefined&&value.length>field.maxItems){errors[path]='最多允许 '+field.maxItems+' 项';return undefined}if(field.items)value.forEach((item,index)=>validateField(field.items!,item,path+'['+(index+1)+']',false))}
+   if(type==='object'&&field.properties){const obj=value as Record<string,unknown>;for(const [key,child] of Object.entries(field.properties))validateField(child,obj[key],path+'.'+key,(field.required||[]).includes(key))}
+   return value
+  }
+  for(const [key,field] of schemaKeys(schema||{})){const value=validateField(field,values[key],key,(schema?.required||[]).includes(key));if(!errors[key]&&!isEmptyRequired(value))payload[key]=value}
+  return {errors,payload,valid:Object.keys(errors).length===0}
+ },[schema,values])
  const availableProviders = providerByPlatform[channel] || ['Apify']
  const selectedCountry = countries.find(c=>c.code===countryCode)
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
