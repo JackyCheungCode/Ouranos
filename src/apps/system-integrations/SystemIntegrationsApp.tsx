@@ -13,8 +13,8 @@ import { useAuth } from '../../lib/auth'
 
 type Section = 'data' | 'ai' | 'logs'
 type Provider = { key: string; name: string; category: string; description: string; channels: string; docs: string; group: 'data' | 'ai' }
-type DataConnection = {provider_key:string;status:string;is_enabled:boolean;last_tested_at:string|null;last_error:string|null}
-type AiConfig = {provider_key:string;provider_name:string;model_name:string;is_default:boolean;is_enabled:boolean;status:string;last_tested_at:string|null;last_error:string|null;base_url:string|null}
+type DataConnection = {provider_key:string;status:string;is_enabled:boolean;verification_method:string;last_tested_at:string|null;last_error:string|null}
+type AiConfig = {provider_key:string;provider_name:string;model_name:string;is_default:boolean;is_enabled:boolean;status:string;verification_method:string;last_tested_at:string|null;last_error:string|null;base_url:string|null}
 type IntegrationLog = {id:string;created_at:string;provider_name:string;action:string;status:string;message:string|null}
 type CostSummary = {provider_key:string;cost_currency:string;run_count:number;completed_runs:number;failed_runs:number;estimated_total:number;actual_total:number;records_found:number;estimated_cost_runs:number;actual_cost_runs:number;unpriced_runs:number}
 
@@ -57,8 +57,8 @@ export default function SystemIntegrationsApp() {
     if(!supabase||!workspace)return
     setDbLoading(true);setDbError('')
     const [dataResult,aiResult]=await Promise.all([
-      supabase.from('integration_connections').select('provider_key,status,is_enabled,last_tested_at,last_error').eq('workspace_id',workspace.id),
-      supabase.from('ai_model_configs').select('provider_key,provider_name,model_name,is_default,is_enabled,status,last_tested_at,last_error,base_url').eq('workspace_id',workspace.id)
+      supabase.from('integration_connections').select('provider_key,status,is_enabled,verification_method,last_tested_at,last_error').eq('workspace_id',workspace.id),
+      supabase.from('ai_model_configs').select('provider_key,provider_name,model_name,is_default,is_enabled,status,verification_method,last_tested_at,last_error,base_url').eq('workspace_id',workspace.id)
     ])
     if(dataResult.error)setDbError(dataResult.error.message);else setDataConnections((dataResult.data||[]) as DataConnection[])
     if(aiResult.error)setDbError(aiResult.error.message);else setAiConfigs((aiResult.data||[]) as AiConfig[])
@@ -135,7 +135,7 @@ export default function SystemIntegrationsApp() {
               <span className={'int-detail-icon ' + (selected.group === 'ai' ? 'ai' : '')}>{selected.group === 'ai' ? <Bot size={23}/> : <Cloud size={23}/>}</span>
               <div><div className="int-eyebrow">{selected.group === 'ai' ? 'AI PROVIDER' : 'DATA PROVIDER'}</div><h2>{selected.name}</h2><p>{selected.category}</p></div>
             </div>
-            <span className={selected.key==='works-ai'?'int-status built-in':selectedConnection?'int-status connected':configuredConnection?.status==='error'?'int-status error':'int-status'}><i/> {selected.key==='works-ai'?'内置默认':selectedConnection?'已连接':configuredConnection?.status==='configured'?'已配置':configuredConnection?.status==='error'?'连接异常':'未配置'}</span>
+            <span className={selected.key==='works-ai'?'int-status built-in':selectedConnection?'int-status connected':configuredConnection?.status==='error'?'int-status error':'int-status'}><i/> {selected.key==='works-ai'?'内置默认':selectedConnection?(selectedConnection.verification_method==='manual'?'手动确认':'已连接'):configuredConnection?.status==='configured'?'已配置':configuredConnection?.status==='error'?'连接异常':'未配置'}</span>
           </div>
           <p className="int-description">{selected.description}</p>
           <div className="int-detail-tabs"><span className="active">连接信息</span><span>高级设置</span><span>使用记录</span></div>
