@@ -45,6 +45,8 @@ const localizeDescription=(key:string,field:SchemaField)=>({searchStringsArray:'
 const localizeEnum=(value:unknown)=>({true:'是',false:'否',daily:'每天',weekly:'每周',monthly:'每月',popular:'热门',relevance:'相关度',newest:'最新',oldest:'最早',ascending:'升序',descending:'降序'} as Record<string,string>)[String(value).toLowerCase()]||String(value)
 const fieldType=(field:SchemaField)=>Array.isArray(field.type)?field.type.find(x=>x!=='null')||'string':field.type||'string'
 const deriveSchemaRequirements=(schema:JsonSchema)=>{const requiredFields=new Set<string>(schema.required||[]);const props=schema.properties||{};const searchEntryPattern=/^(searchstringsarray|searchterms?|searchstrings?|searchqueries?|searchquery|keywords?|categoryfilterwords|placecategories|categories|starturls?|googlemapsurls)$/i;const searchEntries=Object.keys(props).filter(key=>searchEntryPattern.test(key));const atLeastOneGroups:string[][]=[];if(searchEntries.length>1)atLeastOneGroups.push(searchEntries);else if(searchEntries.length===1)requiredFields.add(searchEntries[0]);for(const [key,field] of Object.entries(props)){const description=(key+' '+String(field.title||'')+' '+String(field.description||'')).toLowerCase();if(/^(location|locationquery|location_query|searchlocation)$/i.test(key)&&/geographic area to search|location to search|search location/.test(description))requiredFields.add(key);if(/required|must provide|cannot be empty|is mandatory/.test(description))requiredFields.add(key);}return {requiredFields,atLeastOneGroups}}
+const schemaPathLabel=(schema:JsonSchema,path:string)=>{let properties=schema.properties||{};return path.replace(/\[(\d+)\]/g,'.$1').split('.').map(part=>{if(/^\d+$/.test(part))return '第'+part+'项';const field=properties[part];const label=field?localizeTitle(part,field):'Actor 参数';properties=field?.properties||{};return label}).join(' / ')}
+const schemaPathAnchor=(path:string)=>'schema-field-'+encodeURIComponent(path).replace(/%/g,'-')
 const isEmptyRequired=(value:unknown)=>value===undefined||value===null||value===''||(Array.isArray(value)&&value.length===0)||(typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value as object).length===0)
 const getDefaultValue = (field: SchemaField, required=false) => field.default ?? (fieldType(field)==='boolean' ? false : fieldType(field)==='array' ? (required?'':field.editor==='stringList'?'':'[]') : fieldType(field)==='object' ? (required?'':'{}') : '')
 const nominatim = async (params: Record<string,string>) => {
@@ -151,7 +153,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    if(type==='object'&&field.properties){const obj=value as Record<string,unknown>;for(const [key,child] of Object.entries(field.properties))validateField(child,obj[key],path+'.'+key,(field.required||[]).includes(key))}
    return value
   }
-  for(const [key,field] of schemaKeys(schema||{})){const value=validateField(field,values[key],key,requirements.requiredFields.has(key));if(!errors[key]&&!isEmptyRequired(value))payload[key]=value}
+  for(const [key,field] of schemaKeys(schema||{})){const value=validateField(field,values[key],key,requirements.requiredFields.has(key));const hasNestedErrors=Object.keys(errors).some(path=>path===key||path.startsWith(key+'.')||path.startsWith(key+'['));if(!hasNestedErrors&&!isEmptyRequired(value))payload[key]=value}
   for(const group of requirements.atLeastOneGroups){if(group.every(key=>isEmptyRequired(payload[key]))){errors[group[0]]='搜索入口至少填写一项：'+group.map(key=>localizeTitle(key,schema?.properties?.[key]||{})).join(' / ')}}
   return {errors,payload,valid:Object.keys(errors).length===0}
  },[schema,values])
@@ -232,9 +234,10 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const cityField=/^city$|cityname|city_name/.test(semantic)
   const portField=/port|seaport|unlocode/.test(semantic)
   const showHelp=Boolean(expandedHelp[key])
-  const fieldError=schemaValidation.errors[key]
+  const fieldErrors=Object.entries(schemaValidation.errors).filter(([path])=>path===key||path.startsWith(key+'.')||path.startsWith(key+'['))
+  const fieldError=fieldErrors.length>0
   const constraints=[field.minimum!==undefined?'≥ '+field.minimum:'',field.maximum!==undefined?'≤ '+field.maximum:'',field.minLength!==undefined?'最少 '+field.minLength+' 字符':'',field.maxLength!==undefined?'最多 '+field.maxLength+' 字符':'',field.minItems!==undefined?'至少 '+field.minItems+' 项':'',field.maxItems!==undefined?'最多 '+field.maxItems+' 项':'',field.pattern?'正则格式':'',field.format?field.format:''].filter(Boolean)
-  return <label className={'ldw-field ldw-schema-field '+(fieldError?'has-error':'')} key={key}>
+  return <label id={schemaPathAnchor(key)} className={'ldw-field ldw-schema-field '+(fieldError?'has-error':'')} key={key}>
    <span className="ldw-field-heading"><span className="ldw-field-label">{localizeTitle(key,field)}{required&&<b> * 必填</b>}{groupRequired&&<b> * 至少填写一项</b>}</span><small className="ldw-field-type">{Array.isArray(field.type)?field.type.join(' / '):(field.type||'text')}</small>{constraints.length>0&&<small className="ldw-constraint-chip">{constraints.join(' · ')}</small>}<button type="button" className="ldw-help-button" aria-expanded={showHelp} onClick={e=>{e.preventDefault();setExpandedHelp(current=>({...current,[key]:!current[key]}))}}><HelpCircle size={13}/>{showHelp?'收起说明':'字段说明'}</button></span>
    {enumValues.length>0?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">请选择</option>{enumValues.map(option=><option key={String(option)} value={String(option)}>{localizeEnum(option)}</option>)}</select>
    :countryField?<select value={String(value)} onChange={e=>{const next=e.target.value;set(next);const found=countries.find(c=>c.code===next||c.geoName===next);if(found){setCountryCode(found.code);setSelectedCountries(current=>current.includes(found.code)?current:[...current,found.code])}}}><option value="">选择国家</option>{countries.map(c=><option key={c.code} value={/code/.test(semantic)?c.code:c.geoName}>{c.flag} {c.name}</option>)}</select>
@@ -246,7 +249,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    :type==='array'&&field.editor==='stringList'?<textarea rows={3} value={Array.isArray(value)?value.join('\n'):String(value)} onChange={e=>set(e.target.value.split('\n').map(v=>v.trim()).filter(Boolean))} placeholder={Array.isArray(field.example)?'例如：'+field.example.slice(0,3).join('、'):'每行填写一项'}/>
    :type==='array'||type==='object'?<textarea rows={3} value={String(value)} onChange={e=>set(e.target.value)} placeholder={type==='array'?'请输入 JSON 数组':'请输入 JSON 对象'}/>
     :<input type={field.format==='uri'?'url':field.format==='email'?'email':field.format==='date'?'date':field.format==='date-time'?'datetime-local':'text'} minLength={field.minLength} maxLength={field.maxLength} pattern={field.pattern} value={String(value)} aria-invalid={Boolean(fieldError)} onChange={e=>set(e.target.value)}/>}
-   <small className="ldw-field-key">Actor 原始字段：{key}</small>{fieldError&&<small className="ldw-field-error">{fieldError}</small>}{showHelp&&<small className="ldw-field-help">{localizeDescription(key,field)}</small>}
+   <small className="ldw-field-key">Actor 原始字段：{key}</small>{fieldErrors.map(([path,message])=><small className="ldw-field-error" key={path}>{path===key?'':schemaPathLabel(schema||{},path)+'：'}{message}</small>)}{showHelp&&<small className="ldw-field-help">{localizeDescription(key,field)}</small>}
   </label>
  }
  const startSearch = async () => {
@@ -316,6 +319,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    {schemaBusy&&<div className="ldw-loading"><Loader2 size={16}/> 正在读取 Actor Schema…</div>}
    {schema&&actor&&<div className="ldw-schema-panel">
     <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个动态输入字段 · Schema 来自 Actor 最新构建 · {pricingLabel(actor)}</small><small>{Number(actor.currentPricingInfo?.pricePerUnitUsd)>0 ? `按 ${targetCount} 条估算约 $${(Number(actor.currentPricingInfo?.pricePerUnitUsd)*Number(targetCount)).toFixed(2)}` : '最终费用以 Actor 计费模型和实际使用量为准'}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
+    {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段；修正后错误会自动消失。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span><small>原始字段：{path}</small></li>)}</ol></div>}
     <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div><div className="ldw-request-preview"><button type="button" onClick={()=>setShowRequestPreview(v=>!v)}><span><b>请求参数预览</b><small>{Object.keys(schemaValidation.payload).length} 个字段 · {Object.keys(schemaValidation.errors).length} 项校验问题</small></span><span>{showRequestPreview?'收起':'展开'} <ChevronDown size={13}/></span></button>{showRequestPreview&&<><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过，可以提交':`请修正 ${Object.keys(schemaValidation.errors).length} 个字段错误后再提交`}</div></>}</div>
     
    </div>}
