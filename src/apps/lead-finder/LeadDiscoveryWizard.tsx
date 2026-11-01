@@ -408,7 +408,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     const taskTitle=taskName.trim()||product.trim()||keywords.trim()||actor.title
    const actorId=actor.username+'~'+actor.name
     const schemaHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stableStringify(schema))).then(d=>[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''))
-    const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel,ai_analysis:aiGenerated?{model:aiModel,user_request:aiRequest,summary:aiSummary,strategy:aiStrategy,actor_input:aiGenerated,analyzed_at:new Date().toISOString()}:null}
+    const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel,ai_analysis:aiGenerated?{model:aiModel,user_request:aiRequest,conversation:chatMessages,summary:aiSummary,strategy:aiStrategy,actor_input:actorInput,field_explanations:aiFieldExplanations,missing_information:aiMissingInformation,warnings:aiWarnings,analyzed_at:new Date().toISOString()}:null}
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspaceId,created_by:userId,name:taskTitle,status:'draft',target_profile:profile,selected_channels:[channel],target_count:Number(targetCount)}).select('id').single()
    if(taskError)throw new Error(taskError.message)
    const adapterKey='apify-'+channel+'-'+(actor.username+'-'+actor.name).toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,110)
@@ -504,7 +504,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     {aiApplied&&<div className="ldw-validation-ok">AI 参数已同步到手动配置。你可以展开手动配置修改任意字段，预览会同步更新。</div>}
    </div>}
    {!schema&&<div className="ldw-chat-hint">AI 识别平台后，请点击上方「手动配置」展开平台与 Actor 搜索。选择 Actor 后，AI 会自动读取 Schema 并开始参数确认。</div>}
-   <div className="ldw-submit-row"><span>只有 Actor 已选择、Schema 校验通过、所有必填信息完整且费用授权确认后，才能创建任务。</span><button disabled={!schema||!actor||!costConsent||busy||!schemaValidation.valid||aiMissingInformation.length>0} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并创建任务'} <ArrowRight size={15}/></button></div>
+   <div className="ldw-submit-row"><span>只有 Actor 已选择、Schema 校验通过、所有必填信息完整且费用授权确认后，才能创建任务。</span><button disabled={!schema||!actor||!costConsent||busy||!schemaValidation.valid} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并创建任务'} <ArrowRight size={15}/></button></div>
   </section>
 
  </div>
