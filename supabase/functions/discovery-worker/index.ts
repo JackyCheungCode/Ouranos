@@ -104,14 +104,14 @@ async function processRun(run:Record<string,unknown>,admin:string){
   await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:hasNext?"running":"completed",provider_status:hasNext?"fetching":"completed",output_cursor:page.nextCursor||null,records_found:recordsFound,completed_at:hasNext?null:now,lease_expires_at:hasNext?new Date(Date.now()+10000).toISOString():null,locked_by:null,last_polled_at:now,usage_metrics:usage,actual_cost:Number.isFinite(cost)&&cost>0?cost:run.actual_cost,cost_currency:costCurrency,result_summary:{...obj(run.result_summary),...counts,item_count:recordsFound},updated_at:now})});
   return;
  }
- const polled=await adapter.poll(ctx,jobId);
+ const polled=await adapter.poll(ctx,jobId);const polledUsage=obj(polled.usage);const mergedPollUsage={...obj(run.usage_metrics),...polledUsage};
  if(polled.state==="failed")throw new Error(`Provider job failed: ${JSON.stringify(polled.raw).slice(0,1000)}`);
  if(polled.state==="completed"&&provider==="texau"){
   const items=extractItems(polled.raw);const counts=await processItems(run,items,admin);
-  await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"completed",provider_status:"completed",records_found:items.length,completed_at:now,lease_expires_at:null,locked_by:null,last_polled_at:now,result_summary:{...counts,item_count:items.length},updated_at:now})});
+  await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"completed",provider_status:"completed",records_found:items.length,completed_at:now,lease_expires_at:null,locked_by:null,last_polled_at:now,usage_metrics:mergedPollUsage,billing_details:{...obj(run.billing_details),usage:mergedPollUsage},result_summary:{...counts,item_count:items.length},updated_at:now})});
   return;
  }
- await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({provider_status:polled.state==="completed"?"completed":"running",lease_expires_at:new Date(Date.now()+(polled.retryAfterSeconds||15)*1000).toISOString(),locked_by:null,last_polled_at:now,updated_at:now})});
+ await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({provider_status:polled.state==="completed"?"completed":"running",usage_metrics:mergedPollUsage,billing_details:{...obj(run.billing_details),usage:mergedPollUsage},lease_expires_at:new Date(Date.now()+(polled.retryAfterSeconds||15)*1000).toISOString(),locked_by:null,last_polled_at:now,updated_at:now})});
 }
 Deno.serve(async(req:Request)=>{
  if(req.method!=="POST")return new Response("Method not allowed",{status:405});
