@@ -9,9 +9,10 @@ const getPath=(source:unknown,path:string)=>path.split(".").reduce<unknown>((val
 const asText=(v:unknown)=>v===undefined||v===null?"":String(v).trim();
 const normalDomain=(value:string)=>{if(!value)return null;try{return new URL(value.includes("://")?value:`https://${value}`).hostname.toLowerCase().replace(/^www\./,"");}catch{return value.toLowerCase().replace(/^www\./,"").split("/")[0];}};
 const normalPhone=(value:string)=>value.replace(/[^0-9]/g,"")||null;
+async function hash(value:string){const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("");}
 const categories=(value:unknown)=>Array.isArray(value)?value.map(String).filter(Boolean):typeof value==="string"?value.split(/[,;|]/).map(x=>x.trim()).filter(Boolean):[];
 function mapped(raw:unknown,mapping:Record<string,unknown>,field:string,fallbacks:string[]=[]){const path=asText(mapping[field]);if(path){const value=getPath(raw,path);if(value!==undefined&&value!==null)return value;}for(const path of fallbacks){const value=getPath(raw,path);if(value!==undefined&&value!==null&&value!=="")return value;}return undefined;}
-function extractItems(provider:string,raw:unknown):unknown[]{if(Array.isArray(raw))return raw;const r=obj(raw);const data=obj(r.data);for(const candidate of [r.items,r.results,r.records,r.resultObject,data.items,data.results,data.records,data.data])if(Array.isArray(candidate))return candidate;return [];}
+function extractItems(raw:unknown):unknown[]{if(Array.isArray(raw))return raw;const r=obj(raw);const data=obj(r.data);for(const candidate of [r.items,r.results,r.records,r.resultObject,data.items,data.results,data.records,data.data])if(Array.isArray(candidate))return candidate;return [];}
 async function insertRows(path:string,payload:Record<string,unknown>[],admin:string){if(!payload.length)return [];const response=await rest(path,admin,{method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=representation"},body:JSON.stringify(payload)});if(!response.ok){const text=await response.text();throw new Error(`Database insert failed: ${text.slice(0,1000)}`);}return await response.json();}
 async function processItems(run:Record<string,unknown>,items:unknown[],admin:string){
  const mapping=obj(run.field_mapping_snapshot);let companyCount=0;let contactCount=0;
@@ -86,7 +87,7 @@ async function processRun(run:Record<string,unknown>,admin:string){
   const started=await adapter.start(ctx);
   const usage=obj(started.usage);
   if(started.state==="completed"){
-   const items=extractItems(provider,started.raw);const counts=await processItems(run,items,admin);
+   const items=extractItems(started.raw);const counts=await processItems(run,items,admin);
    const cost=Number(usage.cost_usd??usage.actual_cost??usage.cost);
    await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"completed",provider_job_id:started.providerJobId,provider_cursor:started.cursor||null,provider_status:"completed",records_found:items.length,completed_at:now,lease_expires_at:null,locked_by:null,usage_metrics:usage,billing_details:{...obj(run.billing_details),usage},actual_cost:Number.isFinite(cost)&&cost>0?cost:null,result_summary:{...counts,item_count:items.length},updated_at:now})});
   }else{
@@ -105,7 +106,7 @@ async function processRun(run:Record<string,unknown>,admin:string){
  const polled=await adapter.poll(ctx,jobId);
  if(polled.state==="failed")throw new Error(`Provider job failed: ${JSON.stringify(polled.raw).slice(0,1000)}`);
  if(polled.state==="completed"&&provider==="texau"){
-  const items=extractItems(provider,polled.raw);const counts=await processItems(run,items,admin);
+  const items=extractItems(polled.raw);const counts=await processItems(run,items,admin);
   await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"completed",provider_status:"completed",records_found:items.length,completed_at:now,lease_expires_at:null,locked_by:null,last_polled_at:now,result_summary:{...counts,item_count:items.length},updated_at:now})});
   return;
  }
