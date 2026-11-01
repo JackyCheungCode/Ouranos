@@ -44,7 +44,7 @@ const outputMapping = (schema: Record<string, unknown>) => {
   phone: pick(['phone','phoneNumber','phone_number','telephone'], 'phone'),
   country_name: pick(['country','countryName','country_name'], 'country'),
   address: pick(['address','fullAddress','full_address','streetAddress'], 'address'),
-  contact_name: pick(['contactName','fullName','full_name','personName','person_name'], 'fullName'),
+  contact_name: pick(['contactName','fullName','full_name','personName','person_name','name'], 'name'),
   job_title: pick(['jobTitle','job_title','position','role'], 'jobTitle'),
   contact_email: pick(['contactEmail','email','emailAddress'], 'email'),
   contact_phone: pick(['contactPhone','phone','phoneNumber'], 'phone'),
