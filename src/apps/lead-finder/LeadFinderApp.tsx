@@ -250,7 +250,7 @@ export default function LeadFinderApp() {
    selected_channels:selectedChannels,target_count:quantity==='custom'?500:Number(quantity)
   }).select('id,name,status,selected_channels,created_at').single()
   if(error){setTaskError(error.message);setTaskSubmitting(false);return}
-  const task:SearchTask={id:data.id,name:data.name,criteria,createdAt:new Date(data.created_at).toLocaleString(),channels:(data.selected_channels||[]).length,status:'草稿 / 待配置数据源',statusKey:'draft',discoveredCount:0,companyCount:0,contactCount:0,actualCost:null,modelName:selectedModel}
+  const task:SearchTask={id:data.id,name:data.name,criteria,createdAt:new Date(data.created_at).toLocaleString(),channels:(data.selected_channels||[]).length,status:'草稿 / 待配置数据源',statusKey:'draft',discoveredCount:0,companyCount:0,contactCount:0,actualCost:null,modelName:selectedModel,targetProfile:{product,industry,countries:selectedCountryItems.map(x=>({code:x.code,name:x.name})),target_type:targetType,quantity,keywords,ai_model:selectedModel,criteria},targetCount:quantity==='custom'?500:Number(quantity)}
   setTasks(current=>[task,...current]);setActiveTask(task.id);setShowPlan(false);setTab('tasks');setTaskSubmitting(false)
  }
  const visibleChannels = channelGroups.map(g=>({...g,channels:g.channels.filter(c=>(c.name+c.detail+c.providers.join('')).toLowerCase().includes(channelQuery.toLowerCase()))})).filter(g=>g.channels.length)
