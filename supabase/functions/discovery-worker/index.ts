@@ -68,11 +68,11 @@ async function updateTaskSummary(taskId:string,workspaceId:string,admin:string){
  ]);
  const runs=runsResponse.ok?await runsResponse.json():[];const inbox=inboxResponse.ok?await inboxResponse.json():[];
  const pending=runs.some((r:Record<string,unknown>)=>r.status==="queued"||r.status==="running");const successes=runs.some((r:Record<string,unknown>)=>r.status==="completed");const status=pending?"running":successes?"completed":"failed";
- const cost=runs.reduce((sum:number,r:Record<string,unknown>)=>sum+(Number(r.actual_cost)||0),0);
+ const taskCurrency=String((await (await rest(`lead_search_tasks?select=cost_currency&workspace_id=eq.${encodeURIComponent(workspaceId)}&id=eq.${encodeURIComponent(taskId)}&limit=1`,admin)).json())[0]?.cost_currency||"USD");const matchingCosts=runs.filter((r:Record<string,unknown>)=>r.cost_currency===taskCurrency&&r.actual_cost!==null);const cost=matchingCosts.reduce((sum:number,r:Record<string,unknown>)=>sum+(Number(r.actual_cost)||0),0);
  const companies=inbox.filter((r:Record<string,unknown>)=>r.record_type==="company"&&r.review_status!=="duplicate").length;
  const contacts=inbox.filter((r:Record<string,unknown>)=>r.record_type==="contact"&&r.review_status!=="duplicate").length;
  const sources=new Set(inbox.map((r:Record<string,unknown>)=>r.source_record_id).filter(Boolean));
- await rest(`lead_search_tasks?workspace_id=eq.${encodeURIComponent(workspaceId)}&id=eq.${encodeURIComponent(taskId)}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status,discovered_count:sources.size,unique_company_count:companies,unique_contact_count:contacts,actual_cost:cost||null,completed_at:pending?null:new Date().toISOString(),updated_at:new Date().toISOString()})});
+ await rest(`lead_search_tasks?workspace_id=eq.${encodeURIComponent(workspaceId)}&id=eq.${encodeURIComponent(taskId)}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status,discovered_count:sources.size,unique_company_count:companies,unique_contact_count:contacts,actual_cost:matchingCosts.length?cost:null,completed_at:pending?null:new Date().toISOString(),updated_at:new Date().toISOString()})});
 }
 async function processRun(run:Record<string,unknown>,admin:string){
  const workspaceId=String(run.workspace_id);const provider=String(run.provider_key) as ProviderKey;const adapter=getProviderAdapter(provider);if(!adapter)throw new Error(`Unsupported provider adapter: ${provider}`);
