@@ -17,7 +17,6 @@ const stageMap: Record<string, string[]> = {
   sequences: ['草稿','待审核','运行中','已暂停','已完成'],
   campaigns: ['计划中','准备中','进行中','已结束','已取消'],
   agents: ['未发布','已发布','运行中','已暂停','异常'],
-  pipeline: ['新建','需求确认','方案制定','报价谈判','赢单','丢单'],
   default: ['草稿','处理中','待确认','已完成','已取消'],
 }
 const records: Record<string, RecordItem[]> = {
