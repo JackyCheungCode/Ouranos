@@ -68,8 +68,8 @@ const osmRegions = async (countryCode:string,countryName:string) => {
  try {
   const country=await nominatim({q:countryName,featureType:'country',limit:'1'})
   const match=country.find(x=>x.osm_type==='relation'||x.osm_type==='way')
-  if(match?.osm_type==='relation')areaId=3600000000+match.osm_id
-  else if(match?.osm_type==='way')areaId=2400000000+match.osm_id
+  if(match?.osm_type==='relation'&&match.osm_id)areaId=3600000000+match.osm_id
+  else if(match?.osm_type==='way'&&match.osm_id)areaId=2400000000+match.osm_id
  } catch { /* ISO boundary fallback */ }
  const query=areaId
   ? `[out:json][timeout:40];area(${areaId})->.country;(relation(area.country)["boundary"="administrative"]["admin_level"~"3|4|5"];);out tags center;`
@@ -213,7 +213,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   return <label className="ldw-field" key={key}>
    <span className="ldw-field-heading"><span>{field.title || key}{required&&<b> *</b>}</span>{field.description&&<button type="button" className="ldw-help-button" aria-expanded={showHelp} onClick={e=>{e.preventDefault();setExpandedHelp(current=>({...current,[key]:!current[key]}))}}><HelpCircle size={13}/>{showHelp?'收起提示':'字段提示'}</button>}</span>
    {enumValues.length>0?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">请选择</option>{enumValues.map(option=><option key={String(option)} value={String(option)}>{String(option)}</option>)}</select>
-   :countryField?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">选择国家</option>{countries.map(c=><option key={c.code} value={/code/.test(semantic)?c.code:c.geoName}>{c.flag} {c.name}</option>)}</select>
+   :countryField?<select value={String(value)} onChange={e=>{const next=e.target.value;set(next);const found=countries.find(c=>c.code===next||c.geoName===next);if(found){setCountryCode(found.code);setSelectedCountries(current=>current.includes(found.code)?current:[...current,found.code])}}}><option value="">选择国家</option>{countries.map(c=><option key={c.code} value={/code/.test(semantic)?c.code:c.geoName}>{c.flag} {c.name}</option>)}</select>
    :regionField?<select value={String(value)} onChange={e=>set(e.target.value)} disabled={!countryCode||locationBusy}><option value="">全部地区（不限制）</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select>
    :cityField?<><div className="ldw-city-search-row"><input value={cityQuery||String(value)} onChange={e=>{setCityQuery(e.target.value);set('')}} placeholder="输入城市名称…"/><button type="button" onClick={()=>void searchCities()} disabled={!countryCode||citySearchBusy}><Search size={12}/>{citySearchBusy?'搜索中':'搜索'}</button></div>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{set(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}</>
    :portField?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">选择港口</option>{portCatalog.map(([code,name])=><option key={code} value={code}>{name} · {code}</option>)}</select>
