@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Check, ChevronDown, ExternalLink, Loader2, MapPin, Search, ShieldCheck, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
+import type { Feature, FeatureCollection, Geometry } from 'geojson'
+import type { PathOptions } from 'leaflet'
 import { countries } from './countries'
 import './LeadDiscoveryWizard.css'
 
@@ -24,7 +27,7 @@ const providerByPlatform: Record<string, string[]> = {
 }
 const searchTerms: Record<string,string> = Object.fromEntries(platformGroups.flatMap(g=>g.items.map(([id,,term])=>[id,term])))
 const portCatalog = [
- ['USLAX','Los Angeles, United States'],['USLGB','Long Beach, United States'],['USNYC','New York, United States'],['USMIA','Miami, United States'],['CAVAN','Vancouver, Canada'],['CATOR','Toronto, Canada'],['CNSHA','Shanghai, China'],['CNNGB','Ningbo, China'],['CNSZX','Shenzhen, China'],['CNYTN','Yantian, China'],['HKHKG','Hong Kong'],['SGSIN','Singapore'],['KRPUS','Busan, South Korea'],['JPTYO','Tokyo, Japan'],['JPYOK','Yokohama, Japan'],['TWKHH','Kaohsiung, Taiwan'],['NLRTM','Rotterdam, Netherlands'],['DEHAM','Hamburg, Germany'],['BEANR','Antwerp, Belgium'],['GBFXT','Felixstowe, United Kingdom'],['AEJEA','Jebel Ali, United Arab Emirates'],['AEDXB','Dubai, United Arab Emirates'],['INMUN','Mundra, India'],['INNSA','Nhava Sheva, India'],['BRSSZ','Santos, Brazil'],['MXZLO','Manzanillo, Mexico'],['AU SYD','Sydney, Australia'],['ZADUR','Durban, South Africa'],['ESBCN','Barcelona, Spain'],['FRLEH','Le Havre, France']
+ ['USLAX','Los Angeles, United States'],['USLGB','Long Beach, United States'],['USNYC','New York, United States'],['USMIA','Miami, United States'],['CAVAN','Vancouver, Canada'],['CATOR','Toronto, Canada'],['CNSHA','Shanghai, China'],['CNNGB','Ningbo, China'],['CNSZX','Shenzhen, China'],['CNYTN','Yantian, China'],['HKHKG','Hong Kong'],['SGSIN','Singapore'],['KRPUS','Busan, South Korea'],['JPTYO','Tokyo, Japan'],['JPYOK','Yokohama, Japan'],['TWKHH','Kaohsiung, Taiwan'],['NLRTM','Rotterdam, Netherlands'],['DEHAM','Hamburg, Germany'],['BEANR','Antwerp, Belgium'],['GBFXT','Felixstowe, United Kingdom'],['AEJEA','Jebel Ali, United Arab Emirates'],['AEDXB','Dubai, United Arab Emirates'],['INMUN','Mundra, India'],['INNSA','Nhava Sheva, India'],['BRSSZ','Santos, Brazil'],['MXZLO','Manzanillo, Mexico'],['AUSYD','Sydney, Australia'],['ZADUR','Durban, South Africa'],['ESBCN','Barcelona, Spain'],['FRLEH','Le Havre, France']
 ] as const
 
 const providerDescriptions: Record<string,string> = { Apify:'搜索 Apify Store 中可用的 Actors，并读取每个 Actor 自己的输入 Schema。', 'Bright Data':'数据集 / Scraper 产品目录与专属输入参数。', Octoparse:'模板任务与参数 Schema。', Firecrawl:'网站搜索、抓取与提取操作。', PhantomBuster:'Agent 工作流及参数。', TexAu:'自动化 Action 与参数。', '跨境魔方':'跨境电商数据 API 与接口参数。' }
@@ -50,6 +53,19 @@ const nominatim = async (params: Record<string,string>) => {
  const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } })
  if (!response.ok) throw new Error('OpenStreetMap 地点服务暂时不可用')
  return await response.json() as Array<{ place_id:number; display_name:string; name?:string; address?:Record<string,string>; type?:string; class?:string }>
+}
+
+function MarketMap({selected}:{selected:typeof countries}) {
+ const [geo,setGeo]=useState<FeatureCollection<Geometry>|null>(null)
+ useEffect(()=>{let active=true;fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json()).then(data=>{if(active)setGeo(data)}).catch(()=>{if(active)setGeo(null)});return()=>{active=false}},[])
+ const codes=new Set(selected.map(c=>c.code))
+ const style=(feature?:Feature):PathOptions=>{
+  const p=feature?.properties as Record<string,string>|undefined
+  const code=p?.ISO_A2||p?.ISO3166_1_Alpha_2||p?.ISO2||''
+  const picked=codes.has(code)
+  return {color:picked?'#76556f':'#c9c4ca',weight:picked?1.5:.55,fillColor:picked?'#a887a0':'#e9e6ea',fillOpacity:picked?.72:.3}
+ }
+ return <div className="ldw-map"><MapContainer center={[24,5]} zoom={1.25} minZoom={1} maxZoom={6} scrollWheelZoom={false} worldCopyJump style={{height:220,width:'100%'}}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>{geo&&<GeoJSON key={selected.map(c=>c.code).sort().join(',')} data={geo} style={style}/>}</MapContainer><div>OpenStreetMap · 已选国家 / 地区边界</div></div>
 }
 
 export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated }: Props) {
@@ -232,6 +248,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     <div className="ldw-field ldw-country-field"><span>目标国家 / 地区</span><button type="button" className="ldw-country-trigger" onClick={()=>setCountryOpen(v=>!v)}><span>{selectedCountryItems.length?selectedCountryItems.map(c=>c.flag).join(' ')+'  '+selectedCountryItems.length+' 个国家 / 地区':'全球（不限制）'}</span><ChevronDown size={14}/></button>
      {countryOpen&&<div className="ldw-country-popover"><div className="ldw-country-search"><Search size={13}/><input value={countryQuery} onChange={e=>setCountryQuery(e.target.value)} placeholder="搜索国家或地区"/></div><div className="ldw-country-actions"><button type="button" onClick={()=>{setSelectedCountries([]);setCountryCode('');setRegion('');setCity('')}}>清空</button><button type="button" onClick={()=>setSelectedCountries(countries.map(c=>c.code))}>选择列表全部</button></div><div className="ldw-country-list">{countries.filter(c=>(c.name+c.code+c.geoName).toLowerCase().includes(countryQuery.toLowerCase())).map(c=><button type="button" key={c.code} className={selectedCountries.includes(c.code)?'selected':''} onClick={()=>toggleCountry(c.code)}><span>{c.flag}</span><span>{c.name}</span>{selectedCountries.includes(c.code)&&<Check size={13}/>}</button>)}</div><small>支持多国筛选；地区和城市范围由下方指定的国家联动。</small></div>}
     </div>
+    <div className="ldw-map-wrap"><MarketMap selected={selectedCountryItems}/></div>
     <label className="ldw-field"><span>地区所属国家</span><select value={countryCode} onChange={e=>{setCountryCode(e.target.value);setRegion('');setCity('');setCityQuery('')}} disabled={!selectedCountries.length}><option value="">选择国家</option>{selectedCountryItems.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select><small>可从已选国家中指定一个国家筛选州 / 省和城市。</small></label>
     <label className="ldw-field"><span>州 / 省 / 行政区</span><select value={region} onChange={e=>{setRegion(e.target.value);setCity('');setCityQuery('')}} disabled={!countryCode||locationBusy}><option value="">{locationBusy?'正在从 OpenStreetMap 加载…':'选择地区（可选）'}</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select><small>地区选项随所选国家动态加载。</small></label>
     <div className="ldw-field ldw-city-field"><span>城市</span><input disabled={!countryCode} value={cityQuery||city} onChange={e=>{setCityQuery(e.target.value);setCity('')}} placeholder="输入城市名称搜索 OpenStreetMap…"/>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{setCity(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}<small>选择国家和地区后，城市搜索会自动限定范围。</small></div>
