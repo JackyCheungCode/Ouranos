@@ -17,6 +17,7 @@ export default function ApifyActorManager({canSync}:{canSync:boolean}){
  const [message,setMessage]=useState('')
  const [selections,setSelections]=useState<Selection[]>([])
  const [mappingDrafts,setMappingDrafts]=useState<Record<string,string>>({})
+ const [inputDrafts,setInputDrafts]=useState<Record<string,Record<string,string|boolean>>>({})
  const load=async()=>{
   if(!supabase||!workspace)return
   setLoading(true);setError('')
@@ -28,6 +29,7 @@ export default function ApifyActorManager({canSync}:{canSync:boolean}){
    const rows=(data||[]) as unknown as Selection[]
    setSelections(rows)
    setMappingDrafts(Object.fromEntries(rows.map(row=>[row.id,JSON.stringify(row.config?.field_mapping||{},null,2)])))
+   setInputDrafts(Object.fromEntries(rows.map(row=>{const schema=row.discovery_adapter_catalog.input_schema||{};const saved=(row.config?.input_defaults||{}) as Record<string,unknown>;const values=Object.fromEntries(Object.entries(schema.properties||{}).map(([key,field])=>{const value=saved[key]??field.default??(field.type==='boolean'?false:field.type==='array'?'[]':field.type==='object'?'{}':'');return [key,typeof value==='boolean'?value:typeof value==='string'?value:JSON.stringify(value)]}));return [row.id,values as Record<string,string|boolean>]})))
   }
   setLoading(false)
  }
@@ -48,6 +50,24 @@ export default function ApifyActorManager({canSync}:{canSync:boolean}){
   setBusy(true);setError('')
   const {error:updateError}=await supabase.from('workspace_adapter_selections').update({config:{...(row.config||{}),field_mapping:mapping},updated_at:new Date().toISOString()}).eq('id',row.id).eq('workspace_id',workspace.id)
   if(updateError)setError(updateError.message);else setMessage('字段映射已保存。')
+  await load();setBusy(false)
+ }
+ const saveInputDefaults=async(row:Selection)=>{
+  if(!supabase||!workspace)return
+  const schema=row.discovery_adapter_catalog.input_schema||{};const fields=Object.entries(schema.properties||{});const raw=inputDrafts[row.id]||{};const output:Record<string,unknown>={}
+  try{
+   for(const [key,field] of fields){
+    const value=raw[key]??''
+    if(schema.required?.includes(key)&&(value===''||value===undefined||value===null))throw new Error(`必填字段未填写：${field.title||key}`)
+    if(field.type==='boolean')output[key]=Boolean(value)
+    else if(field.type==='integer'){if(value!=='')output[key]=Number(value)}
+    else if(field.type==='array'||field.type==='object'){if(String(value).trim())output[key]=JSON.parse(String(value))}
+    else if(value!=='')output[key]=String(value)
+   }
+  }catch(e){setError(e instanceof Error?e.message:'Actor 输入参数格式错误');return}
+  setBusy(true);setError('')
+  const {error:updateError}=await supabase.from('workspace_adapter_selections').update({config:{...(row.config||{}),input_defaults:output},updated_at:new Date().toISOString()}).eq('id',row.id).eq('workspace_id',workspace.id)
+  if(updateError)setError(updateError.message);else setMessage('Actor 专属输入参数已保存。创建任务时可将 AI 生成参数与这些默认值合并。')
   await load();setBusy(false)
  }
  const toggle=async(row:Selection)=>{
@@ -71,6 +91,6 @@ export default function ApifyActorManager({canSync}:{canSync:boolean}){
   <div className="apify-actor-sync-form"><label>获客渠道<select value={channel} onChange={e=>setChannel(e.target.value)}>{channelOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label className="actor-id-field">Actor ID<input value={actorId} onChange={e=>setActorId(e.target.value)} placeholder="例如：compass/google-maps-extractor"/></label><button disabled={!canSync||busy||!actorId.trim()} onClick={()=>void sync()}><RefreshCw size={13}/> {busy?'处理中…':'读取 Actor Schema'}</button></div>
   {error&&<div className="int-db-error">{error}</div>}{message&&<div className="int-credential-feedback"><CheckCircle2 size={13}/>{message}</div>}
   <div className="apify-actor-list-head"><b>工作空间 Actor 列表</b><button onClick={()=>void load()} disabled={loading}><RefreshCw size={12}/> 刷新</button></div>
-  {loading?<div className="apify-actor-empty">读取 Actor 配置…</div>:!selections.length?<div className="apify-actor-empty"><Database size={18}/><b>尚未添加 Actor</b><span>输入 Apify Store 中的 Actor ID，系统将读取其独立输入 Schema。</span></div>:<div className="apify-actor-list">{selections.map(row=>{const schema=row.discovery_adapter_catalog.input_schema||{};const fields=Object.entries(schema.properties||{});return <article className="apify-actor-card" key={row.id}><div className="apify-actor-card-head"><div><b>{row.discovery_adapter_catalog.adapter_name}</b><small>{row.discovery_adapter_catalog.external_actor_id} · {row.channel_key} · build {row.discovery_adapter_catalog.adapter_version}</small></div><span className={row.is_enabled?'enabled':'disabled'}>{row.is_enabled?'已启用':'待配置'}</span></div><details><summary>输入字段 Schema（{fields.length}）<ChevronDown size={13}/></summary><div className="apify-schema-fields">{fields.map(([key,field])=><div key={key}><b>{field.title||key}</b><code>{key} · {field.type||'unknown'}{schema.required?.includes(key)?' · required':''}</code>{field.description&&<small>{field.description}</small>}</div>)}</div></details><label className="apify-mapping-label">输出字段映射 <small>左侧为 Ouranos 标准字段，右侧为 Actor 输出字段名，例如 {"{\"company_name\":\"name\",\"website\":\"websiteUrl\"}"}</small><textarea rows={3} value={mappingDrafts[row.id]||'{}'} onChange={e=>setMappingDrafts(current=>({...current,[row.id]:e.target.value}))}/></label><div className="apify-actor-actions"><button onClick={()=>void saveMapping(row)} disabled={busy}>保存字段映射</button><button onClick={()=>void toggle(row)} disabled={busy}>{row.is_enabled?<ToggleRight size={14}/>:<ToggleLeft size={14}/>} {row.is_enabled?'停用':'启用'}</button><button className="remove" onClick={()=>void remove(row)} disabled={busy}><Trash2 size={13}/> 移除</button></div></article>})}</div>}
+  {loading?<div className="apify-actor-empty">读取 Actor 配置…</div>:!selections.length?<div className="apify-actor-empty"><Database size={18}/><b>尚未添加 Actor</b><span>输入 Apify Store 中的 Actor ID，系统将读取其独立输入 Schema。</span></div>:<div className="apify-actor-list">{selections.map(row=>{const schema=row.discovery_adapter_catalog.input_schema||{};const fields=Object.entries(schema.properties||{});return <article className="apify-actor-card" key={row.id}><div className="apify-actor-card-head"><div><b>{row.discovery_adapter_catalog.adapter_name}</b><small>{row.discovery_adapter_catalog.external_actor_id} · {row.channel_key} · build {row.discovery_adapter_catalog.adapter_version}</small></div><span className={row.is_enabled?'enabled':'disabled'}>{row.is_enabled?'已启用':'待配置'}</span></div><details><summary>输入字段 Schema（{fields.length}）<ChevronDown size={13}/></summary><div className="apify-schema-fields">{fields.map(([key,field])=><div key={key}><b>{field.title||key}</b><code>{key} · {field.type||'unknown'}{schema.required?.includes(key)?' · required':''}</code>{field.description&&<small>{field.description}</small>}</div>)}</div></details><details className="apify-input-details"><summary>Actor 专属输入参数（{fields.length} 个字段）<ChevronDown size={13}/></summary><div className="apify-input-grid">{fields.map(([key,field])=>{const value=inputDrafts[row.id]?.[key]??'';const required=schema.required?.includes(key);return <label className="apify-dynamic-field" key={key}><span>{field.title||key}{required?' *':''}</span>{field.enum?.length?<select value={String(value)} onChange={e=>setInputDrafts(current=>({...current,[row.id]:{...(current[row.id]||{}),[key]:e.target.value}}))}><option value="">请选择</option>{field.enum.map(item=><option key={String(item)} value={String(item)}>{String(item)}</option>)}</select>:field.type==='boolean'?<input type="checkbox" checked={Boolean(value)} onChange={e=>setInputDrafts(current=>({...current,[row.id]:{...(current[row.id]||{}),[key]:e.target.checked}}))}/>:field.type==='array'||field.type==='object'?<textarea rows={2} value={String(value)} onChange={e=>setInputDrafts(current=>({...current,[row.id]:{...(current[row.id]||{}),[key]:e.target.value}}))} placeholder={field.type==='array'?'[]':'{}'}/>:<input type={field.type==='integer'?'number':'text'} value={String(value)} onChange={e=>setInputDrafts(current=>({...current,[row.id]:{...(current[row.id]||{}),[key]:e.target.value}}))} placeholder={field.default===undefined?'':String(field.default)}/ >}{field.description&&<small>{field.description}</small>}</label>})}</div><button className="apify-save-inputs" disabled={busy} onClick={()=>void saveInputDefaults(row)}>保存 Actor 输入参数</button></details><label className="apify-mapping-label">输出字段映射 <small>左侧为 Ouranos 标准字段，右侧为 Actor 输出字段名，例如 {"{\"company_name\":\"name\",\"website\":\"websiteUrl\"}"}</small><textarea rows={3} value={mappingDrafts[row.id]||'{}'} onChange={e=>setMappingDrafts(current=>({...current,[row.id]:e.target.value}))}/></label><div className="apify-actor-actions"><button onClick={()=>void saveMapping(row)} disabled={busy}>保存字段映射</button><button onClick={()=>void toggle(row)} disabled={busy}>{row.is_enabled?<ToggleRight size={14}/>:<ToggleLeft size={14}/>} {row.is_enabled?'停用':'启用'}</button><button className="remove" onClick={()=>void remove(row)} disabled={busy}><Trash2 size={13}/> 移除</button></div></article>})}</div>}
  </div>
 }
