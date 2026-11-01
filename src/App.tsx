@@ -6,6 +6,7 @@ import AppTile from './apps/components/AppTile'
 import LeadFinderApp from './apps/lead-finder/LeadFinderApp'
 import SystemIntegrationsApp from './apps/system-integrations/SystemIntegrationsApp'
 import BusinessWorkspace from './apps/BusinessWorkspace'
+import CompaniesWorkspace from './apps/CompaniesWorkspace'
 import './index.css'
 import { AuthProvider, useAuth } from './lib/auth'
 import AuthScreen from './lib/auth-screen'
@@ -56,7 +57,7 @@ function AuthenticatedApp() {
         </aside>
       </>}
       <main className="main">
-        {active?.id === 'lead-finder' ? <div className="module-page"><div className="breadcrumbs"><button onClick={() => setActive(null)}><Layers3 size={15}/> 全部应用</button><ChevronRight size={14}/><span>{active.name}</span></div><LeadFinderApp /></div> : active?.id === 'integrations' ? <div className="module-page"><div className="breadcrumbs"><button onClick={() => setActive(null)}><Layers3 size={15}/> 全部应用</button><ChevronRight size={14}/><span>{active.name}</span></div><SystemIntegrationsApp /></div> : active ? <div className="module-page"><div className="breadcrumbs"><button onClick={() => setActive(null)}><Layers3 size={15}/> 全部应用</button><ChevronRight size={14}/><span>{active.name}</span></div><BusinessWorkspace app={active}/></div> : <div className="launcher">
+        {active?.id === 'companies' ? <div className="module-page"><CompaniesWorkspace app={active}/></div> : active?.id === 'lead-finder' ? <div className="module-page"><div className="breadcrumbs"><button onClick={() => setActive(null)}><Layers3 size={15}/> 全部应用</button><ChevronRight size={14}/><span>{active.name}</span></div><LeadFinderApp /></div> : active?.id === 'integrations' ? <div className="module-page"><div className="breadcrumbs"><button onClick={() => setActive(null)}><Layers3 size={15}/> 全部应用</button><ChevronRight size={14}/><span>{active.name}</span></div><SystemIntegrationsApp /></div> : active ? <div className="module-page"><div className="breadcrumbs"><button onClick={() => setActive(null)}><Layers3 size={15}/> 全部应用</button><ChevronRight size={14}/><span>{active.name}</span></div><BusinessWorkspace app={active}/></div> : <div className="launcher">
           <div className="welcome-row"><div><div className="eyebrow">OURANOS 工作空间</div><h1>早上好，欢迎回来 <span>✦</span></h1><p>发现客户、洞察市场、拓展业务所需的一切，尽在一个工作空间。</p></div></div>
           <div className="app-section"><div className="section-heading"><div><h2>{pageTitle}</h2><p>共找到 {filtered.length} 个应用</p></div></div>
             {groupedApps.length ? groupedApps.map(group => <section className="category-section" key={group.id}><div className="category-heading"><div><h3>{group.title}</h3><p>{group.subtitle}</p></div><span>{group.apps.length} 个应用</span></div><div className="app-grid">{group.apps.map(app => <AppTile key={app.id} app={app} onOpen={openApp} favorite={favorites.includes(app.id)} onFavorite={toggleFavorite}/>)}</div></section>) : <div className="empty-search"><h3>没有找到匹配的应用</h3><p>请尝试其他关键词。</p></div>}
