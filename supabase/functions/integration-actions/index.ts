@@ -95,7 +95,7 @@ Deno.serve(async(req:Request)=>{
     const user=await userResponse.json();const body=await req.json();
     const action=String(body.action||"");const kind=body.kind==="ai_model"?"ai_model":body.kind==="data_source"?"data_source":"";
     const workspaceId=String(body.workspace_id||"");const providerKey=String(body.provider_key||"").toLowerCase();const modelName=String(body.model_name||"");
-    if(!["delete","test"].includes(action)||!workspaceId||!kind||! /^[a-z0-9-]{2,64}$/.test(providerKey))return json({error:"Invalid integration action"},400,origin);
+    if(!["delete","test","manual_confirm"].includes(action)||!workspaceId||!kind||! /^[a-z0-9-]{2,64}$/.test(providerKey))return json({error:"Invalid integration action"},400,origin);
     const membership=await rest(`workspace_members?select=role&workspace_id=eq.${encodeURIComponent(workspaceId)}&user_id=eq.${encodeURIComponent(user.id)}&limit=1`,adminKey);
     if(!membership.ok)return json({error:"Unable to verify workspace access"},500,origin);
     const members=await membership.json();let isOwner=false;
@@ -108,6 +108,14 @@ Deno.serve(async(req:Request)=>{
     const existingRows=await existingResponse.json();const existing=existingRows[0];
     if(!existing)return json({error:"Integration configuration not found"},404,origin);
     const started=Date.now();
+    if(action==="manual_confirm"){
+      if(kind!=="data_source"||providerKey!=="kuajingmofang")return json({error:"Only Cross-border Magic supports manual verification"},400,origin);
+      if(!existing.secret_ref)return json({error:"No stored credential found"},400,origin);
+      const manualUpdate=await rest(`${table}?${filter}`,adminKey,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"connected",is_enabled:true,verification_method:"manual",last_tested_at:null,last_error:null,updated_at:new Date().toISOString()})});
+      if(!manualUpdate.ok)return json({error:"Manual verification could not be saved"},500,origin);
+      await recordEvent(adminKey,{workspace_id:workspaceId,provider_key:providerKey,provider_name:existing.provider_name,action:"test",status:"success",message:"用户确认已在服务商后台核验 API Key；未发送计费请求",details:{verification_method:"manual"},duration_ms:Date.now()-started,created_by:user.id});
+      return json({ok:true,action:"manual_confirm",provider_key:providerKey,status:"connected",verification_method:"manual",message:"已按用户确认启用连接；系统未向跨境魔方发送计费请求。"},200,origin);
+    }
     if(action==="delete"){
       if(existing.secret_ref){const secretDelete=await rest("rpc/integration_secret_delete",adminKey,{method:"POST",body:JSON.stringify({p_secret_id:existing.secret_ref})});if(!secretDelete.ok)return json({error:"Vault credential deletion failed"},500,origin);}
       const deleted=await rest(`${table}?${filter}`,adminKey,{method:"DELETE",headers:{Prefer:"return=minimal"}});
@@ -122,7 +130,7 @@ Deno.serve(async(req:Request)=>{
     if(typeof secret!=="string"||!secret)return json({error:"Stored credential is empty"},500,origin);
     const result=await testProvider(providerKey,secret,kind);
     const status=result.success?"connected":result.manual?"configured":"error";
-    const update=await rest(`${table}?${filter}`,adminKey,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status,is_enabled:result.success,last_tested_at:new Date().toISOString(),last_error:result.success?null:result.message,updated_at:new Date().toISOString()})});
+    const update=await rest(`${table}?${filter}`,adminKey,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status,is_enabled:result.success,verification_method:result.success?"api_test":result.manual?"manual_pending":"failed",last_tested_at:new Date().toISOString(),last_error:result.success?null:result.message,updated_at:new Date().toISOString()})});
     if(!update.ok)return json({error:"Test completed but status could not be saved"},500,origin);
     await recordEvent(adminKey,{workspace_id:workspaceId,provider_key:providerKey,provider_name:existing.provider_name,action:"test",status:result.success?"success":"failure",message:result.message,details:{status_code:result.statusCode??null,manual:result.manual===true},duration_ms:Date.now()-started,created_by:user.id});
     return json({ok:true,action:"test",provider_key:providerKey,status,message:result.message,usage:result.usage??null},200,origin);
