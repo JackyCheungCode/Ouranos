@@ -79,9 +79,15 @@ const osmRegions = async (countryCode:string,countryName:string) => {
  throw lastError instanceof Error?lastError:new Error('OpenStreetMap 地区数据暂时不可用')
 }
 
-function MarketMap({selected}:{selected:typeof countries}) {
+function MapFocus({location}:{location:MapLocation|null}) {
+ const map=useMap()
+ useEffect(()=>{if(location)map.flyTo([location.lat,location.lon],location.label?7:2,{duration:.7})},[map,location])
+ return null
+}
+
+function MarketMap({selected,location}:{selected:typeof countries;location:MapLocation|null}) {
  const [geo,setGeo]=useState<FeatureCollection<Geometry>|null>(null)
- useEffect(()=>{let active=true;fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json()).then(data=>{if(active)setGeo(data)}).catch(()=>{if(active)setGeo(null)});return()=>{active=false}},[])
+ useEffect(()=>{let active=true;fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',{signal:AbortSignal.timeout(15000)}).then(r=>{if(!r.ok)throw new Error('country boundary unavailable');return r.json()}).then(data=>{if(active)setGeo(data)}).catch(()=>{if(active)setGeo(null)});return()=>{active=false}},[])
  const codes=new Set(selected.map(c=>c.code))
  const style=(feature?:Feature):PathOptions=>{
   const p=feature?.properties as Record<string,string>|undefined
@@ -89,7 +95,7 @@ function MarketMap({selected}:{selected:typeof countries}) {
   const picked=codes.has(code)
   return {color:picked?'#76556f':'#c9c4ca',weight:picked?1.5:.55,fillColor:picked?'#a887a0':'#e9e6ea',fillOpacity:picked?.72:.3}
  }
- return <div className="ldw-map"><MapContainer center={[24,5]} zoom={1.25} minZoom={1} maxZoom={6} scrollWheelZoom={false} worldCopyJump style={{height:220,width:'100%'}}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>{geo&&<GeoJSON key={selected.map(c=>c.code).sort().join(',')} data={geo} style={style}/>}</MapContainer><div>OpenStreetMap · 已选国家 / 地区边界</div></div>
+ return <div className="ldw-map"><MapContainer center={location?[location.lat,location.lon]:[24,5]} zoom={location?5:1.25} minZoom={1} maxZoom={12} scrollWheelZoom={false} worldCopyJump style={{height:220,width:'100%'}}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>{geo&&<GeoJSON key={selected.map(c=>c.code).sort().join(',')} data={geo} style={style}/>}<MapFocus location={location}/>{location&&<Marker position={[location.lat,location.lon]}><Popup>{location.label}</Popup></Marker>}</MapContainer><div>{location?'地图已定位：'+location.label:'OpenStreetMap · 选择城市或行政区后自动定位'}</div></div>
 }
 
 export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated }: Props) {
@@ -100,13 +106,16 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [countryQuery,setCountryQuery] = useState('')
  const [countryOpen,setCountryOpen] = useState(false)
  const [region,setRegion] = useState('__all__')
+ const [regionManual,setRegionManual] = useState('')
+ const [regionLoadError,setRegionLoadError] = useState('')
+ const [mapLocation,setMapLocation] = useState<MapLocation|null>(null)
  const [expandedPlatformGroup,setExpandedPlatformGroup] = useState('搜索引擎与地图')
  const [showAllActors,setShowAllActors] = useState(false)
  const [expandedHelp,setExpandedHelp] = useState<Record<string,boolean>>({})
  const [city,setCity] = useState('')
  const [cityQuery,setCityQuery] = useState('')
- const [cityResults,setCityResults] = useState<Array<{place_id:number;display_name:string;name?:string}>>([])
- const [regionResults,setRegionResults] = useState<Array<{place_id:number;display_name:string;name?:string}>>([])
+ const [cityResults,setCityResults] = useState<Array<{place_id:number;display_name:string;name?:string;lat?:string;lon?:string}>>([])
+ const [regionResults,setRegionResults] = useState<Array<{place_id:number;display_name:string;name?:string;lat?:number;lon?:number}>>([])
  const [locationBusy,setLocationBusy] = useState(false)
  const [citySearchBusy,setCitySearchBusy] = useState(false)
  const [actorQuery,setActorQuery] = useState('')
