@@ -89,8 +89,8 @@ async function processRun(run:Record<string,unknown>,admin:string){
   const usage=obj(started.usage);
   if(started.state==="completed"){
    const items=extractItems(started.raw);const counts=await processItems(run,items,admin);
-   const cost=Number(usage.cost_usd??usage.actual_cost??usage.cost);
-   await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"completed",provider_job_id:started.providerJobId,provider_cursor:started.cursor||null,provider_status:"completed",records_found:items.length,completed_at:now,lease_expires_at:null,locked_by:null,usage_metrics:usage,billing_details:{...obj(run.billing_details),usage},actual_cost:Number.isFinite(cost)&&cost>0?cost:null,result_summary:{...counts,item_count:items.length},updated_at:now})});
+   const costValue=usage.cost_usd??(usage.currency?usage.actual_cost??usage.cost:undefined);const cost=Number(costValue);const costCurrency=String(usage.currency||(usage.cost_usd?"USD":run.cost_currency||"USD"));
+   await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"completed",provider_job_id:started.providerJobId,provider_cursor:started.cursor||null,provider_status:"completed",records_found:items.length,completed_at:now,lease_expires_at:null,locked_by:null,usage_metrics:usage,billing_details:{...obj(run.billing_details),usage},actual_cost:Number.isFinite(cost)&&cost>0?cost:null,cost_currency:costCurrency,result_summary:{...counts,item_count:items.length},updated_at:now})});
   }else{
    await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({provider_job_id:started.providerJobId,provider_cursor:started.cursor||null,provider_status:"running",lease_expires_at:new Date(Date.now()+15000).toISOString(),locked_by:null,usage_metrics:usage,billing_details:{...obj(run.billing_details),usage},updated_at:now})});
   }
@@ -99,9 +99,9 @@ async function processRun(run:Record<string,unknown>,admin:string){
  if(run.provider_status==="completed"||run.provider_status==="fetching"){
   const page=await adapter.fetch(ctx,jobId,asText(run.output_cursor)||null);const counts=await processItems(run,page.items,admin);
   const recordsFound=Number(run.records_found||0)+page.items.length;const usage={...obj(run.usage_metrics),...obj(page.usage)};
-  const cost=Number(usage.cost_usd??usage.actual_cost??usage.cost);
+  const costValue=usage.cost_usd??(usage.currency?usage.actual_cost??usage.cost:undefined);const cost=Number(costValue);const costCurrency=String(usage.currency||(usage.cost_usd?"USD":run.cost_currency||"USD"));
   const hasNext=Boolean(page.nextCursor);
-  await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:hasNext?"running":"completed",provider_status:hasNext?"fetching":"completed",output_cursor:page.nextCursor||null,records_found:recordsFound,completed_at:hasNext?null:now,lease_expires_at:hasNext?new Date(Date.now()+10000).toISOString():null,locked_by:null,last_polled_at:now,usage_metrics:usage,actual_cost:Number.isFinite(cost)&&cost>0?cost:run.actual_cost,result_summary:{...obj(run.result_summary),...counts,item_count:recordsFound},updated_at:now})});
+  await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:hasNext?"running":"completed",provider_status:hasNext?"fetching":"completed",output_cursor:page.nextCursor||null,records_found:recordsFound,completed_at:hasNext?null:now,lease_expires_at:hasNext?new Date(Date.now()+10000).toISOString():null,locked_by:null,last_polled_at:now,usage_metrics:usage,actual_cost:Number.isFinite(cost)&&cost>0?cost:run.actual_cost,cost_currency:costCurrency,result_summary:{...obj(run.result_summary),...counts,item_count:recordsFound},updated_at:now})});
   return;
  }
  const polled=await adapter.poll(ctx,jobId);
