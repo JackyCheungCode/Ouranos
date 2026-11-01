@@ -406,7 +406,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    </div>}
   </section> 
   <section className="ldw-card ldw-ai-step"><div className="ldw-step-title"><span>06</span><div><h3>AI 智能分析与 Schema 参数生成</h3><p>AI 综合目标市场、搜索限制、补充要求和当前 Actor 的真实 Schema，先总结需求，再生成参数。</p></div></div>
-   <label className="ldw-field"><span>AI 模型</span><select value={aiModel} onChange={e=>setAiModel(e.target.value)}><option value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">Cloudflare Workers AI · Llama 3.3 70B（默认）</option><option value="@cf/deepseek-ai/deepseek-r1-distill-qwen-32b">Cloudflare Workers AI · DeepSeek R1 Qwen 32B</option></select><small>模型在服务端运行，不会向浏览器暴露 Cloudflare API 凭证。</small></label>
+   <label className="ldw-field"><span>AI 模型</span><select value={aiModel} onChange={e=>setAiModel(e.target.value)}><option value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">Cloudflare Workers AI · Llama 3.3 70B（默认）</option><option value="@cf/meta/llama-4-scout-17b-16e-instruct">Cloudflare Workers AI · Llama 4 Scout 17B</option></select><small>模型在服务端运行，不会向浏览器暴露 Cloudflare API 凭证。</small></label>
    <label className="ldw-field"><span>补充抓取需求（自然语言）</span><textarea rows={4} value={aiRequest} onChange={e=>setAiRequest(e.target.value)} placeholder="例如：优先寻找真实经营的 USB Cable 批发商和制造商，尽可能获取企业官网、公开邮箱和联系电话；排除零售店和无关结果。也可以留空，AI 将根据上方配置分析。"/></label>
    {aiError&&<div className="ldw-error">{aiError}</div>}
    <div className="ldw-ai-actions"><button type="button" onClick={()=>void analyzeActorInput()} disabled={!schema||!actor||aiBusy}>{aiBusy?<><Loader2 size={14}/> 正在分析并生成参数…</>:<><Sparkles size={14}/> AI 分析需求并生成参数</>}</button></div>
