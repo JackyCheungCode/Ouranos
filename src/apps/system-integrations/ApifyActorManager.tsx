@@ -85,7 +85,7 @@ export default function ApifyActorManager({canSync}:{canSync:boolean}){
  const toggle=async(row:Selection)=>{
   if(!supabase||!workspace)return
   const mapping=row.config?.field_mapping
-  if(!row.is_enabled&&(!mapping||typeof mapping!=='object'||Array.isArray(mapping)||!Object.keys(mapping as object).length)){setError('请先配置并保存至少一个输出字段映射，再启用该 Actor。');return}
+  if(!row.is_enabled&&(!mapping||typeof mapping!=='object'||Array.isArray(mapping)||!(mapping as Record<string,unknown>).company_name&&!(mapping as Record<string,unknown>).contact_name)){setError('请先配置并保存 company_name 或 contact_name 输出映射，再启用该 Actor。');return}
   setBusy(true);setError('')
   const {error:updateError}=await supabase.from('workspace_adapter_selections').update({is_enabled:!row.is_enabled,updated_at:new Date().toISOString()}).eq('id',row.id).eq('workspace_id',workspace.id)
   if(updateError)setError(updateError.message);else setMessage(row.is_enabled?'Actor 已停用。':'Actor 已启用，可参与该渠道的搜索调度。')
