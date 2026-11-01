@@ -22,7 +22,7 @@ function trimSchema(schema, depth = 0) {
     if (schema[key] !== undefined) result[key] = key === "items" ? trimSchema(schema[key], depth + 1) : schema[key];
   }
   if (schema.properties && typeof schema.properties === "object") {
-    result.properties = Object.fromEntries(Object.entries(schema.properties).slice(0, 150).map(([key, value]) => [key, trimSchema(value, depth + 1)]));
+    result.properties = Object.fromEntries(Object.entries(schema.properties).map(([key, value]) => [key, trimSchema(value, depth + 1)]));
   }
   return result;
 }
@@ -58,7 +58,9 @@ export default {
       if (!schema || typeof schema !== "object" || !schema.properties || typeof schema.properties !== "object") {
         return json({ error: "未提供有效的 Actor 输入 Schema" }, 400, origin);
       }
-      const model = ALLOWED_MODELS.has(body.model) ? body.model : "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+      const requestedModel = String(body.model || "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+      if (!ALLOWED_MODELS.has(requestedModel)) return json({ error: "所选 AI 模型不受支持，请从模型列表中重新选择" }, 400, origin);
+      const model = requestedModel;
       const context = {
         user_request: String(body.user_request || "").slice(0, 8000),
         market: body.market || {},
