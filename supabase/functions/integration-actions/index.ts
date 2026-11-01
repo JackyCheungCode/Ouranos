@@ -76,7 +76,12 @@ async function testProvider(provider:string,secret:string,kind:string):Promise<T
     const ok=response.ok&&Boolean(data.access_token||data.token);
     return {success:ok,message:ok?"八爪鱼账号认证成功，已取得短期 Access Token":`八爪鱼认证失败（HTTP ${response.status}），请检查账号凭据和 API 权限`,statusCode:response.status};
   }
-  if(provider==="texau")return {success:false,manual:true,message:"TexAu 官方 REST API 文档暂未公开独立的无计费凭证检查端点。为避免测试时消耗查询额度，本次不发送计费请求；凭证已安全保存，待接入官方验证端点。"};
+  if(provider==="texau"){
+    const response=await fetch("https://v3-api.texau.com/api/v1/email_finding_waterfall",{method:"POST",headers:{"x-api-key":apiKey,"Content-Type":"application/json",Accept:"application/json"},body:"{}",signal:timeout});
+    const data=await response.json().catch(()=>({}));
+    const authOk=response.status===400||(response.status===422)||(response.ok&&data.success===false);
+    return {success:authOk,message:authOk?"TexAu API Key 已通过认证；空参数校验请求被拒绝，未执行 enrichment":response.status===401||response.status===403?"TexAu API Key 无效或无权访问":`TexAu 返回 HTTP ${response.status}`,statusCode:response.status};
+  }
   if(provider==="kuajingmofang")return {success:false,manual:true,message:"跨境魔方公开接口按次计费，当前未确认无计费的 API Key 验证端点。为避免测试产生费用，本次不调用计费接口；凭证已安全保存。"};
   return {success:false,manual:true,message:"该服务商暂未配置连接测试适配器。"};
 }
