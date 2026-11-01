@@ -44,7 +44,7 @@ Deno.serve(async(req:Request)=>{
     const config=(selection.config||{}) as Record<string,unknown>;const defaults=(config.input_defaults||{}) as Record<string,unknown>;const mapping=(config.input_mapping||{}) as Record<string,string>;const outputMapping=(config.field_mapping||catalog.field_mapping||{}) as Record<string,unknown>;if(!outputMapping.company_name&&!outputMapping.contact_name)return json({error:`渠道 ${selection.channel_key} 尚未映射企业名称或联系人姓名`,adapter_key:selection.adapter_key},422,origin);
     const input:Record<string,unknown>={...defaults};
     for(const [inputField,profilePath] of Object.entries(mapping)){const value=getPath(searchProfile,profilePath);if(value!==undefined&&value!==null&&value!=="")setPath(input,inputField,value);}
-    const schema=(catalog.input_schema||{}) as Record<string,unknown>;const required=Array.isArray(schema.required)?schema.required as string[]:[];
+    if(input.customGeolocation&&typeof input.customGeolocation==='object'&&!Array.isArray(input.customGeolocation)&&Object.keys(input.customGeolocation as Record<string,unknown>).length===0)delete input.customGeolocation;const schema=(catalog.input_schema||{}) as Record<string,unknown>;const required=Array.isArray(schema.required)?schema.required as string[]:[];
     const missingFields=required.filter(field=>input[field]===undefined||input[field]===null||input[field]==="");
     if(missingFields.length)return json({error:`渠道 ${selection.channel_key} 的 Actor 缺少必填参数`,adapter_key:selection.adapter_key,missing_input_fields:missingFields},422,origin);
     const pricing=(catalog.pricing_model||{}) as Record<string,unknown>;const maxCost=Number(config.max_cost||0);
