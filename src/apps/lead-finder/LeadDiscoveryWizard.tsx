@@ -286,8 +286,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   return model+price
  }
  return <div className="ldw-shell">
-  <div className="ldw-intro"><div><span className="ldw-eyebrow">LEAD DISCOVERY WORKSPACE</span><h2>发现潜在客户</h2><p>先选择客户来源，再选择供应商和采集器。参数表单会根据采集器 Schema 自动生成。</p></div><span className="ldw-status"><Sparkles size={14}/> 动态采集配置</span></div>
-  <div className="ldw-odoo-flow" aria-label="潜客发现流程">{[['01','来源平台'],['02','数据供应商'],['03','目标市场'],['04','采集器与参数'],['05','任务设置']].map(([n,label])=><div className="ldw-odoo-flow-item" key={n}><span>{n}</span><b>{label}</b></div>)}</div>
+  <div className="ldw-intro"><div><span className="ldw-eyebrow">LEAD DISCOVERY WORKSPACE</span><h2>发现潜在客户</h2><p>先定义目标市场和搜索任务，再选择采集器；AI 将依据真实 Schema 生成参数。</p></div><span className="ldw-status"><Sparkles size={14}/> 动态采集配置</span></div>
+  <div className="ldw-odoo-flow" aria-label="潜客发现流程">{[['01','来源平台'],['02','数据供应商'],['03','目标市场'],['04','搜索任务限制'],['05','选择 Actor'],['06','AI 分析与参数']].map(([n,label])=><div className="ldw-odoo-flow-item" key={n}><span>{n}</span><b>{label}</b></div>)}</div>
   <div className="ldw-step-grid">
    <section className="ldw-card"><div className="ldw-step-title"><span>01</span><div><h3>选择客户来源平台</h3><p>先确定你要从哪里发现潜在客户。按类别收纳，点击展开。</p></div></div>
     <div className="ldw-platform-groups">{platformGroups.map(group=><div className="ldw-platform-group" key={group.label}>
@@ -312,19 +312,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    </div>
    <div className="ldw-osm-credit">地点数据 © OpenStreetMap contributors · Nominatim · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">数据与使用政策</a></div>
   </section>
-  <section className="ldw-card"><div className="ldw-step-title"><span>04</span><div><h3>选择 Actor / 采集器</h3><p>Apify Store 提供公开 Actor 搜索；选择后读取该 Actor 的真实输入 Schema。</p></div></div>
-   {provider==='Apify'?<><div className="ldw-actor-search"><input value={actorQuery} onChange={e=>setActorQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void searchActors()}} placeholder={'搜索 '+(searchTerms[channel]||channel)+'…'}/><button onClick={()=>void searchActors()} disabled={actorBusy}><Search size={14}/>{actorBusy?'搜索中…':'搜索 Apify Actors'}</button></div>
-    {actors.length>0&&<><div className="ldw-actor-result-summary"><span>找到 {actors.length} 个 Actor · 默认显示前 4 个</span><button type="button" onClick={()=>setShowAllActors(v=>!v)}>{showAllActors?'收起列表':'显示全部 Actor'} <ChevronDown size={13}/></button></div><div className="ldw-actor-list">{(showAllActors?actors:actors.slice(0,4)).map(item=><article key={item.id} className={'ldw-actor-card '+(actor?.id===item.id?'selected':'')}><div><b>{item.title||item.name}</b><small>{item.username}/{item.name}</small><p>{item.description||'暂无描述'}</p><small>评分 {item.stats?.actorReviewRating??'—'} · {item.stats?.actorReviewCount??0} 条评价 · 用户 {item.stats?.totalUsers??'—'} · {pricingLabel(item)}</small></div><button onClick={()=>void selectActor(item)} disabled={schemaBusy}>{actor?.id===item.id?'已选择':'选择此 Actor'} <ArrowRight size={13}/></button><a href={item.url||'https://apify.com/'+item.username+'/'+item.name} target="_blank" rel="noreferrer" aria-label="打开 Actor 页面"><ExternalLink size={13}/></a></article>)}</div></>}
-   </>:<div className="ldw-provider-note">选择 Apify 时可以直接搜索 Actor Store 并读取 Schema。其他供应商将使用各自的模板 / 数据集 / Action 目录，不能把 Actor 机制混用。</div>}
-   {schemaBusy&&<div className="ldw-loading"><Loader2 size={16}/> 正在读取 Actor Schema…</div>}
-   {schema&&actor&&<div className="ldw-schema-panel">
-    <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个动态输入字段 · Schema 来自 Actor 最新构建 · {pricingLabel(actor)}</small><small>{Number(actor.currentPricingInfo?.pricePerUnitUsd)>0 ? `按 ${targetCount} 条估算约 $${(Number(actor.currentPricingInfo?.pricePerUnitUsd)*Number(targetCount)).toFixed(2)}` : '最终费用以 Actor 计费模型和实际使用量为准'}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
-    {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段；修正后错误会自动消失。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span><small>原始字段：{path}</small></li>)}</ol></div>}
-    <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div><div className="ldw-request-preview"><button type="button" onClick={()=>setShowRequestPreview(v=>!v)}><span><b>请求参数预览</b><small>{Object.keys(schemaValidation.payload).length} 个字段 · {Object.keys(schemaValidation.errors).length} 项校验问题</small></span><span>{showRequestPreview?'收起':'展开'} <ChevronDown size={13}/></span></button>{showRequestPreview&&<><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过，可以提交':`请修正 ${Object.keys(schemaValidation.errors).length} 个字段错误后再提交`}</div></>}</div>
-    
-   </div>}
-  </section>
-  <section className="ldw-card"><div className="ldw-step-title"><span>05</span><div><h3>搜索任务设置</h3><p>确认关键词、数量和收费授权后才会创建执行任务。</p></div></div>
+  <section className="ldw-card"><div className="ldw-step-title"><span>04</span><div><h3>搜索任务设置</h3><p>确认关键词、数量和收费授权后才会创建执行任务。</p></div></div>
    <div className="ldw-location-grid">
     <label className="ldw-field"><span>任务名称</span><input value={taskName} onChange={e=>setTaskName(e.target.value)} placeholder="例如：美国加州牙科诊所潜客"/></label>
     <label className="ldw-field"><span>产品 / 服务</span><input value={product} onChange={e=>setProduct(e.target.value)} placeholder="例如：工业泵、汽车配件、牙科服务"/></label>
@@ -336,7 +324,19 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    </div>
    <label className="ldw-consent"><input type="checkbox" checked={costConsent} onChange={e=>setCostConsent(e.target.checked)}/><span>我确认已查看所选 Actor 的价格和使用政策，并授权启动采集；本次预算设置为 ${maxCost||'0'}（按 Actor 支持的计费模型执行限额）。</span></label>
    {error&&<div className="ldw-error">{error}</div>}{notice&&<div className="ldw-notice">{notice}</div>}
-   <div className="ldw-submit-row"><span>创建任务不会自动推广为正式客户；结果先进入待审核线索。</span><button disabled={!schema||!actor||!costConsent||busy} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认并启动搜索'} <ArrowRight size={15}/></button></div>
   </section>
+  <section className="ldw-card"><div className="ldw-step-title"><span>05</span><div><h3>选择 Actor / 采集器</h3><p>Apify Store 提供公开 Actor 搜索；选择后读取该 Actor 的真实输入 Schema。</p></div></div>
+   {provider==='Apify'?<><div className="ldw-actor-search"><input value={actorQuery} onChange={e=>setActorQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void searchActors()}} placeholder={'搜索 '+(searchTerms[channel]||channel)+'…'}/><button onClick={()=>void searchActors()} disabled={actorBusy}><Search size={14}/>{actorBusy?'搜索中…':'搜索 Apify Actors'}</button></div>
+    {actors.length>0&&<><div className="ldw-actor-result-summary"><span>找到 {actors.length} 个 Actor · 默认显示前 4 个</span><button type="button" onClick={()=>setShowAllActors(v=>!v)}>{showAllActors?'收起列表':'显示全部 Actor'} <ChevronDown size={13}/></button></div><div className="ldw-actor-list">{(showAllActors?actors:actors.slice(0,4)).map(item=><article key={item.id} className={'ldw-actor-card '+(actor?.id===item.id?'selected':'')}><div><b>{item.title||item.name}</b><small>{item.username}/{item.name}</small><p>{item.description||'暂无描述'}</p><small>评分 {item.stats?.actorReviewRating??'—'} · {item.stats?.actorReviewCount??0} 条评价 · 用户 {item.stats?.totalUsers??'—'} · {pricingLabel(item)}</small></div><button onClick={()=>void selectActor(item)} disabled={schemaBusy}>{actor?.id===item.id?'已选择':'选择此 Actor'} <ArrowRight size={13}/></button><a href={item.url||'https://apify.com/'+item.username+'/'+item.name} target="_blank" rel="noreferrer" aria-label="打开 Actor 页面"><ExternalLink size={13}/></a></article>)}</div></>}
+   </>:<div className="ldw-provider-note">选择 Apify 时可以直接搜索 Actor Store 并读取 Schema。其他供应商将使用各自的模板 / 数据集 / Action 目录，不能把 Actor 机制混用。</div>}
+   {schemaBusy&&<div className="ldw-loading"><Loader2 size={16}/> 正在读取 Actor Schema…</div>}
+   {schema&&actor&&<div className="ldw-schema-panel">
+    <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个动态输入字段 · Schema 来自 Actor 最新构建 · {pricingLabel(actor)}</small><small>{Number(actor.currentPricingInfo?.pricePerUnitUsd)>0 ? `按 ${targetCount} 条估算约 $${(Number(actor.currentPricingInfo?.pricePerUnitUsd)*Number(targetCount)).toFixed(2)}` : '最终费用以 Actor 计费模型和实际使用量为准'}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
+    {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段；修正后错误会自动消失。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span><small>原始字段：{path}</small></li>)}</ol></div>}
+    <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div><div className="ldw-request-preview"><button type="button" onClick={()=>setShowRequestPreview(v=>!v)}><span><b>请求参数预览</b><small>{Object.keys(schemaValidation.payload).length} 个字段 · {Object.keys(schemaValidation.errors).length} 项校验问题</small></span><span>{showRequestPreview?'收起':'展开'} <ChevronDown size={13}/></span></button>{showRequestPreview&&<><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过，可以提交':`请修正 ${Object.keys(schemaValidation.errors).length} 个字段错误后再提交`}</div></>}</div>
+    
+   </div>}
+  </section>
+
  </div>
 }
