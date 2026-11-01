@@ -205,7 +205,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    const actorInput:Record<string,unknown>={}
    for(const [key,field] of schemaKeys(schema)){
     const value=values[key]
-    if(schema.required?.includes(key)&&(value===undefined||value===null||value===''))throw new Error('请填写必填字段：'+(field.title||key))
     if(field.type==='array'||field.type==='object'){
      if(typeof value==='string'&&value.trim()){try{actorInput[key]=JSON.parse(value)}catch{throw new Error((field.title||key)+' 必须是有效 JSON')}}
     }else if(value!==''&&value!==undefined)actorInput[key]=value
@@ -223,6 +222,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     else if(/max.*(place|result|item|record|lead)|^(limit|maxresults|maxitems)$/.test(k))actorInput[key]=Number(targetCount)
     else if(/searchquery|searchterm|^query$/.test(k)&&keywords.trim())actorInput[key]=keywords.trim()
    }
+   for(const key of schema.required||[]){const value=actorInput[key];if(value===undefined||value===null||value==='')throw new Error('请填写必填字段：'+(schema.properties?.[key]?.title||key))}
    const taskTitle=taskName.trim()||product.trim()||keywords.trim()||actor.title
    const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actor.username+'~'+actor.name,actor_input:actorInput,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region,city},source_channel:channel}
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspaceId,created_by:userId,name:taskTitle,status:'draft',target_profile:profile,selected_channels:[channel],target_count:Number(targetCount)}).select('id').single()
