@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
-  ArrowLeft, ArrowRight, Bot, Building2, Check, CheckCircle2, ChevronDown,
-  CircleHelp, Clock3, Database, Globe2, Linkedin, MapPin, Plus, Search,
-  Settings2, ShieldCheck, Sparkles, Target, Users, Workflow, X
+  ArrowLeft, ArrowRight, Bot, Building2, Check, CheckCircle2,
+  CircleHelp, Clock3, Database, Globe2, Linkedin, Plus, Search,
+  Settings2, ShieldCheck, Sparkles, Target, Users, Workflow
 } from 'lucide-react'
 import './LeadFinderApp.css'
 
@@ -59,6 +59,7 @@ export default function LeadFinderApp() {
   const [showPlan, setShowPlan] = useState(false)
   const [tasks, setTasks] = useState<SearchTask[]>([])
   const [activeTask, setActiveTask] = useState<string | null>(null)
+  const [sourceNotice, setSourceNotice] = useState(false)
 
   const selectedNames = useMemo(() => channels.filter(item => selectedChannels.includes(item.id)).map(item => item.name), [selectedChannels])
   const activeTaskData = tasks.find(task => task.id === activeTask)
@@ -249,7 +250,8 @@ export default function LeadFinderApp() {
       {tab === 'sources' && (
         <div className="lead-content-panel">
           <div className="lead-content-heading"><div><h2>数据源管理</h2><p>统一查看七家数据服务商的连接状态与职责。当前尚未配置真实 API 凭证。</p></div><span className="lead-status pending"><Clock3 size={13}/> 0 / 7 已连接</span></div>
-          <div className="lead-provider-grid">{providers.map(provider => <div className="lead-provider-card" key={provider.name}><div className="lead-provider-top"><span className="lead-provider-logo">{provider.name.slice(0, 1)}</span><span className="lead-status pending">未连接</span></div><h3>{provider.name}</h3><span className="lead-provider-category">{provider.category}</span><p>{provider.description}</p><div className="lead-provider-channels">{provider.channels}</div><button className="lead-provider-action" onClick={() => window.alert('数据源连接配置将在后续后端接入阶段开放。请勿在前端填写或保存 API Key。')}>查看连接要求 <ArrowRight size={14}/></button></div>)}</div>
+          {sourceNotice && <div className="lead-notice"><CircleHelp size={17}/><div><b>连接配置将在后端接入阶段开放</b><p>请勿在浏览器中输入 API Key。后续将通过服务端密钥管理完成安全连接。</p></div><button className="lead-notice-close" onClick={() => setSourceNotice(false)} aria-label="关闭提示">×</button></div>}
+          <div className="lead-provider-grid">{providers.map(provider => <div className="lead-provider-card" key={provider.name}><div className="lead-provider-top"><span className="lead-provider-logo">{provider.name.slice(0, 1)}</span><span className="lead-status pending">未连接</span></div><h3>{provider.name}</h3><span className="lead-provider-category">{provider.category}</span><p>{provider.description}</p><div className="lead-provider-channels">{provider.channels}</div><button className="lead-provider-action" onClick={() => setSourceNotice(true)}>查看连接要求 <ArrowRight size={14}/></button></div>)}</div>
           <div className="lead-security-note"><ShieldCheck size={17}/><span>安全提示：API Key 只能保存在服务端密钥管理中，不会放入浏览器、前端代码或 Git 仓库。</span></div>
         </div>
       )}
