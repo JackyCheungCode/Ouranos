@@ -23,6 +23,10 @@ const providerByPlatform: Record<string, string[]> = {
  'company-sites':['Firecrawl','Apify','Octoparse','Bright Data'], directories:['Apify','Octoparse','Bright Data'], exhibitors:['Apify','Firecrawl','Octoparse'], 'trade-records':['跨境魔方'], 'company-registry':['Apify','Bright Data']
 }
 const searchTerms: Record<string,string> = Object.fromEntries(platformGroups.flatMap(g=>g.items.map(([id,,term])=>[id,term])))
+const portCatalog = [
+ ['USLAX','Los Angeles, United States'],['USLGB','Long Beach, United States'],['USNYC','New York, United States'],['USMIA','Miami, United States'],['CAVAN','Vancouver, Canada'],['CATOR','Toronto, Canada'],['CNSHA','Shanghai, China'],['CNNGB','Ningbo, China'],['CNSZX','Shenzhen, China'],['CNYTN','Yantian, China'],['HKHKG','Hong Kong'],['SGSIN','Singapore'],['KRPUS','Busan, South Korea'],['JPTYO','Tokyo, Japan'],['JPYOK','Yokohama, Japan'],['TWKHH','Kaohsiung, Taiwan'],['NLRTM','Rotterdam, Netherlands'],['DEHAM','Hamburg, Germany'],['BEANR','Antwerp, Belgium'],['GBFXT','Felixstowe, United Kingdom'],['AEJEA','Jebel Ali, United Arab Emirates'],['AEDXB','Dubai, United Arab Emirates'],['INMUN','Mundra, India'],['INNSA','Nhava Sheva, India'],['BRSSZ','Santos, Brazil'],['MXZLO','Manzanillo, Mexico'],['AU SYD','Sydney, Australia'],['ZADUR','Durban, South Africa'],['ESBCN','Barcelona, Spain'],['FRLEH','Le Havre, France']
+] as const
+
 const providerDescriptions: Record<string,string> = { Apify:'搜索 Apify Store 中可用的 Actors，并读取每个 Actor 自己的输入 Schema。', 'Bright Data':'数据集 / Scraper 产品目录与专属输入参数。', Octoparse:'模板任务与参数 Schema。', Firecrawl:'网站搜索、抓取与提取操作。', PhantomBuster:'Agent 工作流及参数。', TexAu:'自动化 Action 与参数。', '跨境魔方':'跨境电商数据 API 与接口参数。' }
 const schemaKeys = (schema: JsonSchema) => Object.entries(schema.properties || {})
 const getDefaultValue = (field: SchemaField) => field.default ?? (field.type === 'boolean' ? false : field.type === 'array' ? '[]' : field.type === 'object' ? '{}' : '')
@@ -145,8 +149,17 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const required=schema?.required?.includes(key)
   const set=(v:unknown)=>setValues(current=>({...current,[key]:v}))
   const enumValues=field.enum || []
+  const semantic=key.toLowerCase()
+  const countryField=/country|countrycode|country_code/.test(semantic)
+  const regionField=/^(state|region|province|stateorprovince)$/.test(semantic)||/stateorprovince|regionname|province/.test(semantic)
+  const cityField=/^city$|cityname|city_name/.test(semantic)
+  const portField=/port|seaport|unlocode/.test(semantic)
   return <label className="ldw-field" key={key}><span>{field.title || key}{required&&<b> *</b>}</span>
    {enumValues.length>0?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">请选择</option>{enumValues.map(option=><option key={String(option)} value={String(option)}>{String(option)}</option>)}</select>
+   :countryField?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">选择国家</option>{countries.map(c=><option key={c.code} value={/code/.test(semantic)?c.code:c.geoName}>{c.flag} {c.name}</option>)}</select>
+   :regionField?<select value={String(value)} onChange={e=>set(e.target.value)} disabled={!countryCode}><option value="">选择州 / 省 / 地区</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select>
+   :cityField?<><input value={cityQuery||String(value)} onChange={e=>{setCityQuery(e.target.value);set('')}} placeholder="输入城市名称搜索 OpenStreetMap…"/>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{set(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}</>
+   :portField?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">选择港口</option>{portCatalog.map(([code,name])=><option key={code} value={code}>{name} · {code}</option>)}</select>
    :field.type==='boolean'?<input type="checkbox" checked={Boolean(value)} onChange={e=>set(e.target.checked)}/>
    :field.type==='integer'||field.type==='number'?<input type="number" min={field.minimum} max={field.maximum} value={String(value)} onChange={e=>set(e.target.value===''?'':Number(e.target.value))}/>
    :field.type==='array'||field.type==='object'?<textarea rows={3} value={String(value)} onChange={e=>set(e.target.value)} placeholder={field.type==='array'?'[]':'{}'}/>
