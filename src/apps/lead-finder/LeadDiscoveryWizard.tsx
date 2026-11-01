@@ -99,6 +99,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [values,setValues] = useState<Record<string,unknown>>({})
  const [mapping,setMapping] = useState<Record<string,string>>({})
  const [keywords,setKeywords] = useState('')
+ const [product,setProduct] = useState('')
+ const [industry,setIndustry] = useState('')
+ const [targetType,setTargetType] = useState<'companies'|'contacts'|'both'>('both')
  const [targetCount,setTargetCount] = useState('100')
  const [taskName,setTaskName] = useState('')
  const [costConsent,setCostConsent] = useState(false)
@@ -216,8 +219,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     else if(/max.*(place|result|item|record|lead)|^(limit|maxresults|maxitems)$/.test(k))actorInput[key]=Number(targetCount)
     else if(/searchquery|searchterm|^query$/.test(k)&&keywords.trim())actorInput[key]=keywords.trim()
    }
-   const taskTitle=taskName.trim()||keywords.trim()||actor.title
-   const profile={criteria:taskTitle,keywords,product:keywords,industry:'',countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region?[region]:[],cities:city?[city]:[],target_type:'companies',provider,actor_id:actor.username+'~'+actor.name,actor_input:actorInput,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region,city},source_channel:channel}
+   const taskTitle=taskName.trim()||product.trim()||keywords.trim()||actor.title
+   const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actor.username+'~'+actor.name,actor_input:actorInput,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region,city},source_channel:channel}
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspaceId,created_by:userId,name:taskTitle,status:'draft',target_profile:profile,selected_channels:[channel],target_count:Number(targetCount)}).select('id').single()
    if(taskError)throw new Error(taskError.message)
    const adapterKey='apify-'+channel+'-'+(actor.username+'-'+actor.name).toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,110)
@@ -272,7 +275,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    </div>}
   </section>
   <section className="ldw-card"><div className="ldw-step-title"><span>05</span><div><h3>搜索任务设置</h3><p>确认关键词、数量和收费授权后才会创建执行任务。</p></div></div>
-   <div className="ldw-location-grid"><label className="ldw-field"><span>任务名称</span><input value={taskName} onChange={e=>setTaskName(e.target.value)} placeholder="例如：美国加州牙科诊所潜客"/></label><label className="ldw-field"><span>搜索关键词</span><input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="例如：Dental clinic, importer, wholesaler"/></label><label className="ldw-field"><span>目标数量</span><select value={targetCount} onChange={e=>setTargetCount(e.target.value)}><option value="50">最多 50 条</option><option value="100">最多 100 条</option><option value="250">最多 250 条</option><option value="500">最多 500 条</option><option value="1000">最多 1,000 条</option></select></label></div>
+   <div className="ldw-location-grid"><label className="ldw-field"><span>任务名称</span><input value={taskName} onChange={e=>setTaskName(e.target.value)} placeholder="例如：美国加州牙科诊所潜客"/></label><label className="ldw-field"><span>产品 / 服务</span><input value={product} onChange={e=>setProduct(e.target.value)} placeholder="例如：工业泵、汽车配件、牙科服务"/></label><label className="ldw-field"><span>目标行业</span><input value={industry} onChange={e=>setIndustry(e.target.value)} placeholder="例如：制造业、医疗、批发贸易"/></label><label className="ldw-field"><span>搜索关键词</span><input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="例如：Dental clinic, importer, wholesaler"/></label><label className="ldw-field"><span>目标数量</span><select value={targetCount} onChange={e=>setTargetCount(e.target.value)}><option value="50">最多 50 条</option><option value="100">最多 100 条</option><option value="250">最多 250 条</option><option value="500">最多 500 条</option><option value="1000">最多 1,000 条</option></select></label><div className="ldw-field"><span>搜索对象</span><div className="ldw-target-types"><button type="button" className={targetType==='companies'?'selected':''} onClick={()=>setTargetType('companies')}>企业</button><button type="button" className={targetType==='contacts'?'selected':''} onClick={()=>setTargetType('contacts')}>联系人</button><button type="button" className={targetType==='both'?'selected':''} onClick={()=>setTargetType('both')}>企业 + 联系人</button></div></div></div>
    <label className="ldw-consent"><input type="checkbox" checked={costConsent} onChange={e=>setCostConsent(e.target.checked)}/><span>我确认已查看所选 Actor 的价格和使用政策，并授权 Ouranos 启动可能产生费用的采集任务。</span></label>
    {error&&<div className="ldw-error">{error}</div>}{notice&&<div className="ldw-notice">{notice}</div>}
    <div className="ldw-submit-row"><span>创建任务不会自动推广为正式客户；结果先进入待审核线索。</span><button disabled={!schema||!actor||!costConsent||busy} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认并启动搜索'} <ArrowRight size={15}/></button></div>
