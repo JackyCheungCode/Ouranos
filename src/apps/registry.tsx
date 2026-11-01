@@ -6,7 +6,7 @@ import {
   Plus, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Target, TrendingUp, Users,
   WandSparkles, Workflow, X, Zap, Star, ArrowUpRight, BriefcaseBusiness, Boxes, Layers3 } from 'lucide-react'
 import type { AppItem, AppGroup } from './types'
-const groups = [
+export const groups: AppGroup[] = [
   { id: 'workspace', title: 'Workspace', subtitle: 'Your work, all in one place' },
   { id: 'prospecting', title: 'Prospecting', subtitle: 'Discover your next customer' },
   { id: 'sales', title: 'Sales', subtitle: 'Turn opportunities into revenue' },
@@ -16,7 +16,7 @@ const groups = [
   { id: 'analytics', title: 'Analytics', subtitle: 'Understand business performance' },
   { id: 'admin', title: 'Administration', subtitle: 'Configure your workspace' },
 ]
-const apps: AppItem[] = [
+export const apps: AppItem[] = [
   { id:'dashboard',name:'Dashboard',subtitle:'Overview',group:'workspace',icon:LayoutDashboard,color:'#714B67',description:'A live overview of your prospecting, sales activity and team performance.' },
   { id:'activities',name:'My Activities',subtitle:'Tasks & reminders',group:'workspace',icon:CalendarClock,color:'#E08B36',description:'Your daily priorities, follow-ups and reminders in one focused inbox.' },
   { id:'lead-finder',name:'Lead Finder',subtitle:'Find prospects',group:'prospecting',icon:Target,color:'#167D9A',description:'Discover target companies by country, industry, product and business profile.' },
