@@ -75,3 +75,16 @@
 .dark .apify-actor-warning{background:#383126;color:#d4b77e}
 .dark .apify-actor-actions button.remove{background:#352625;border-color:#62413e;color:#e0a19a}
 @media(max-width:650px){.apify-actor-sync-form{grid-template-columns:1fr}.apify-schema-fields{grid-template-columns:1fr}.apify-actor-heading{flex-direction:column}}
+
+.apify-input-details{border-top:1px solid var(--int-border);padding:8px 0}
+.apify-input-details>summary{display:flex;align-items:center;gap:6px;list-style:none;color:var(--int-muted);font-size:9px;cursor:pointer}
+.apify-input-details>summary::-webkit-details-marker{display:none}
+.apify-input-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;margin-top:10px}
+.apify-dynamic-field{display:flex;flex-direction:column;gap:5px;color:var(--int-text);font-size:9px;font-weight:700}
+.apify-dynamic-field>span{font-size:9px}
+.apify-dynamic-field input:not([type=checkbox]),.apify-dynamic-field select,.apify-dynamic-field textarea{width:100%;min-height:31px;padding:6px 8px;border:1px solid var(--int-border);border-radius:4px;background:var(--int-soft);color:var(--int-text);font:400 9px 'DM Sans','Microsoft YaHei'}
+.apify-dynamic-field input[type=checkbox]{width:15px;height:15px;accent-color:#714b67}
+.apify-dynamic-field small{color:var(--int-muted);font-size:8px;line-height:1.45;font-weight:400}
+.apify-save-inputs{margin-top:9px;padding:7px 10px;border:1px solid var(--int-border);border-radius:4px;background:var(--int-soft);color:#80657d;font-size:8px;font-weight:700;cursor:pointer}
+.apify-save-inputs:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:650px){.apify-input-grid{grid-template-columns:1fr}}
