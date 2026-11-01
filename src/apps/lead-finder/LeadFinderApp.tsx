@@ -5,6 +5,7 @@ import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import type { Layer, PathOptions } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './LeadFinderApp.css'
+import { countries as countryCatalog } from './countries'
 
 type Tab = 'search' | 'tasks' | 'review' | 'sources'
 type TargetType = 'companies' | 'contacts' | 'both'
@@ -12,12 +13,8 @@ type Country = { code:string; name:string; flag:string; geoName:string }
 type Channel = { id:string; name:string; detail:string; logo:string; providers:string[]; status:string }
 type ChannelGroup = { id:string; title:string; description:string; channels:Channel[] }
 
-const countries:Country[] = [
- {code:'US',name:'美国',flag:'🇺🇸',geoName:'United States of America'},{code:'CA',name:'加拿大',flag:'🇨🇦',geoName:'Canada'},{code:'MX',name:'墨西哥',flag:'🇲🇽',geoName:'Mexico'},{code:'BR',name:'巴西',flag:'🇧🇷',geoName:'Brazil'},{code:'AR',name:'阿根廷',flag:'🇦🇷',geoName:'Argentina'},{code:'CL',name:'智利',flag:'🇨🇱',geoName:'Chile'},
- {code:'GB',name:'英国',flag:'🇬🇧',geoName:'United Kingdom'},{code:'DE',name:'德国',flag:'🇩🇪',geoName:'Germany'},{code:'FR',name:'法国',flag:'🇫🇷',geoName:'France'},{code:'IT',name:'意大利',flag:'🇮🇹',geoName:'Italy'},{code:'ES',name:'西班牙',flag:'🇪🇸',geoName:'Spain'},{code:'NL',name:'荷兰',flag:'🇳🇱',geoName:'Netherlands'},{code:'BE',name:'比利时',flag:'🇧🇪',geoName:'Belgium'},{code:'CH',name:'瑞士',flag:'🇨🇭',geoName:'Switzerland'},{code:'SE',name:'瑞典',flag:'🇸🇪',geoName:'Sweden'},{code:'NO',name:'挪威',flag:'🇳🇴',geoName:'Norway'},{code:'PL',name:'波兰',flag:'🇵🇱',geoName:'Poland'},{code:'TR',name:'土耳其',flag:'🇹🇷',geoName:'Turkey'},{code:'RU',name:'俄罗斯',flag:'🇷🇺',geoName:'Russia'},
- {code:'CN',name:'中国大陆',flag:'🇨🇳',geoName:'China'},{code:'MO',name:'中国澳门',flag:'🇲🇴',geoName:'Macao'},{code:'HK',name:'中国香港',flag:'🇭🇰',geoName:'Hong Kong'},{code:'TW',name:'中国台湾',flag:'🇹🇼',geoName:'Taiwan'},{code:'JP',name:'日本',flag:'🇯🇵',geoName:'Japan'},{code:'KR',name:'韩国',flag:'🇰🇷',geoName:'South Korea'},{code:'SG',name:'新加坡',flag:'🇸🇬',geoName:'Singapore'},{code:'MY',name:'马来西亚',flag:'🇲🇾',geoName:'Malaysia'},{code:'TH',name:'泰国',flag:'🇹🇭',geoName:'Thailand'},{code:'VN',name:'越南',flag:'🇻🇳',geoName:'Vietnam'},{code:'ID',name:'印度尼西亚',flag:'🇮🇩',geoName:'Indonesia'},{code:'PH',name:'菲律宾',flag:'🇵🇭',geoName:'Philippines'},{code:'IN',name:'印度',flag:'🇮🇳',geoName:'India'},{code:'PK',name:'巴基斯坦',flag:'🇵🇰',geoName:'Pakistan'},{code:'BD',name:'孟加拉国',flag:'🇧🇩',geoName:'Bangladesh'},
- {code:'AE',name:'阿联酋',flag:'🇦🇪',geoName:'United Arab Emirates'},{code:'SA',name:'沙特阿拉伯',flag:'🇸🇦',geoName:'Saudi Arabia'},{code:'IL',name:'以色列',flag:'🇮🇱',geoName:'Israel'},{code:'ZA',name:'南非',flag:'🇿🇦',geoName:'South Africa'},{code:'EG',name:'埃及',flag:'🇪🇬',geoName:'Egypt'},{code:'NG',name:'尼日利亚',flag:'🇳🇬',geoName:'Nigeria'},{code:'KE',name:'肯尼亚',flag:'🇰🇪',geoName:'Kenya'},{code:'AU',name:'澳大利亚',flag:'🇦🇺',geoName:'Australia'},{code:'NZ',name:'新西兰',flag:'🇳🇿',geoName:'New Zealand'}
-]
+const countries:Country[] = countryCatalog
+
 
 const channelGroups:ChannelGroup[] = [
  {id:'social',title:'社交媒体与职业社交',description:'企业主页、品牌账号、创始人及采购决策人',channels:[
@@ -110,10 +107,12 @@ function CountryMap({selected}:{selected:Country[]}) {
  const [geo,setGeo] = useState<FeatureCollection<Geometry> | null>(null)
  useEffect(()=>{let alive=true;fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json()).then(data=>{if(alive)setGeo(data)}).catch(()=>{if(alive)setGeo(null)});return()=>{alive=false}},[])
  const selectedNames = new Set(selected.map(c=>c.geoName.toLowerCase()))
+ const selectedCodes = new Set(selected.map(c=>c.code))
  const style = (feature?:Feature):PathOptions => {
   const props = feature?.properties as Record<string,string> | undefined
   const name = (props?.ADMIN || props?.name || props?.NAME || '').toLowerCase()
-  const picked = selectedNames.has(name) || (name==='china' && selected.some(c=>c.code==='CN')) || (name.includes('hong kong') && selected.some(c=>c.code==='HK')) || (name.includes('macao') && selected.some(c=>c.code==='MO')) || (name==='taiwan' && selected.some(c=>c.code==='TW'))
+  const code = props?.ISO_A2 || props?.ISO3166_1_Alpha_2 || props?.ISO2 || ''
+  const picked = selectedCodes.has(code) || selectedNames.has(name) || (name==='china' && selected.some(c=>c.code==='CN')) || (name.includes('hong kong') && selected.some(c=>c.code==='HK')) || (name.includes('macao') && selected.some(c=>c.code==='MO')) || (name==='taiwan' && selected.some(c=>c.code==='TW'))
   return {color:picked?'#714b67':'#c8c4c8',weight:picked?1.5:.55,fillColor:picked?'#a887a0':'#e8e6e8',fillOpacity: picked ? 0.72 : 0.32}
  }
  return <div className="lead-map-shell">
