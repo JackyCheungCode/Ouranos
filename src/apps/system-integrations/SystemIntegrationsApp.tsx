@@ -108,7 +108,7 @@ export default function SystemIntegrationsApp() {
             <div className="int-config-row"><span>支持渠道 / 能力</span><b>{selected.channels}</b></div>
             {selected.group === 'ai' && <><div className="int-config-row"><span>模型名称</span><b>连接后选择模型</b></div><div className="int-config-row"><span>默认模型</span><b>未设置</b></div></>}
             <div className="int-config-row"><span>API 凭证</span><b className="int-credential-state"><KeyRound size={13}/> 尚未配置</b></div>
-            <div className="int-config-row"><span>密钥存储</span><b>服务端安全存储（待启用）</b></div>
+            <div className="int-config-row"><span>密钥存储</span><b>Supabase Vault（服务端）</b></div>
             <div className="int-config-row"><span>最近测试</span><b>从未测试</b></div>
           </div>
           <div className="int-connection-actions">
@@ -125,7 +125,7 @@ export default function SystemIntegrationsApp() {
     </section>}
 
     {showDisabledHint && <div className="int-hint-overlay" role="dialog" aria-modal="true" aria-label="连接配置说明">
-      <div className="int-hint-dialog"><button className="int-hint-close" onClick={() => setShowDisabledHint(false)} aria-label="关闭"><X size={17}/></button><span className="int-hint-icon"><KeyRound size={21}/></span><h3>安全凭证服务正在接入</h3><p>统一集成页面已经建立。下一步会接入 Supabase 服务端密钥管理和连接测试接口，再开放 API Key、模型密钥及自定义 Endpoint 的保存功能。</p><div className="int-hint-checks"><span><CheckCircle2 size={14}/> 数据库配置结构已建立</span><span><CheckCircle2 size={14}/> 前端不会保存明文密钥</span><span><Workflow size={14}/> 服务端凭证 API 待开发</span></div><button className="int-primary full" onClick={() => setShowDisabledHint(false)}>知道了</button></div>
+      <div className="int-hint-dialog"><button className="int-hint-close" onClick={() => setShowDisabledHint(false)} aria-label="关闭"><X size={17}/></button><span className="int-hint-icon"><KeyRound size={21}/></span><h3>安全凭证服务正在接入</h3><p>服务端凭证写入接口和 Supabase Vault 密钥存储已经部署。前端账号认证与工作空间上下文尚未接通，因此暂不开放密钥输入；完成认证后即可安全保存 API Key 和模型密钥。</p><div className="int-hint-checks"><span><CheckCircle2 size={14}/> 数据库配置结构已建立</span><span><CheckCircle2 size={14}/> Vault 服务端密钥接口已部署</span><span><Workflow size={14}/> 用户认证与连接测试待接入</span></div><button className="int-primary full" onClick={() => setShowDisabledHint(false)}>知道了</button></div>
     </div>}
   </div>
 }
