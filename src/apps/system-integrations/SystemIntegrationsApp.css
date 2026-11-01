@@ -5,3 +5,14 @@
 .int-connected{display:inline-flex;align-items:center;gap:5px;color:#648b72;font-size:9px;white-space:nowrap}
 .int-connected i,.int-status.built-in i{width:6px;height:6px;border-radius:50%;background:#648b72}
 .int-status.built-in{color:#648b72;background:#edf5ef}
+
+.int-configured{display:inline-flex;align-items:center;gap:5px;color:#a27a3f;font-size:9px;white-space:nowrap}
+.int-configured i{width:6px;height:6px;border-radius:50%;background:#b88a45}
+.int-status.connected{background:#edf5ef;color:#557b61}
+.int-status.error{background:#fff0ee;color:#a44f47}
+.int-status.connected i{background:#648b72}
+.int-status.error i{background:#b65d53}
+.int-error-text{color:#a44f47!important;font-size:10px!important;max-width:260px;text-align:right}
+.int-db-error{padding:9px 11px;margin:10px 0;border-radius:5px;background:#fff0ee;color:#a44f47;font-size:10px}
+.int-db-loading{padding:8px 0;color:var(--int-muted);font-size:9px}
+.dark .int-configured{color:#d2b477}
