@@ -115,7 +115,7 @@ export default function SystemIntegrationsApp() {
             <span className="int-provider-main"><b>{provider.name}</b><small>{provider.category}</small></span>
             <span className={status==='connected'?'int-connected':status==='configured'?'int-configured':provider.key==='works-ai'?'int-connected':'int-not-connected'}><i/> {status==='connected'?'已连接':status==='configured'?'已配置':status==='error'?'连接异常':provider.key==='works-ai'?'内置默认':'未配置'}</span>
             <ChevronRight size={15} className="int-row-chevron"/>
-          </button>)}
+          </button>})}
           {!filtered.length && <div className="int-no-results">没有匹配的服务商</div>}
         </div>
         <div className="int-list-footer">显示 {filtered.length} 项，共 {providers.length} 项</div>
