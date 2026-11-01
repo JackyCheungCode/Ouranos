@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Check, ChevronDown, ExternalLink, Loader2, MapPin, Search, ShieldCheck, Sparkles } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ExternalLink, HelpCircle, Loader2, MapPin, Search, ShieldCheck, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
@@ -25,6 +25,10 @@ const providerByPlatform: Record<string, string[]> = {
  amazon:['Apify','Bright Data','跨境魔方'], ebay:['Apify','Bright Data'], walmart:['Apify','Bright Data'], etsy:['Apify','Bright Data'], shopify:['Apify','Firecrawl','Bright Data'], aliexpress:['Apify','跨境魔方'], temu:['Apify','跨境魔方'], shopee:['Apify','跨境魔方'], lazada:['Apify','跨境魔方'],
  'company-sites':['Firecrawl','Apify','Octoparse','Bright Data'], directories:['Apify','Octoparse','Bright Data'], exhibitors:['Apify','Firecrawl','Octoparse'], 'trade-records':['跨境魔方'], 'company-registry':['Apify','Bright Data']
 }
+const platformDomains:Record<string,string> = {'google-maps':'maps.google.com','google-search':'google.com',bing:'bing.com',yelp:'yelp.com',instagram:'instagram.com',facebook:'facebook.com',linkedin:'linkedin.com',tiktok:'tiktok.com',youtube:'youtube.com',x:'x.com',alibaba:'alibaba.com','made-in-china':'made-in-china.com',globalsources:'globalsources.com',indiamart:'indiamart.com',amazon:'amazon.com',ebay:'ebay.com',walmart:'walmart.com',etsy:'etsy.com',shopify:'shopify.com',aliexpress:'aliexpress.com',temu:'temu.com',shopee:'shopee.com',lazada:'lazada.com','company-sites':'google.com',directories:'yelp.com',exhibitors:'10times.com','trade-records':'importyeti.com','company-registry':'opencorporates.com'}
+const providerDomains:Record<string,string> = {Apify:'apify.com','Bright Data':'brightdata.com',Octoparse:'octoparse.com',Firecrawl:'firecrawl.dev',PhantomBuster:'phantombuster.com',TexAu:'texau.com'}
+const platformLogo=(id:string)=>'https://www.google.com/s2/favicons?domain='+encodeURIComponent(platformDomains[id]||'google.com')+'&sz=64'
+const providerLogo=(name:string)=>'https://www.google.com/s2/favicons?domain='+encodeURIComponent(providerDomains[name]||'apify.com')+'&sz=64'
 const searchTerms: Record<string,string> = Object.fromEntries(platformGroups.flatMap(g=>g.items.map(([id,,term])=>[id,term])))
 const portCatalog = [
  ['USLAX','Los Angeles, United States'],['USLGB','Long Beach, United States'],['USNYC','New York, United States'],['USMIA','Miami, United States'],['CAVAN','Vancouver, Canada'],['CATOR','Toronto, Canada'],['CNSHA','Shanghai, China'],['CNNGB','Ningbo, China'],['CNSZX','Shenzhen, China'],['CNYTN','Yantian, China'],['HKHKG','Hong Kong'],['SGSIN','Singapore'],['KRPUS','Busan, South Korea'],['JPTYO','Tokyo, Japan'],['JPYOK','Yokohama, Japan'],['TWKHH','Kaohsiung, Taiwan'],['NLRTM','Rotterdam, Netherlands'],['DEHAM','Hamburg, Germany'],['BEANR','Antwerp, Belgium'],['GBFXT','Felixstowe, United Kingdom'],['AEJEA','Jebel Ali, United Arab Emirates'],['AEDXB','Dubai, United Arab Emirates'],['INMUN','Mundra, India'],['INNSA','Nhava Sheva, India'],['BRSSZ','Santos, Brazil'],['MXZLO','Manzanillo, Mexico'],['AUSYD','Sydney, Australia'],['ZADUR','Durban, South Africa'],['ESBCN','Barcelona, Spain'],['FRLEH','Le Havre, France']
@@ -59,12 +63,29 @@ const nominatim = async (params: Record<string,string>) => {
  return await response.json() as Array<{ place_id:number; display_name:string; name?:string; address?:Record<string,string>; type?:string; class?:string }>
 }
 
-const osmRegions = async (countryCode:string) => {
- const query = `[out:json][timeout:25];area["ISO3166-1"="${countryCode}"][admin_level=2]->.country;relation(area.country)["boundary"="administrative"]["admin_level"~"4|5"];out tags center;`
- const response = await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',Accept:'application/json'},body:new URLSearchParams({data:query}).toString()})
- if(!response.ok)throw new Error('OpenStreetMap 地区数据暂时不可用')
- const body=await response.json() as {elements?:Array<{id:number;tags?:Record<string,string>}>}
- return (body.elements||[]).filter(x=>x.tags?.name).map(x=>({place_id:x.id,name:x.tags?.name||'',display_name:x.tags?.name||''}))
+const osmRegions = async (countryCode:string,countryName:string) => {
+ let areaId=0
+ try {
+  const country=await nominatim({q:countryName,featureType:'country',limit:'1'})
+  const match=country.find(x=>x.osm_type==='relation'||x.osm_type==='way')
+  if(match?.osm_type==='relation')areaId=3600000000+match.osm_id
+  else if(match?.osm_type==='way')areaId=2400000000+match.osm_id
+ } catch { /* ISO boundary fallback */ }
+ const query=areaId
+  ? `[out:json][timeout:40];area(${areaId})->.country;(relation(area.country)["boundary"="administrative"]["admin_level"~"3|4|5"];);out tags center;`
+  : `[out:json][timeout:40];area["ISO3166-1"="${countryCode}"]["admin_level"="2"]->.country;(relation(area.country)["boundary"="administrative"]["admin_level"~"3|4|5"];);out tags center;`
+ let lastError:unknown
+ for(const endpoint of ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter']){
+  try {
+   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',Accept:'application/json'},body:new URLSearchParams({data:query}).toString()})
+   if(!response.ok)throw new Error('OpenStreetMap 地区服务暂时不可用')
+   const body=await response.json() as {elements?:Array<{id:number;tags?:Record<string,string>}>}
+   const unique=new Map<string,{place_id:number;name:string;display_name:string}>()
+   for(const item of body.elements||[]){const name=item.tags?.['name:en']||item.tags?.name;if(name&&!unique.has(name.toLocaleLowerCase()))unique.set(name.toLocaleLowerCase(),{place_id:item.id,name,display_name:name})}
+   return [...unique.values()].sort((a,b)=>a.name.localeCompare(b.name))
+  }catch(error){lastError=error}
+ }
+ throw lastError instanceof Error?lastError:new Error('OpenStreetMap 地区数据暂时不可用')
 }
 
 function MarketMap({selected}:{selected:typeof countries}) {
@@ -87,7 +108,10 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [selectedCountries,setSelectedCountries] = useState<string[]>([])
  const [countryQuery,setCountryQuery] = useState('')
  const [countryOpen,setCountryOpen] = useState(false)
- const [region,setRegion] = useState('')
+ const [region,setRegion] = useState('__all__')
+ const [expandedPlatformGroup,setExpandedPlatformGroup] = useState('搜索引擎与地图')
+ const [showAllActors,setShowAllActors] = useState(false)
+ const [expandedHelp,setExpandedHelp] = useState<Record<string,boolean>>({})
  const [city,setCity] = useState('')
  const [cityQuery,setCityQuery] = useState('')
  const [cityResults,setCityResults] = useState<Array<{place_id:number;display_name:string;name?:string}>>([])
@@ -130,7 +154,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   if(!countryCode){setRegionResults([]);setRegion('');setCity('');return}
   setLocationBusy(true);setRegion('');setCity('');setCityQuery('')
   const timer=setTimeout(async()=>{
-   try {const results=await osmRegions(countryCode);if(active)setRegionResults(results)}
+   try {const results=await osmRegions(countryCode,selectedCountry?.geoName||selectedCountry?.name||countryCode);if(active){setRegionResults(results);setRegion('__all__')}}
    catch(e){if(active)setError(e instanceof Error?e.message:'地区列表加载失败')}
    finally{if(active)setLocationBusy(false)}
   },350)
@@ -184,17 +208,19 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const regionField=/^(state|region|province|stateorprovince)$/.test(semantic)||/stateorprovince|regionname|province/.test(semantic)
   const cityField=/^city$|cityname|city_name/.test(semantic)
   const portField=/port|seaport|unlocode/.test(semantic)
-  return <label className="ldw-field" key={key}><span>{field.title || key}{required&&<b> *</b>}</span>
+  const showHelp=Boolean(expandedHelp[key])
+  return <label className="ldw-field" key={key}>
+   <span className="ldw-field-heading"><span>{field.title || key}{required&&<b> *</b>}</span>{field.description&&<button type="button" className="ldw-help-button" aria-expanded={showHelp} onClick={e=>{e.preventDefault();setExpandedHelp(current=>({...current,[key]:!current[key]}))}}><HelpCircle size={13}/>{showHelp?'收起提示':'字段提示'}</button>}</span>
    {enumValues.length>0?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">请选择</option>{enumValues.map(option=><option key={String(option)} value={String(option)}>{String(option)}</option>)}</select>
    :countryField?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">选择国家</option>{countries.map(c=><option key={c.code} value={/code/.test(semantic)?c.code:c.geoName}>{c.flag} {c.name}</option>)}</select>
-   :regionField?<select value={String(value)} onChange={e=>set(e.target.value)} disabled={!countryCode}><option value="">选择州 / 省 / 地区</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select>
+   :regionField?<select value={String(value)} onChange={e=>set(e.target.value)} disabled={!countryCode||locationBusy}><option value="">全部地区（不限制）</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select>
    :cityField?<><div className="ldw-city-search-row"><input value={cityQuery||String(value)} onChange={e=>{setCityQuery(e.target.value);set('')}} placeholder="输入城市名称…"/><button type="button" onClick={()=>void searchCities()} disabled={!countryCode||citySearchBusy}><Search size={12}/>{citySearchBusy?'搜索中':'搜索'}</button></div>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{set(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}</>
    :portField?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">选择港口</option>{portCatalog.map(([code,name])=><option key={code} value={code}>{name} · {code}</option>)}</select>
    :field.type==='boolean'?<input type="checkbox" checked={Boolean(value)} onChange={e=>set(e.target.checked)}/>
    :field.type==='integer'||field.type==='number'?<input type="number" min={field.minimum} max={field.maximum} value={String(value)} onChange={e=>set(e.target.value===''?'':Number(e.target.value))}/>
    :field.type==='array'||field.type==='object'?<textarea rows={3} value={String(value)} onChange={e=>set(e.target.value)} placeholder={field.type==='array'?'[]':'{}'}/>
    :<input type={field.format==='uri'?'url':'text'} value={String(value)} onChange={e=>set(e.target.value)}/>}
-   {field.description&&<small>{field.description}</small>}
+   {showHelp&&field.description&&<small className="ldw-field-help">{field.description}</small>}
   </label>
  }
  const startSearch = async () => {
@@ -211,7 +237,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      if(typeof value==='string'&&value.trim()){try{actorInput[key]=JSON.parse(value)}catch{throw new Error((field.title||key)+' 必须是有效 JSON')}}
     }else if(value!==''&&value!==undefined)actorInput[key]=value
    }
-   const locationText=[city,region,selectedCountry?.geoName].filter(Boolean).join(', ')
+   const locationText=[city,region!=='__all__'?region:'',selectedCountry?.geoName].filter(Boolean).join(', ')
    for(const [key,field] of schemaKeys(schema)){
     if(actorInput[key]!==undefined&&actorInput[key]!=='' )continue
     const k=key.toLowerCase()
@@ -252,11 +278,14 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  return <div className="ldw-shell">
   <div className="ldw-intro"><div><span className="ldw-eyebrow">LEAD DISCOVERY WORKSPACE</span><h2>发现潜在客户</h2><p>先选择客户来源，再选择供应商和采集器。参数表单会根据采集器 Schema 自动生成。</p></div><span className="ldw-status"><Sparkles size={14}/> 动态采集配置</span></div>
   <div className="ldw-step-grid">
-   <section className="ldw-card"><div className="ldw-step-title"><span>01</span><div><h3>选择客户来源平台</h3><p>先确定你要从哪里发现潜在客户。</p></div></div>
-    <div className="ldw-platform-groups">{platformGroups.map(group=><div key={group.label}><h4>{group.label}</h4><div className="ldw-platform-grid">{group.items.map(([id,name])=><button key={id} className={channel===id?'selected':''} onClick={()=>setChannel(id)}>{name}{channel===id&&<Check size={14}/>}</button>)}</div></div>)}</div>
+   <section className="ldw-card"><div className="ldw-step-title"><span>01</span><div><h3>选择客户来源平台</h3><p>先确定你要从哪里发现潜在客户。按类别收纳，点击展开。</p></div></div>
+    <div className="ldw-platform-groups">{platformGroups.map(group=><div className="ldw-platform-group" key={group.label}>
+     <button type="button" className="ldw-platform-group-trigger" aria-expanded={expandedPlatformGroup===group.label} onClick={()=>setExpandedPlatformGroup(current=>current===group.label?'':group.label)}><span><b>{group.label}</b><small>{group.items.length} 个渠道{group.items.some(([id])=>id===channel)?' · 当前选择':''}</small></span><ChevronDown size={15}/></button>
+     {expandedPlatformGroup===group.label&&<div className="ldw-platform-grid">{group.items.map(([id,name])=><button key={id} className={channel===id?'selected':''} onClick={()=>setChannel(id)}><img className="ldw-brand-logo" src={platformLogo(id)} alt="" loading="lazy"/><span>{name}</span>{channel===id&&<Check size={14}/>}</button>)}</div>}
+    </div>)}</div>
    </section>
    <section className="ldw-card"><div className="ldw-step-title"><span>02</span><div><h3>选择数据供应商</h3><p>仅显示当前平台有对应产品的供应商。</p></div></div>
-    <div className="ldw-provider-grid">{availableProviders.map(name=><button key={name} className={provider===name?'selected':''} onClick={()=>setProvider(name)}><b>{name}</b><small>{providerDescriptions[name]||'查看该供应商支持的采集能力。'}</small></button>)}</div>
+    <div className="ldw-provider-grid">{availableProviders.map(name=><button key={name} className={provider===name?'selected':''} onClick={()=>setProvider(name)}><span className="ldw-provider-name"><img className="ldw-brand-logo" src={providerLogo(name)} alt="" loading="lazy"/><b>{name}</b>{provider===name&&<Check size={13}/>}</span><small>{providerDescriptions[name]||'查看该供应商支持的采集能力。'}</small></button>)}</div>
     {provider!=='Apify'&&<div className="ldw-provider-note">该供应商已列入平台目录；此版本的动态 Actor Schema 流程先支持 Apify。其他供应商需要各自的产品目录与参数 Schema，不能错误地套用 Apify Actor。</div>}
    </section>
   </div>
@@ -267,14 +296,14 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     </div>
     <div className="ldw-map-wrap"><MarketMap selected={selectedCountryItems}/></div>
     <label className="ldw-field"><span>地区所属国家</span><select value={countryCode} onChange={e=>{setCountryCode(e.target.value);setRegion('');setCity('');setCityQuery('')}} disabled={!selectedCountries.length}><option value="">选择国家</option>{selectedCountryItems.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select><small>可从已选国家中指定一个国家筛选州 / 省和城市。</small></label>
-    <label className="ldw-field"><span>州 / 省 / 行政区</span><select value={region} onChange={e=>{setRegion(e.target.value);setCity('');setCityQuery('')}} disabled={!countryCode||locationBusy}><option value="">{locationBusy?'正在从 OpenStreetMap 加载…':'选择地区（可选）'}</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select><small>地区选项随所选国家动态加载。</small></label>
+    <label className="ldw-field"><span>州 / 省 / 行政区</span><select value={region} onChange={e=>{setRegion(e.target.value);setCity('');setCityQuery('')}} disabled={!countryCode||locationBusy}><option value="__all__">{locationBusy?'正在从 OpenStreetMap 加载…':'全部（不限制州 / 省 / 行政区）'}</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select><small>{locationBusy?'正在读取该国家的行政区划…':regionResults.length?'已从 OpenStreetMap 读取 '+regionResults.length+' 个地区。':'地区暂不可用时仍可选择全部。'}</small></label>
     <div className="ldw-field ldw-city-field"><span>城市</span><div className="ldw-city-search-row"><input disabled={!countryCode} value={cityQuery||city} onChange={e=>{setCityQuery(e.target.value);setCity('')}} onKeyDown={e=>{if(e.key==='Enter')void searchCities()}} placeholder="输入城市名称…"/><button type="button" disabled={!countryCode||citySearchBusy||!cityQuery.trim()} onClick={()=>void searchCities()}><Search size={12}/>{citySearchBusy?'搜索中':'搜索'}</button></div>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{setCity(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}<small>选择国家和地区后，点击搜索查询 OpenStreetMap 城市。</small></div>
    </div>
    <div className="ldw-osm-credit">地点数据 © OpenStreetMap contributors · Nominatim · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">数据与使用政策</a></div>
   </section>
   <section className="ldw-card"><div className="ldw-step-title"><span>04</span><div><h3>选择 Actor / 采集器</h3><p>Apify Store 提供公开 Actor 搜索；选择后读取该 Actor 的真实输入 Schema。</p></div></div>
    {provider==='Apify'?<><div className="ldw-actor-search"><input value={actorQuery} onChange={e=>setActorQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void searchActors()}} placeholder={'搜索 '+(searchTerms[channel]||channel)+'…'}/><button onClick={()=>void searchActors()} disabled={actorBusy}><Search size={14}/>{actorBusy?'搜索中…':'搜索 Apify Actors'}</button></div>
-    {actors.length>0&&<div className="ldw-actor-list">{actors.map(item=><article key={item.id} className={'ldw-actor-card '+(actor?.id===item.id?'selected':'')}><div><b>{item.title||item.name}</b><small>{item.username}/{item.name}</small><p>{item.description||'暂无描述'}</p><small>评分 {item.stats?.actorReviewRating??'—'} · {item.stats?.actorReviewCount??0} 条评价 · 用户 {item.stats?.totalUsers??'—'} · {pricingLabel(item)}</small></div><button onClick={()=>void selectActor(item)} disabled={schemaBusy}>{actor?.id===item.id?'已选择':'选择此 Actor'} <ArrowRight size={13}/></button><a href={item.url||'https://apify.com/'+item.username+'/'+item.name} target="_blank" rel="noreferrer" aria-label="打开 Actor 页面"><ExternalLink size={13}/></a></article>)}</div>}
+    {actors.length>0&&<><div className="ldw-actor-result-summary"><span>找到 {actors.length} 个 Actor · 默认显示前 4 个</span><button type="button" onClick={()=>setShowAllActors(v=>!v)}>{showAllActors?'收起列表':'显示全部 Actor'} <ChevronDown size={13}/></button></div><div className="ldw-actor-list">{(showAllActors?actors:actors.slice(0,4)).map(item=><article key={item.id} className={'ldw-actor-card '+(actor?.id===item.id?'selected':'')}><div><b>{item.title||item.name}</b><small>{item.username}/{item.name}</small><p>{item.description||'暂无描述'}</p><small>评分 {item.stats?.actorReviewRating??'—'} · {item.stats?.actorReviewCount??0} 条评价 · 用户 {item.stats?.totalUsers??'—'} · {pricingLabel(item)}</small></div><button onClick={()=>void selectActor(item)} disabled={schemaBusy}>{actor?.id===item.id?'已选择':'选择此 Actor'} <ArrowRight size={13}/></button><a href={item.url||'https://apify.com/'+item.username+'/'+item.name} target="_blank" rel="noreferrer" aria-label="打开 Actor 页面"><ExternalLink size={13}/></a></article>)}</div></>}
    </>:<div className="ldw-provider-note">选择 Apify 时可以直接搜索 Actor Store 并读取 Schema。其他供应商将使用各自的模板 / 数据集 / Action 目录，不能把 Actor 机制混用。</div>}
    {schemaBusy&&<div className="ldw-loading"><Loader2 size={16}/> 正在读取 Actor Schema…</div>}
    {schema&&actor&&<div className="ldw-schema-panel">
