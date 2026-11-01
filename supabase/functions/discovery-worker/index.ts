@@ -63,7 +63,7 @@ async function processItems(run:Record<string,unknown>,items:unknown[],admin:str
 function retryableError(message:string){return /HTTP (408|425|429|500|502|503|504)|timeout|temporar|rate.?limit|network|fetch failed/i.test(message);}
 async function updateTaskSummary(taskId:string,workspaceId:string,admin:string){
  const [runsResponse,inboxResponse]=await Promise.all([
-  rest(`lead_task_runs?select=status,actual_cost,estimated_cost&task_id=eq.${encodeURIComponent(taskId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}`,admin),
+  rest(`lead_task_runs?select=status,actual_cost,estimated_cost,cost_currency&task_id=eq.${encodeURIComponent(taskId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}`,admin),
   rest(`lead_inbox_records?select=id,record_type,review_status,source_record_id&task_id=eq.${encodeURIComponent(taskId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}`,admin)
  ]);
  const runs=runsResponse.ok?await runsResponse.json():[];const inbox=inboxResponse.ok?await inboxResponse.json():[];
