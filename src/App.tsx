@@ -9,11 +9,8 @@ import './index.css'
 import { AuthProvider, useAuth } from './lib/auth'
 import AuthScreen from './lib/auth-screen'
 
-function AppContent() {
-  const { user, workspace, signOut, loading, configured } = useAuth()
-  if (!configured) return <AuthScreen />
-  if (loading) return <div className="auth-loading">正在载入工作空间…</div>
-  if (!user || !workspace) return <AuthScreen />
+function AuthenticatedApp() {
+  const { user, workspace, signOut } = useAuth()
   const [active, setActive] = useState<AppItem | null>(null)
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -74,6 +71,14 @@ function AppContent() {
       </main>
     </div>
   </div>
+}
+
+function AppContent() {
+  const { user, workspace, loading, configured } = useAuth()
+  if (!configured) return <AuthScreen />
+  if (loading) return <div className="auth-loading">正在载入工作空间…</div>
+  if (!user || !workspace) return <AuthScreen />
+  return <AuthenticatedApp />
 }
 
 export default function App() { return <AuthProvider><AppContent /></AuthProvider> }
