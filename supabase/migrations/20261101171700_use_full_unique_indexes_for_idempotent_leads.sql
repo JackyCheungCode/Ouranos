@@ -1,0 +1,6 @@
+drop index if exists public.lead_source_records_external_identity_uidx;
+create unique index lead_source_records_external_identity_uidx
+ on public.lead_source_records(workspace_id,provider_key,channel_key,external_record_id);
+drop index if exists public.lead_inbox_source_item_uidx;
+create unique index lead_inbox_source_item_uidx
+ on public.lead_inbox_records(workspace_id,source_record_id,record_type,source_item_key);
