@@ -2,7 +2,7 @@ import {
   Activity, BarChart3, Bot, Building2, CalendarClock, Check, ClipboardList, Cloud,
   Contact, Database, FileText, Globe2, LayoutDashboard, Mail, Network, Send,
   Settings, ShieldCheck, Sparkles, Target, TrendingUp, Users, WandSparkles,
-  Workflow, Zap, Boxes, Layers3
+  Workflow, Zap, Boxes, Layers3, Truck, Wallet, Headset, PackageCheck
 } from 'lucide-react'
 import type { AppItem, AppGroup } from './types'
 
@@ -27,9 +27,13 @@ export const apps: AppItem[] = [
   { id:'crm',name:'客户关系管理',subtitle:'客户关系',group:'sales',icon:Users,color:'#714B67',description:'管理客户档案、联系人、沟通历史与负责人。' },
   { id:'pipeline',name:'销售管道',subtitle:'商机阶段',group:'sales',icon:Workflow,color:'#168A9A',description:'跟踪从新线索、需求沟通到谈判及成交的每个商机。' },
   { id:'quotations',name:'报价管理',subtitle:'价格与报价单',group:'sales',icon:FileText,color:'#C18A32',description:'创建、整理并跟踪客户报价单及商务条款。' },
+  { id:'orders',name:'销售订单',subtitle:'订单履约',group:'sales',icon:PackageCheck,color:'#168A9A',description:'从报价转订单，管理确认、备货、履约与交付。' },
+  { id:'shipments',name:'出货管理',subtitle:'仓储与物流',group:'sales',icon:Truck,color:'#4776B8',description:'管理拣货、质检、发货、物流追踪与签收。' },
+  { id:'invoices',name:'收款管理',subtitle:'应收与核销',group:'sales',icon:Wallet,color:'#239B82',description:'管理应收款、付款记录、部分收款与账款核销。' },
+  { id:'aftersales',name:'售后服务',subtitle:'服务与退换货',group:'sales',icon:Headset,color:'#A16BB5',description:'处理质量反馈、退换货、补发、退款及客户确认。' },
   { id:'sales-activities',name:'销售活动',subtitle:'电话与会议',group:'sales',icon:ClipboardList,color:'#4776B8',description:'记录电话、会议、邮件以及下一次客户触达计划。' },
   { id:'data-hub',name:'数据中心',subtitle:'统一数据集',group:'data',icon:Database,color:'#4776B8',description:'导入、整理和浏览来自多个渠道的商业数据。' },
-  { id:'providers',name:'数据服务商',subtitle:'数据源与 API',group:'data',icon:Cloud,color:'#168A9A',description:'管理已连接的数据源、服务状态、用量与成本。' },
+  { id:'providers',name:'数据源目录',subtitle:'服务商能力目录',group:'data',icon:Cloud,color:'#168A9A',description:'浏览外部数据服务商的能力与支持渠道，API 连接配置统一在系统集成中管理。' },
   { id:'enrichment',name:'数据补全',subtitle:'完善数据档案',group:'data',icon:WandSparkles,color:'#A16BB5',description:'为企业和联系人档案补充更多商业信息。' },
   { id:'cleaning',name:'数据清洗',subtitle:'质量与去重',group:'data',icon:Check,color:'#239B82',description:'标准化、验证并去除企业和联系人数据中的重复项。' },
   { id:'trade',name:'贸易情报',subtitle:'进出口数据',group:'data',icon:Boxes,color:'#C16D4A',description:'分析贸易活动、产品编码、采购商、供应商与贸易趋势。' },

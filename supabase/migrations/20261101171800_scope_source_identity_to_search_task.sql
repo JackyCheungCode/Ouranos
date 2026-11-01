@@ -1,0 +1,3 @@
+drop index if exists public.lead_source_records_external_identity_uidx;
+create unique index lead_source_records_external_identity_uidx
+ on public.lead_source_records(workspace_id,task_id,provider_key,channel_key,external_record_id);

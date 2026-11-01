@@ -1,0 +1,1 @@
+create index if not exists integration_events_created_by_idx on public.integration_events(created_by) where created_by is not null;
