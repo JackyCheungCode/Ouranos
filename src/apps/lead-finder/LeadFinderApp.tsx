@@ -163,7 +163,7 @@ export default function LeadFinderApp() {
   setInboxLoading(false)
  }
  useEffect(()=>{if(tab==='review')void refreshInbox()},[tab,workspace?.id])
- const reviewRecord = async(record:InboxRecord,status:'approved'|'rejected'|'duplicate',action:'approve'|'reject'|'mark_duplicate')=>{
+ const reviewRecord = async(record:InboxRecord,status:'approved'|'rejected'|'duplicate',action:'approve'|'reject'|'mark_duplicate'|'unmark_duplicate')=>{
   if(!supabase||!workspace||!user)return
   const {error}=await supabase.from('lead_inbox_records').update({review_status:status,reviewed_by:user.id,reviewed_at:new Date().toISOString()}).eq('id',record.id).eq('workspace_id',workspace.id)
   if(error){setInboxError(error.message);return}
