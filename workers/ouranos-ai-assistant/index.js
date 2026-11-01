@@ -35,15 +35,26 @@ function compactSchema(schema, depth = 0) {
     const value = schema[key];
     result[key] = ["title", "description", "placeholderValue"].includes(key) ? clip(value, key === "description" ? MAX_FIELD_TEXT : 180) : value;
   }
-  if (Array.isArray(schema.enum)) result.enum = schema.enum;
-  if (Array.isArray(schema.enumTitles)) result.enumTitles = schema.enumTitles.map(value => clip(value, 120));
+  if (Array.isArray(schema.enum)) {
+    if (schema.enum.length > 60) {
+      result.enum = schema.enum.slice(0, 40);
+      result.enum_truncated = true;
+      result.enum_count = schema.enum.length;
+    } else result.enum = schema.enum;
+  }
+  if (Array.isArray(schema.enumTitles)) result.enumTitles = schema.enumTitles.slice(0, 40).map(value => clip(value, 120));
   if (schema.items && typeof schema.items === "object") result.items = compactSchema(schema.items, depth + 1);
   if (schema.additionalProperties && typeof schema.additionalProperties === "object") result.additionalProperties = compactSchema(schema.additionalProperties, depth + 1);
   for (const key of ["allOf", "anyOf", "oneOf"]) {
     if (Array.isArray(schema[key])) result[key] = schema[key].slice(0, 8).map(item => compactSchema(item, depth + 1));
   }
   if (schema.properties && typeof schema.properties === "object") {
-    result.properties = Object.fromEntries(Object.entries(schema.properties).map(([key, value]) => [key, compactSchema(value, depth + 1)]));
+    const entries = Object.entries(schema.properties);
+    const required = new Set(Array.isArray(schema.required) ? schema.required : []);
+    const ordered = [...entries.filter(([key]) => required.has(key)), ...entries.filter(([key]) => !required.has(key))];
+    const kept = ordered.slice(0, Math.max(50, required.size));
+    result.properties = Object.fromEntries(kept.map(([key, value]) => [key, compactSchema(value, depth + 1)]));
+    if (kept.length < entries.length) result.properties_truncated_count = entries.length - kept.length;
   }
   return result;
 }
@@ -153,7 +164,7 @@ async function runFieldBatch(env, model, shared, schema, entries, depth = 0) {
     return mergeBatchResults(left, right);
   }
   if (approxTokens > 10500) throw new Error("ACTOR_FIELD_TOO_LARGE");
-  const maxTokens = Math.min(2200, Math.max(750, entries.length * 300));
+  const maxTokens = Math.min(1800, Math.max(700, entries.length * 260));
   try {
     const result = await env.AI.run(model, {
       messages: [{ role: "system", content: FIELD_SYSTEM }, { role: "user", content: serialized }],
@@ -228,9 +239,9 @@ async function runConversation(env, model, body, origin) {
       return String(field.title || key) + "（必填）：" + String(field.description || "请补充该参数的具体内容");
     }),
   ])].slice(0, 30);
-  const assistantMessage = combined.assistant_messages.length
-    ? combined.assistant_messages[combined.assistant_messages.length - 1]
-    : missingInformation.length ? "参数已更新，还需要确认：" + missingInformation[0] : "参数已根据目前的需求更新。请检查预览。";
+  const assistantMessage = missingInformation.length
+    ? "我已更新目前能够确定的参数。接下来请确认：" + missingInformation[0]
+    : combined.assistant_messages[combined.assistant_messages.length - 1] || "参数已根据目前的需求更新。请检查预览。";
   return json({
     ok: true, mode: "conversation", model,
     assistant_message: assistantMessage,
