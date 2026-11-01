@@ -5,8 +5,9 @@ const ALLOWED_MODELS = new Set([
 const MAX_BODY_BYTES = 500000;
 const MAX_BATCH_CHARS = 4200;
 const MAX_FIELDS_PER_BATCH = 6;
-const MAX_HISTORY_ITEMS = 8;
-const MAX_HISTORY_CHARS = 900;
+const MAX_HISTORY_ITEMS = 6;
+const MAX_HISTORY_CHARS = 700;
+const MAX_ESTIMATED_INPUT_TOKENS = 14000;
 const MAX_FIELD_TEXT = 900;
 
 const allowedOrigin = (origin) => origin === "https://ouranos-1b3.pages.dev" ||
@@ -26,6 +27,13 @@ const clip = (value, max = MAX_FIELD_TEXT) => {
   const text = typeof value === "string" ? value : JSON.stringify(value ?? "");
   return text.length > max ? text.slice(0, max) + "…（已压缩）" : text;
 };
+function compactExample(value, depth = 0) {
+  if (depth > 3) return "…";
+  if (typeof value === "string") return clip(value, 360);
+  if (Array.isArray(value)) return value.slice(0, 12).map(item => compactExample(item, depth + 1));
+  if (isRecord(value)) return Object.fromEntries(Object.entries(value).slice(0, 16).map(([key, item]) => [key, compactExample(item, depth + 1)]));
+  return value;
+}
 function compactSchema(schema, depth = 0) {
   if (depth > 7 || !schema || typeof schema !== "object") return {};
   const result = {};
@@ -33,11 +41,15 @@ function compactSchema(schema, depth = 0) {
   for (const key of scalarKeys) {
     if (schema[key] === undefined) continue;
     const value = schema[key];
-    result[key] = ["title", "description", "placeholderValue"].includes(key) ? clip(value, key === "description" ? MAX_FIELD_TEXT : 180) : value;
+    if (["title", "description", "placeholderValue"].includes(key)) result[key] = clip(value, key === "description" ? MAX_FIELD_TEXT : 180);
+    else if (["default", "prefill", "example"].includes(key)) result[key] = compactExample(value);
+    else if (key === "pattern") result[key] = clip(value, 900);
+    else result[key] = value;
   }
   if (Array.isArray(schema.enum)) {
-    if (schema.enum.length > 60) {
-      result.enum = schema.enum.slice(0, 40);
+    const enumChars = JSON.stringify(schema.enum).length;
+    if (schema.enum.length > 60 || enumChars > 1800) {
+      result.enum = schema.enum.slice(0, 30);
       result.enum_truncated = true;
       result.enum_count = schema.enum.length;
     } else result.enum = schema.enum;
@@ -156,14 +168,14 @@ async function runFieldBatch(env, model, shared, schema, entries, depth = 0) {
     actor_schema: batchSchema,
   };
   const serialized = JSON.stringify(inputContext);
-  const approxTokens = Math.ceil((FIELD_SYSTEM.length + serialized.length) / 2);
-  if (approxTokens > 10500 && entries.length > 1) {
+  const approxTokens = Math.ceil((FIELD_SYSTEM.length + serialized.length) / 1.6);
+  if (approxTokens > MAX_ESTIMATED_INPUT_TOKENS && entries.length > 1) {
     const midpoint = Math.ceil(entries.length / 2);
     const left = await runFieldBatch(env, model, shared, schema, entries.slice(0, midpoint), depth + 1);
     const right = await runFieldBatch(env, model, shared, schema, entries.slice(midpoint), depth + 1);
     return mergeBatchResults(left, right);
   }
-  if (approxTokens > 10500) throw new Error("ACTOR_FIELD_TOO_LARGE");
+  if (approxTokens > MAX_ESTIMATED_INPUT_TOKENS) throw new Error("ACTOR_FIELD_TOO_LARGE");
   const maxTokens = Math.min(1800, Math.max(700, entries.length * 260));
   try {
     const result = await env.AI.run(model, {
