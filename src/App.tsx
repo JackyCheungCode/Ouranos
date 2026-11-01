@@ -3,6 +3,7 @@ import { Activity, ChevronDown, ChevronRight, CircleHelp, Home, Layers3, Menu, M
 import { apps, groups, initialFavorites, recentIds } from './apps/registry'
 import type { AppItem } from './apps/types'
 import AppTile from './apps/components/AppTile'
+import LeadFinderApp from './apps/lead-finder/LeadFinderApp'
 import './index.css'
 
 export default function App() {
@@ -48,7 +49,7 @@ export default function App() {
         </aside>
       </>}
       <main className="main">
-        {active ? <div className="module-page">
+        {active?.id === 'lead-finder' ? <div className="module-page"><div className="breadcrumbs"><button onClick={() => setActive(null)}><Layers3 size={15}/> 全部应用</button><ChevronRight size={14}/><span>{active.name}</span></div><LeadFinderApp /></div> : active ? <div className="module-page">
           <div className="breadcrumbs"><button onClick={() => setActive(null)}><Layers3 size={15}/> 全部应用</button><ChevronRight size={14}/><span>{active.name}</span></div>
           <div className="module-heading"><div className="module-heading-left"><span className="app-icon large" style={{background:active.color}}>{Icon && <Icon size={27}/>}</span><div><div className="eyebrow">{groups.find(group => group.id === active.group)?.title}</div><h1>{active.name}</h1><p>{active.description}</p></div></div></div>
           <div className="module-tabs"><button className="active">概览</button><button>数据记录</button><button>活动</button><button>配置</button></div>
