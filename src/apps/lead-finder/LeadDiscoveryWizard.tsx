@@ -55,6 +55,14 @@ const nominatim = async (params: Record<string,string>) => {
  return await response.json() as Array<{ place_id:number; display_name:string; name?:string; address?:Record<string,string>; type?:string; class?:string }>
 }
 
+const osmRegions = async (countryCode:string) => {
+ const query = `[out:json][timeout:25];area["ISO3166-1"="${countryCode}"][admin_level=2]->.country;relation(area.country)["boundary"="administrative"]["admin_level"~"4|5"];out tags center;`
+ const response = await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',Accept:'application/json'},body:new URLSearchParams({data:query}).toString()})
+ if(!response.ok)throw new Error('OpenStreetMap 地区数据暂时不可用')
+ const body=await response.json() as {elements?:Array<{id:number;tags?:Record<string,string>}>}
+ return (body.elements||[]).filter(x=>x.tags?.name).map(x=>({place_id:x.id,name:x.tags?.name||'',display_name:x.tags?.name||''}))
+}
+
 function MarketMap({selected}:{selected:typeof countries}) {
  const [geo,setGeo]=useState<FeatureCollection<Geometry>|null>(null)
  useEffect(()=>{let active=true;fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json()).then(data=>{if(active)setGeo(data)}).catch(()=>{if(active)setGeo(null)});return()=>{active=false}},[])
@@ -81,6 +89,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [cityResults,setCityResults] = useState<Array<{place_id:number;display_name:string;name?:string}>>([])
  const [regionResults,setRegionResults] = useState<Array<{place_id:number;display_name:string;name?:string}>>([])
  const [locationBusy,setLocationBusy] = useState(false)
+ const [citySearchBusy,setCitySearchBusy] = useState(false)
  const [actorQuery,setActorQuery] = useState('')
  const [actors,setActors] = useState<Actor[]>([])
  const [actorBusy,setActorBusy] = useState(false)
@@ -113,26 +122,23 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   if(!countryCode){setRegionResults([]);setRegion('');setCity('');return}
   setLocationBusy(true);setRegion('');setCity('');setCityQuery('')
   const timer=setTimeout(async()=>{
-   try {
-    const results=await nominatim({country:selectedCountry?.geoName || countryCode,featureType:'state'})
-    if(active)setRegionResults(results.map(x=>({place_id:x.place_id,display_name:x.display_name,name:x.name || x.address?.state || x.display_name.split(',')[0]})))
-   } catch(e){if(active)setError(e instanceof Error?e.message:'地区列表加载失败')}
+   try {const results=await osmRegions(countryCode);if(active)setRegionResults(results)}
+   catch(e){if(active)setError(e instanceof Error?e.message:'地区列表加载失败')}
    finally{if(active)setLocationBusy(false)}
-  },1100)
+  },350)
   return()=>{active=false;clearTimeout(timer)}
  },[countryCode])
- useEffect(()=>{
-  let active=true
-  if(!cityQuery.trim()||!countryCode){setCityResults([]);return}
-  const timer=setTimeout(async()=>{
-   try {
-    const q=[cityQuery,region,selectedCountry?.geoName].filter(Boolean).join(', ')
-    const results=await nominatim({q,countrycodes:countryCode.toLowerCase(),featureType:'city'})
-    if(active)setCityResults(results.slice(0,8).map(x=>({place_id:x.place_id,display_name:x.display_name,name:x.name || x.display_name.split(',')[0]})))
-   }catch(e){if(active)setError(e instanceof Error?e.message:'城市搜索失败')}
-  },1100)
-  return()=>{active=false;clearTimeout(timer)}
- },[cityQuery,region,countryCode])
+ const searchCities = async () => {
+  if(!cityQuery.trim()||!countryCode)return
+  setCitySearchBusy(true);setError('')
+  try {
+   const q=[cityQuery,region,selectedCountry?.geoName].filter(Boolean).join(', ')
+   const results=await nominatim({q,countrycodes:countryCode.toLowerCase(),featureType:'city',limit:'8'})
+   setCityResults(results.slice(0,8).map(x=>({place_id:x.place_id,display_name:x.display_name,name:x.name||x.display_name.split(',')[0]})))
+   if(!results.length)setNotice('OpenStreetMap 没有找到匹配城市，请调整名称再搜索。')
+  }catch(e){setError(e instanceof Error?e.message:'城市搜索失败')}
+  finally{setCitySearchBusy(false)}
+ }
 
  const searchActors = async () => {
   if(provider!=='Apify')return
@@ -174,7 +180,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    {enumValues.length>0?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">请选择</option>{enumValues.map(option=><option key={String(option)} value={String(option)}>{String(option)}</option>)}</select>
    :countryField?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">选择国家</option>{countries.map(c=><option key={c.code} value={/code/.test(semantic)?c.code:c.geoName}>{c.flag} {c.name}</option>)}</select>
    :regionField?<select value={String(value)} onChange={e=>set(e.target.value)} disabled={!countryCode}><option value="">选择州 / 省 / 地区</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select>
-   :cityField?<><input value={cityQuery||String(value)} onChange={e=>{setCityQuery(e.target.value);set('')}} placeholder="输入城市名称搜索 OpenStreetMap…"/>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{set(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}</>
+   :cityField?<><div className="ldw-city-search-row"><input value={cityQuery||String(value)} onChange={e=>{setCityQuery(e.target.value);set('')}} placeholder="输入城市名称…"/><button type="button" onClick={()=>void searchCities()} disabled={!countryCode||citySearchBusy}><Search size={12}/>{citySearchBusy?'搜索中':'搜索'}</button></div>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{set(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}</>
    :portField?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">选择港口</option>{portCatalog.map(([code,name])=><option key={code} value={code}>{name} · {code}</option>)}</select>
    :field.type==='boolean'?<input type="checkbox" checked={Boolean(value)} onChange={e=>set(e.target.checked)}/>
    :field.type==='integer'||field.type==='number'?<input type="number" min={field.minimum} max={field.maximum} value={String(value)} onChange={e=>set(e.target.value===''?'':Number(e.target.value))}/>
@@ -251,7 +257,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     <div className="ldw-map-wrap"><MarketMap selected={selectedCountryItems}/></div>
     <label className="ldw-field"><span>地区所属国家</span><select value={countryCode} onChange={e=>{setCountryCode(e.target.value);setRegion('');setCity('');setCityQuery('')}} disabled={!selectedCountries.length}><option value="">选择国家</option>{selectedCountryItems.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select><small>可从已选国家中指定一个国家筛选州 / 省和城市。</small></label>
     <label className="ldw-field"><span>州 / 省 / 行政区</span><select value={region} onChange={e=>{setRegion(e.target.value);setCity('');setCityQuery('')}} disabled={!countryCode||locationBusy}><option value="">{locationBusy?'正在从 OpenStreetMap 加载…':'选择地区（可选）'}</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select><small>地区选项随所选国家动态加载。</small></label>
-    <div className="ldw-field ldw-city-field"><span>城市</span><input disabled={!countryCode} value={cityQuery||city} onChange={e=>{setCityQuery(e.target.value);setCity('')}} placeholder="输入城市名称搜索 OpenStreetMap…"/>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{setCity(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}<small>选择国家和地区后，城市搜索会自动限定范围。</small></div>
+    <div className="ldw-field ldw-city-field"><span>城市</span><div className="ldw-city-search-row"><input disabled={!countryCode} value={cityQuery||city} onChange={e=>{setCityQuery(e.target.value);setCity('')}} onKeyDown={e=>{if(e.key==='Enter')void searchCities()}} placeholder="输入城市名称…"/><button type="button" disabled={!countryCode||citySearchBusy||!cityQuery.trim()} onClick={()=>void searchCities()}><Search size={12}/>{citySearchBusy?'搜索中':'搜索'}</button></div>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{setCity(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}<small>选择国家和地区后，点击搜索查询 OpenStreetMap 城市。</small></div>
    </div>
    <div className="ldw-osm-credit">地点数据 © OpenStreetMap contributors · Nominatim · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">数据与使用政策</a></div>
   </section>
