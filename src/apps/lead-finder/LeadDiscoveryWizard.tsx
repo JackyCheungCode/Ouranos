@@ -178,22 +178,32 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label)},[channel])
  useEffect(()=>{
   let active=true
-  if(!countryCode){setRegionResults([]);setRegion('__all__');setCity('');return}
-  setLocationBusy(true);setRegion('');setCity('');setCityQuery('')
+  if(!countryCode){setRegionResults([]);setRegion('__all__');setRegionManual('');setCity('');setMapLocation(null);setRegionLoadError('');return}
+  const countryName=selectedCountry?.geoName||selectedCountry?.name||countryCode
+  setLocationBusy(true);setRegion('__all__');setRegionManual('');setCity('');setCityQuery('');setRegionLoadError('')
   const timer=setTimeout(async()=>{
-   try {const results=await osmRegions(countryCode,selectedCountry?.geoName||selectedCountry?.name||countryCode);if(active){setRegionResults(results);setRegion('__all__')}}
-   catch(e){if(active)setError(e instanceof Error?e.message:'地区列表加载失败')}
-   finally{if(active)setLocationBusy(false)}
-  },350)
+   const [regions,geocode]=await Promise.allSettled([
+    osmRegions(countryCode,countryName),
+    nominatim({q:countryName,featureType:'country',limit:'1'})
+   ])
+   if(active){
+    if(regions.status==='fulfilled'){setRegionResults(regions.value);setRegion('__all__')}
+    else{setRegionResults([]);setRegion('__all__');setRegionLoadError(regions.reason instanceof Error?regions.reason.message:'行政区加载失败，可手动输入。')}
+    if(geocode.status==='fulfilled'&&geocode.value[0]?.lat&&geocode.value[0]?.lon){
+     const item=geocode.value[0];setMapLocation({lat:Number(item.lat),lon:Number(item.lon),label:countryName})
+    }else setMapLocation(null)
+    setLocationBusy(false)
+   }
+  },250)
   return()=>{active=false;clearTimeout(timer)}
  },[countryCode])
  const searchCities = async () => {
   if(!cityQuery.trim()||!countryCode)return
   setCitySearchBusy(true);setError('')
   try {
-   const q=[cityQuery,region,selectedCountry?.geoName].filter(Boolean).join(', ')
+   const q=[cityQuery,region!=='__all__'?region:'',selectedCountry?.geoName].filter(Boolean).join(', ')
    const results=await nominatim({q,countrycodes:countryCode.toLowerCase(),featureType:'city',limit:'8'})
-   setCityResults(results.slice(0,8).map(x=>({place_id:x.place_id,display_name:x.display_name,name:x.name||x.display_name.split(',')[0]})))
+   setCityResults(results.slice(0,8).map(x=>({place_id:x.place_id,display_name:x.display_name,name:x.name||x.display_name.split(',')[0],lat:x.lat,lon:x.lon})))
    if(!results.length)setNotice('OpenStreetMap 没有找到匹配城市，请调整名称再搜索。')
   }catch(e){setError(e instanceof Error?e.message:'城市搜索失败')}
   finally{setCitySearchBusy(false)}
