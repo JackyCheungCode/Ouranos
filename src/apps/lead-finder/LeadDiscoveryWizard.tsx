@@ -215,7 +215,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   setSchemaBusy(false)
  }
  const renderField = ([key,field]:[string,SchemaField]) => {
-  const value=values[key] ?? getDefaultValue(field)
+  const type=fieldType(field)
+  const value=values[key] ?? getDefaultValue(field,(schema?.required||[]).includes(key))
   const required=schema?.required?.includes(key)
   const set=(v:unknown)=>setValues(current=>({...current,[key]:v}))
   const enumValues=field.enum || []
@@ -234,9 +235,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    :regionField?<select value={String(value)} onChange={e=>set(e.target.value)} disabled={!countryCode||locationBusy}><option value="">全部地区（不限制）</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select>
    :cityField?<><div className="ldw-city-search-row"><input value={cityQuery||String(value)} onChange={e=>{setCityQuery(e.target.value);set('')}} placeholder="输入城市名称…"/><button type="button" onClick={()=>void searchCities()} disabled={!countryCode||citySearchBusy}><Search size={12}/>{citySearchBusy?'搜索中':'搜索'}</button></div>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{set(item.name||item.display_name);setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}</>
    :portField?<select value={String(value)} onChange={e=>set(e.target.value)}><option value="">选择港口</option>{portCatalog.map(([code,name])=><option key={code} value={code}>{name} · {code}</option>)}</select>
-   :field.type==='boolean'?<input type="checkbox" checked={Boolean(value)} onChange={e=>set(e.target.checked)}/>
-    :field.type==='integer'||field.type==='number'?<input type="number" min={field.minimum} max={field.maximum} step={field.type==='integer'?1:'any'} value={String(value)} aria-invalid={Boolean(fieldError)} onChange={e=>set(e.target.value)}/>
-   :field.type==='array'||field.type==='object'?<textarea rows={3} value={String(value)} onChange={e=>set(e.target.value)} placeholder={field.type==='array'?'[]':'{}'}/>
+   :type==='boolean'?<input type="checkbox" checked={Boolean(value)} onChange={e=>set(e.target.checked)}/>
+    :type==='integer'||type==='number'?<input type="number" min={field.minimum} max={field.maximum} step={type==='integer'?1:'any'} value={String(value)} aria-invalid={Boolean(fieldError)} onChange={e=>set(e.target.value)}/>
+   :type==='array'||type==='object'?<textarea rows={3} value={String(value)} onChange={e=>set(e.target.value)} placeholder={type==='array'?'[]':'{}'}/>
     :<input type={field.format==='uri'?'url':field.format==='email'?'email':field.format==='date'?'date':field.format==='date-time'?'datetime-local':'text'} minLength={field.minLength} maxLength={field.maxLength} pattern={field.pattern} value={String(value)} aria-invalid={Boolean(fieldError)} onChange={e=>set(e.target.value)}/>}
    <small className="ldw-field-key">Actor 原始字段：{key}</small>{fieldError&&<small className="ldw-field-error">{fieldError}</small>}{showHelp&&<small className="ldw-field-help">{localizeDescription(key,field)}</small>}
   </label>
