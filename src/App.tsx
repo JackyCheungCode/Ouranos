@@ -11,8 +11,9 @@ import AuthScreen from './lib/auth-screen'
 
 function AppContent() {
   const { user, workspace, signOut, loading, configured } = useAuth()
-  if (!configured || !user || !workspace) return <AuthScreen />
+  if (!configured) return <AuthScreen />
   if (loading) return <div className="auth-loading">正在载入工作空间…</div>
+  if (!user || !workspace) return <AuthScreen />
   const [active, setActive] = useState<AppItem | null>(null)
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
