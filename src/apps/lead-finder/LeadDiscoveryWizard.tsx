@@ -79,13 +79,12 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const availableProviders = providerByPlatform[channel] || ['Apify']
  const selectedCountry = countries.find(c=>c.code===countryCode)
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
- const toggleCountry = (code:string) => setSelectedCountries(current => {
-  const next=current.includes(code)?current.filter(x=>x!==code):[...current,code]
+ const toggleCountry = (code:string) => {
+  const next=selectedCountries.includes(code)?selectedCountries.filter(x=>x!==code):[...selectedCountries,code]
+  setSelectedCountries(next)
   if(!next.length){setCountryCode('');setRegion('');setCity('')}
-  else if(!next.includes(countryCode))setCountryCode(next[next.length-1])
-  else if(!current.includes(code))setCountryCode(code)
-  return next
- })
+  else if(!next.includes(countryCode)||!countryCode||!selectedCountries.includes(code))setCountryCode(next[next.length-1])
+ }
 
  useEffect(()=>{ setProvider(availableProviders[0] || 'Apify'); setActor(null); setSchema(null); setActors([]); setValues({}); setMapping({}); setError(''); setNotice('') },[channel])
  useEffect(()=>{ setActor(null);setSchema(null);setValues({});setMapping({});setError('');setNotice('') },[provider])
@@ -130,6 +129,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   finally{setActorBusy(false)}
  }
  const selectActor = async (item: Actor) => {
+  if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   setActor(item);setSchema(null);setValues({});setMapping({});setSchemaBusy(true);setError('');setNotice('')
   const actorId=item.username+'~'+item.name
   const {data,error:invokeError}=await supabase.functions.invoke('apify-actor-schema',{body:{workspace_id:workspaceId,actor_id:actorId,channel_key:channel}})
@@ -155,6 +155,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   </label>
  }
  const startSearch = async () => {
+  if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
+  if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
   if(!schema||!actor||!costConsent)return
   setBusy(true);setError('')
   try {
