@@ -69,12 +69,8 @@ async function testProvider(provider:string,secret:string,kind:string):Promise<T
     return {success:response.ok,message:response.ok?"PhantomBuster API Key 验证成功":response.status===401?"PhantomBuster API Key 无效或权限不足":`PhantomBuster 返回 HTTP ${response.status}`,statusCode:response.status};
   }
   if(provider==="octoparse"){
-    const username=String(credentials.username||"");const password=String(credentials.password||"");
-    if(!username||!password)return {success:false,manual:true,message:"八爪鱼旧版 OpenAPI 的官方认证方式需要用户名和密码换取 Access Token。当前只保存了 API Key；请补充账号凭据，或向八爪鱼确认新 API Key 的验证端点。"};
-    const response=await fetch("https://openapi.bazhuayu.com/token",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password,grant_type:"password"}),signal:timeout});
-    const data=await response.json().catch(()=>({}));
-    const ok=response.ok&&Boolean(data.access_token||data.token);
-    return {success:ok,message:ok?"八爪鱼账号认证成功，已取得短期 Access Token":`八爪鱼认证失败（HTTP ${response.status}），请检查账号凭据和 API 权限`,statusCode:response.status};
+    const response=await fetch("https://openapi.octoparse.com/api/agentTools/searchTemplates?keyword=amazon&page=1&limit=1",{headers:{"x-api-key":apiKey,Accept:"application/json"},signal:timeout});
+    return {success:response.ok,message:response.ok?"Octoparse AgentTools API Key 验证成功（仅查询模板目录，未启动采集）":response.status===401||response.status===403?"Octoparse API Key 无效或无权访问":`Octoparse 返回 HTTP ${response.status}`,statusCode:response.status};
   }
   if(provider==="texau"){
     const response=await fetch("https://v3-api.texau.com/api/v1/email_finding_waterfall",{method:"POST",headers:{"x-api-key":apiKey,"Content-Type":"application/json",Accept:"application/json"},body:"{}",signal:timeout});
