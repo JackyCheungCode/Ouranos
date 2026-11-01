@@ -36,11 +36,19 @@ async function recordEvent(adminKey:string, event:Record<string,unknown>) {
   await rest("integration_events",adminKey,{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(event)});
 }
 type TestResult={success:boolean;message:string;statusCode?:number;usage?:unknown;manual?:boolean};
-async function testProvider(provider:string,secret:string):Promise<TestResult>{
+async function testProvider(provider:string,secret:string,kind:string):Promise<TestResult>{
   let credentials:Record<string,unknown>={api_key:secret};
   try { const parsed=JSON.parse(secret); if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))credentials=parsed; } catch { /* legacy plain API key */ }
   const apiKey=String(credentials.api_key||"");
   const timeout=AbortSignal.timeout(12000);
+  if(kind==="ai_model"){
+    if(provider==="openai"){const r=await fetch("https://api.openai.com/v1/models",{headers:{Authorization:`Bearer ${apiKey}`},signal:timeout});return {success:r.ok,message:r.ok?"OpenAI API Key 验证成功":`OpenAI 返回 HTTP ${r.status}`,statusCode:r.status};}
+    if(provider==="anthropic"){const r=await fetch("https://api.anthropic.com/v1/models",{headers:{"x-api-key":apiKey,"anthropic-version":"2023-06-01"},signal:timeout});return {success:r.ok,message:r.ok?"Anthropic API Key 验证成功":`Anthropic 返回 HTTP ${r.status}`,statusCode:r.status};}
+    if(provider==="google-ai"){const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models",{headers:{"x-goog-api-key":apiKey},signal:timeout});return {success:r.ok,message:r.ok?"Google AI API Key 验证成功":`Google AI 返回 HTTP ${r.status}`,statusCode:r.status};}
+    if(provider==="deepseek"){const r=await fetch("https://api.deepseek.com/models",{headers:{Authorization:`Bearer ${apiKey}`},signal:timeout});return {success:r.ok,message:r.ok?"DeepSeek API Key 验证成功":`DeepSeek 返回 HTTP ${r.status}`,statusCode:r.status};}
+    if(provider==="openrouter"){const r=await fetch("https://openrouter.ai/api/v1/models",{headers:{Authorization:`Bearer ${apiKey}`},signal:timeout});return {success:r.ok,message:r.ok?"OpenRouter API Key 验证成功":`OpenRouter 返回 HTTP ${r.status}`,statusCode:r.status};}
+    return {success:false,manual:true,message:"该 AI 服务商暂未配置无计费连接测试适配器。"};
+  }
   if(provider==="apify"){
     const response=await fetch("https://api.apify.com/v2/users/me",{headers:{Authorization:`Bearer ${apiKey}`},signal:timeout});
     return {success:response.ok,message:response.ok?"Apify API Key 验证成功":response.status===401?"Apify API Key 无效或已撤销":`Apify 返回 HTTP ${response.status}`,statusCode:response.status};
@@ -111,7 +119,7 @@ Deno.serve(async(req:Request)=>{
     if(!secretResponse.ok)return json({error:"Unable to retrieve credential from Vault"},500,origin);
     const secret=await secretResponse.json();
     if(typeof secret!=="string"||!secret)return json({error:"Stored credential is empty"},500,origin);
-    const result=await testProvider(providerKey,secret);
+    const result=await testProvider(providerKey,secret,kind);
     const status=result.success?"connected":result.manual?"configured":"error";
     const update=await rest(`${table}?${filter}`,adminKey,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status,is_enabled:result.success,last_tested_at:new Date().toISOString(),last_error:result.success?null:result.message,updated_at:new Date().toISOString()})});
     if(!update.ok)return json({error:"Test completed but status could not be saved"},500,origin);
