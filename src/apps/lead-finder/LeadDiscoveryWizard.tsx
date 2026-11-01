@@ -28,7 +28,7 @@ const providerByPlatform: Record<string, string[]> = {
 const platformDomains:Record<string,string> = {'google-maps':'maps.google.com','google-search':'google.com',bing:'bing.com',yelp:'yelp.com',instagram:'instagram.com',facebook:'facebook.com',linkedin:'linkedin.com',tiktok:'tiktok.com',youtube:'youtube.com',x:'x.com',alibaba:'alibaba.com','made-in-china':'made-in-china.com',globalsources:'globalsources.com',indiamart:'indiamart.com',amazon:'amazon.com',ebay:'ebay.com',walmart:'walmart.com',etsy:'etsy.com',shopify:'shopify.com',aliexpress:'aliexpress.com',temu:'temu.com',shopee:'shopee.com',lazada:'lazada.com','company-sites':'google.com',directories:'yelp.com',exhibitors:'10times.com','trade-records':'importyeti.com','company-registry':'opencorporates.com'}
 const providerDomains:Record<string,string> = {Apify:'apify.com','Bright Data':'brightdata.com',Octoparse:'octoparse.com',Firecrawl:'firecrawl.dev',PhantomBuster:'phantombuster.com',TexAu:'texau.com'}
 const platformLogo=(id:string)=>'https://www.google.com/s2/favicons?domain='+encodeURIComponent(platformDomains[id]||'google.com')+'&sz=64'
-const providerLogo=(name:string)=>'https://www.google.com/s2/favicons?domain='+encodeURIComponent(providerDomains[name]||'apify.com')+'&sz=64'
+const providerLogo=(name:string)=>providerDomains[name]?'https://www.google.com/s2/favicons?domain='+encodeURIComponent(providerDomains[name])+'&sz=64':''
 const searchTerms: Record<string,string> = Object.fromEntries(platformGroups.flatMap(g=>g.items.map(([id,,term])=>[id,term])))
 const portCatalog = [
  ['USLAX','Los Angeles, United States'],['USLGB','Long Beach, United States'],['USNYC','New York, United States'],['USMIA','Miami, United States'],['CAVAN','Vancouver, Canada'],['CATOR','Toronto, Canada'],['CNSHA','Shanghai, China'],['CNNGB','Ningbo, China'],['CNSZX','Shenzhen, China'],['CNYTN','Yantian, China'],['HKHKG','Hong Kong'],['SGSIN','Singapore'],['KRPUS','Busan, South Korea'],['JPTYO','Tokyo, Japan'],['JPYOK','Yokohama, Japan'],['TWKHH','Kaohsiung, Taiwan'],['NLRTM','Rotterdam, Netherlands'],['DEHAM','Hamburg, Germany'],['BEANR','Antwerp, Belgium'],['GBFXT','Felixstowe, United Kingdom'],['AEJEA','Jebel Ali, United Arab Emirates'],['AEDXB','Dubai, United Arab Emirates'],['INMUN','Mundra, India'],['INNSA','Nhava Sheva, India'],['BRSSZ','Santos, Brazil'],['MXZLO','Manzanillo, Mexico'],['AUSYD','Sydney, Australia'],['ZADUR','Durban, South Africa'],['ESBCN','Barcelona, Spain'],['FRLEH','Le Havre, France']
@@ -60,7 +60,7 @@ const nominatim = async (params: Record<string,string>) => {
  Object.entries({format:'jsonv2',addressdetails:'1',dedupe:'1',limit:'30',...params}).forEach(([k,v])=>url.searchParams.set(k,v))
  const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } })
  if (!response.ok) throw new Error('OpenStreetMap 地点服务暂时不可用')
- return await response.json() as Array<{ place_id:number; display_name:string; name?:string; address?:Record<string,string>; type?:string; class?:string }>
+ return await response.json() as Array<{ place_id:number; display_name:string; name?:string; address?:Record<string,string>; type?:string; class?:string; osm_type?:string; osm_id?:number }>
 }
 
 const osmRegions = async (countryCode:string,countryName:string) => {
@@ -149,9 +149,10 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
 
  useEffect(()=>{ setProvider(availableProviders[0] || 'Apify'); setActor(null); setSchema(null); setActors([]); setValues({}); setMapping({}); setError(''); setNotice('') },[channel])
  useEffect(()=>{ setActor(null);setSchema(null);setValues({});setMapping({});setError('');setNotice('') },[provider])
+ useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label)},[channel])
  useEffect(()=>{
   let active=true
-  if(!countryCode){setRegionResults([]);setRegion('');setCity('');return}
+  if(!countryCode){setRegionResults([]);setRegion('__all__');setCity('');return}
   setLocationBusy(true);setRegion('');setCity('');setCityQuery('')
   const timer=setTimeout(async()=>{
    try {const results=await osmRegions(countryCode,selectedCountry?.geoName||selectedCountry?.name||countryCode);if(active){setRegionResults(results);setRegion('__all__')}}
@@ -285,7 +286,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     </div>)}</div>
    </section>
    <section className="ldw-card"><div className="ldw-step-title"><span>02</span><div><h3>选择数据供应商</h3><p>仅显示当前平台有对应产品的供应商。</p></div></div>
-    <div className="ldw-provider-grid">{availableProviders.map(name=><button key={name} className={provider===name?'selected':''} onClick={()=>setProvider(name)}><span className="ldw-provider-name"><img className="ldw-brand-logo" src={providerLogo(name)} alt="" loading="lazy"/><b>{name}</b>{provider===name&&<Check size={13}/>}</span><small>{providerDescriptions[name]||'查看该供应商支持的采集能力。'}</small></button>)}</div>
+    <div className="ldw-provider-grid">{availableProviders.map(name=><button key={name} className={provider===name?'selected':''} onClick={()=>setProvider(name)}><span className="ldw-provider-name">{providerLogo(name)?<img className="ldw-brand-logo" src={providerLogo(name)} alt="" loading="lazy"/>:<span className="ldw-brand-fallback">{name.slice(0,1)}</span>}<b>{name}</b>{provider===name&&<Check size={13}/>}</span><small>{providerDescriptions[name]||'查看该供应商支持的采集能力。'}</small></button>)}</div>
     {provider!=='Apify'&&<div className="ldw-provider-note">该供应商已列入平台目录；此版本的动态 Actor Schema 流程先支持 Apify。其他供应商需要各自的产品目录与参数 Schema，不能错误地套用 Apify Actor。</div>}
    </section>
   </div>
