@@ -23,3 +23,13 @@ The lead discovery wizard is AI-first:
 - The final task snapshot stores the exact validated actor_input sent for execution, together with the conversation and field explanations.
 
 The conversational Worker source is maintained in `workers/ouranos-ai-assistant/index.js` and deployed as `ouranos-ai-assistant`.
+
+
+## Workers AI context budgeting and Odoo-style UI
+
+- Actor input Schema is compacted without removing root required keys or core type/format/range/pattern constraints.
+- Large Actor inputs are split into small Schema property batches and processed sequentially; each batch only receives the relevant previous parameter values.
+- Conversation history is bounded to the latest six short messages; long descriptions, examples and oversized enums are compacted. Full Schema remains the source of truth for frontend validation and task submission.
+- Output token budgets are sized per batch. Context-limit errors trigger a recursive split instead of returning a raw provider 5021 error.
+- Oversized enums are marked as truncated for AI context; the AI must ask for an explicit choice rather than guessing. The frontend still validates against the complete original enum.
+- The lead-discovery UI uses an Odoo-inspired purple backend navbar, compact panels, neutral workspace background, square controls, and restrained status colors.
