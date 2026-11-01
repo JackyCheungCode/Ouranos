@@ -27,7 +27,8 @@ function trimSchema(schema, depth = 0) {
   return result;
 }
 function rejectUnknownKeys(value, schema, path = "actor_input") {
-  if (!value || typeof value !== "object" || Array.isArray(value) || !schema?.properties) return [];
+  if (Array.isArray(value)) return schema?.items ? value.flatMap((item, index) => rejectUnknownKeys(item, schema.items, path + "[" + index + "]")) : [];
+  if (!value || typeof value !== "object" || !schema?.properties) return [];
   const errors = [];
   for (const [key, childValue] of Object.entries(value)) {
     const childSchema = schema.properties[key];
