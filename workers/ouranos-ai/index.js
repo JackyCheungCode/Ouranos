@@ -1,6 +1,5 @@
 const ALLOWED_MODELS = new Set([
   "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-  "@cf/meta/llama-3.1-8b-instruct",
   "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
 ]);
 const allowedOrigin = (origin) => origin === "https://ouranos-1b3.pages.dev" ||
