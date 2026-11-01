@@ -236,13 +236,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   if(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0){setError('请设置大于 0 的单次费用上限。');return}
   setBusy(true);setError('')
   try {
-   const actorInput:Record<string,unknown>={}
-   for(const [key,field] of schemaKeys(schema)){
-    const value=values[key]
-    if(field.type==='array'||field.type==='object'){
-     if(typeof value==='string'&&value.trim()){try{actorInput[key]=JSON.parse(value)}catch{throw new Error((field.title||key)+' 必须是有效 JSON')}}
-    }else if(value!==''&&value!==undefined)actorInput[key]=value
-   }
+   const actorInput:Record<string,unknown>={...schemaValidation.payload}
    const locationText=[city,region!=='__all__'?region:'',selectedCountry?.geoName].filter(Boolean).join(', ')
    for(const [key,field] of schemaKeys(schema)){
     if(actorInput[key]!==undefined&&actorInput[key]!=='' )continue
