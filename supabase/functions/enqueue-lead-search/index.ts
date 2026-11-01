@@ -56,6 +56,11 @@ Deno.serve(async(req:Request)=>{
   }
   const insert=await rest("lead_task_runs?on_conflict=workspace_id,idempotency_key",admin,{method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=representation"},body:JSON.stringify(runPayloads)});if(!insert.ok){const text=await insert.text();return json({error:"Unable to enqueue adapter runs",details:text.slice(0,1000)},500,origin);}
   const created=await insert.json();const update=await rest(`lead_search_tasks?workspace_id=eq.${encodeURIComponent(workspaceId)}&id=eq.${encodeURIComponent(taskId)}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"queued",cost_approved:true,cost_approved_at:new Date().toISOString(),cost_approved_by:user.id,updated_at:new Date().toISOString()})});if(!update.ok)return json({error:"Runs queued but task status could not be updated"},500,origin);
-  return json({ok:true,task_id:taskId,queued_runs:Array.isArray(created)?created.length:0,adapters:runPayloads.map(r=>({provider_key:r.provider_key,channel_key:r.channel_key,adapter_key:r.adapter_key})),message:"搜索任务已进入队列。只有启用的渠道适配器会被执行。"},200,origin);
+  let workerStarted=false;
+  try{
+   const workerSecretResponse=await rest("rpc/integration_secret_read",admin,{method:"POST",body:JSON.stringify({p_secret_id:"8052bb93-5044-4e23-a0ac-481bfb7fbadf"})});
+   if(workerSecretResponse.ok){const workerSecret=await workerSecretResponse.json();const workerResponse=await fetch(`${url}/functions/v1/discovery-worker`,{method:"POST",headers:{"Content-Type":"application/json","x-worker-secret":String(workerSecret)},body:JSON.stringify({limit:10})});workerStarted=workerResponse.ok;}
+  }catch{/* The scheduled worker will pick up queued runs. */}
+  return json({ok:true,task_id:taskId,queued_runs:Array.isArray(created)?created.length:0,worker_started:workerStarted,adapters:runPayloads.map(r=>({provider_key:r.provider_key,channel_key:r.channel_key,adapter_key:r.adapter_key})),message:"搜索任务已进入队列。只有启用的渠道适配器会被执行。"},200,origin);
  }catch(error){return json({error:error instanceof Error?error.message:"Unexpected task enqueue error"},500,req.headers.get("origin"));}
 });
