@@ -29,7 +29,7 @@ export const apps: AppItem[] = [
   { id:'quotations',name:'报价管理',subtitle:'价格与报价单',group:'sales',icon:FileText,color:'#C18A32',description:'创建、整理并跟踪客户报价单及商务条款。' },
   { id:'sales-activities',name:'销售活动',subtitle:'电话与会议',group:'sales',icon:ClipboardList,color:'#4776B8',description:'记录电话、会议、邮件以及下一次客户触达计划。' },
   { id:'data-hub',name:'数据中心',subtitle:'统一数据集',group:'data',icon:Database,color:'#4776B8',description:'导入、整理和浏览来自多个渠道的商业数据。' },
-  { id:'providers',name:'数据服务商',subtitle:'数据源与 API',group:'data',icon:Cloud,color:'#168A9A',description:'管理已连接的数据源、服务状态、用量与成本。' },
+  { id:'providers',name:'数据源目录',subtitle:'服务商能力目录',group:'data',icon:Cloud,color:'#168A9A',description:'浏览外部数据服务商的能力与支持渠道，API 连接配置统一在系统集成中管理。' },
   { id:'enrichment',name:'数据补全',subtitle:'完善数据档案',group:'data',icon:WandSparkles,color:'#A16BB5',description:'为企业和联系人档案补充更多商业信息。' },
   { id:'cleaning',name:'数据清洗',subtitle:'质量与去重',group:'data',icon:Check,color:'#239B82',description:'标准化、验证并去除企业和联系人数据中的重复项。' },
   { id:'trade',name:'贸易情报',subtitle:'进出口数据',group:'data',icon:Boxes,color:'#C16D4A',description:'分析贸易活动、产品编码、采购商、供应商与贸易趋势。' },
