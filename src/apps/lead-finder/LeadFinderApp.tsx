@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, Bot, Building2, Check, CheckCircle2, ChevronDown, CircleHelp, Clock3, Database, Globe2, Plus, Search, Settings2, ShieldCheck, Sparkles, Target, Users, Workflow, X, Inbox, UserRoundCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bot, Building2, Check, CheckCircle2, ChevronDown, CircleHelp, Clock3, Database, Globe2, Plus, Search, Settings2, ShieldCheck, Sparkles, Target, Users, Workflow, Inbox, UserRoundCheck } from 'lucide-react'
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import type { Layer, PathOptions } from 'leaflet'
@@ -113,8 +113,8 @@ function CountryMap({selected}:{selected:Country[]}) {
  const style = (feature?:Feature):PathOptions => {
   const props = feature?.properties as Record<string,string> | undefined
   const name = (props?.ADMIN || props?.name || props?.NAME || '').toLowerCase()
-  const picked = selectedNames.has(name) || (name==='china' && selected.some(c=>c.code==='CN'))
-  return {color:picked?'#714b67':'#c8c4c8',weight:picked?1.5:.55,fillColor:picked?'#a887a0':'#e8e6e8',fillOpacity:picked?.72:.32}
+  const picked = selectedNames.has(name) || (name==='china' && selected.some(c=>c.code==='CN')) || (name.includes('hong kong') && selected.some(c=>c.code==='HK')) || (name.includes('macao') && selected.some(c=>c.code==='MO')) || (name==='taiwan' && selected.some(c=>c.code==='TW'))
+  return {color:picked?'#714b67':'#c8c4c8',weight:picked?1.5:.55,fillColor:picked?'#a887a0':'#e8e6e8',fillOpacity: picked ? 0.72 : 0.32}
  }
  return <div className="lead-map-shell">
   <MapContainer center={[24,5]} zoom={1.35} minZoom={1} maxZoom={7} scrollWheelZoom={false} worldCopyJump style={{height:300,width:'100%'}}>
