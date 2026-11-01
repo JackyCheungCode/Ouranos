@@ -5,6 +5,7 @@ import {
   Sparkles, Workflow, X
 } from 'lucide-react'
 import './SystemIntegrationsApp.css'
+import IntegrationCredentialManager from './IntegrationCredentialManager'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 
@@ -12,6 +13,7 @@ type Section = 'data' | 'ai' | 'logs'
 type Provider = { key: string; name: string; category: string; description: string; channels: string; docs: string; group: 'data' | 'ai' }
 type DataConnection = {provider_key:string;status:string;is_enabled:boolean;last_tested_at:string|null;last_error:string|null}
 type AiConfig = {provider_key:string;provider_name:string;model_name:string;is_default:boolean;is_enabled:boolean;status:string;last_tested_at:string|null;last_error:string|null;base_url:string|null}
+type IntegrationLog = {id:string;created_at:string;provider_name:string;action:string;status:string;message:string|null}
 
 const dataProviders: Provider[] = [
   { key:'apify', name:'Apify', category:'网页采集平台', description:'通过 Actors 运行可配置的数据发现和网页采集任务。', channels:'Google 搜索 · Google Maps · 公开网站', docs:'https://docs.apify.com/', group:'data' },
@@ -42,6 +44,7 @@ export default function SystemIntegrationsApp() {
   const [aiConfigs,setAiConfigs] = useState<AiConfig[]>([])
   const [dbLoading,setDbLoading] = useState(false)
   const [dbError,setDbError] = useState('')
+  const [integrationLogs,setIntegrationLogs] = useState<IntegrationLog[]>([])
   const [section, setSection] = useState<Section>('data')
   const [selectedKey, setSelectedKey] = useState('apify')
   const [query, setQuery] = useState('')
@@ -58,6 +61,7 @@ export default function SystemIntegrationsApp() {
     setDbLoading(false)
   }
   useEffect(()=>{void refreshConnections()},[workspace?.id])
+  useEffect(()=>{if(section!=='logs'||!supabase||!workspace)return;let alive=true;supabase.from('integration_events').select('id,created_at,provider_name,action,status,message').eq('workspace_id',workspace.id).order('created_at',{ascending:false}).limit(200).then(({data,error})=>{if(!alive)return;if(error)setDbError(error.message);else setIntegrationLogs((data||[]) as IntegrationLog[])});return()=>{alive=false}},[section,workspace?.id])
   const providers = section === 'ai' ? aiProviders : dataProviders
   const selected = useMemo(() => [...dataProviders, ...aiProviders].find(item => item.key === selectedKey) ?? providers[0], [selectedKey, providers])
   const selectedDataConnection = dataConnections.find(item=>item.provider_key===selectedKey)
@@ -142,16 +146,17 @@ export default function SystemIntegrationsApp() {
             <div className="int-config-row"><span>最近测试</span><b>{configuredConnection?.last_tested_at?new Date(configuredConnection.last_tested_at).toLocaleString():'从未测试'}</b></div>{configuredConnection?.last_error&&<div className="int-config-row"><span>最近错误</span><b className="int-error-text">{configuredConnection.last_error}</b></div>}
           </div>
           {dbError&&<div className="int-db-error">{dbError}</div>}{dbLoading&&<div className="int-db-loading">正在读取当前工作空间连接配置…</div>}<div className="int-connection-actions">
-            {selected.key !== "works-ai" && <button className="int-primary" onClick={() => setShowDisabledHint(true)}>配置连接 <ArrowRight size={14}/></button>}
+            
             {selected.docs && <a href={selected.docs} target="_blank" rel="noreferrer">查看官方文档 <ExternalLink size={13}/></a>}
           </div>
-          <div className="int-info-box"><ShieldCheck size={17}/><span>{selected.key === "works-ai" ? "Works AI 是 Ouranos 默认模型入口，无需在此录入第三方 API Key。可在 AI 搜索计划中直接选用。" : "连接状态和模型清单已从当前工作空间数据库读取。API Key 的安全录入、更新、删除和真实连接测试将在下一阶段通过服务端 Vault 接口开放。"}</span></div>
+          {selected.key!=='works-ai'&&<IntegrationCredentialManager provider={selected} configured={Boolean(configuredConnection)} modelName={selectedDefaultAi?.model_name} isDefault={selectedDefaultAi?.is_default} onRefresh={refreshConnections}/>}
+          <div className="int-info-box"><ShieldCheck size={17}/><span>{selected.key === "works-ai" ? "Works AI 是 Ouranos 默认模型入口，无需在此录入第三方 API Key。可在 AI 搜索计划中直接选用。" : "凭证通过服务端写入 Supabase Vault；测试成功后才会标记为已连接。未提供无计费验证接口的服务商不会被误标为已连接。"}</span></div>
         </>}
       </section>
     </div> : <section className="int-log-panel">
       <div className="int-log-toolbar"><div><h2>集成日志</h2><p>查看连接测试、API 调用和异常记录。</p></div><button className="int-filter-button"><Settings2 size={14}/> 筛选</button></div>
-      <div className="int-log-table"><div className="int-log-head"><span>时间</span><span>服务商</span><span>操作</span><span>结果</span></div>{integrationLogs.map((log,index)=><div className="int-log-row" key={index}><span>{log.time}</span><span>{log.provider}</span><span>{log.action}</span><span>{log.result}</span></div>)}</div>
-      <div className="int-log-empty"><Activity size={22}/><b>暂无集成日志</b><span>连接服务商后，测试结果和调用记录会显示在这里。</span></div>
+      <div className="int-log-table"><div className="int-log-head"><span>时间</span><span>服务商</span><span>操作</span><span>结果</span></div>{integrationLogs.map(log=><div className="int-log-row" key={log.id}><span>{new Date(log.created_at).toLocaleString()}</span><span>{log.provider_name}</span><span>{log.action==='save'?'保存 / 更新':log.action==='delete'?'删除':'连接测试'}</span><span>{log.message||log.status}</span></div>)}</div>
+      {!integrationLogs.length&&<div className="int-log-empty"><Activity size={22}/><b>暂无集成日志</b><span>凭证保存、删除和连接测试记录会显示在这里。</span></div>}
     </section>}
 
     {showDisabledHint && <div className="int-hint-overlay" role="dialog" aria-modal="true" aria-label="连接配置说明">
