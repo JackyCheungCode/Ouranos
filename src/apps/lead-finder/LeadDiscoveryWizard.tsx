@@ -201,6 +201,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
   if(!schema||!actor||!costConsent)return
+  if(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0){setError('请设置大于 0 的单次费用上限。');return}
   setBusy(true);setError('')
   try {
    const actorInput:Record<string,unknown>={}
@@ -276,7 +277,20 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     {actors.length>0&&<div className="ldw-actor-list">{actors.map(item=><article key={item.id} className={'ldw-actor-card '+(actor?.id===item.id?'selected':'')}><div><b>{item.title||item.name}</b><small>{item.username}/{item.name}</small><p>{item.description||'暂无描述'}</p><small>评分 {item.stats?.actorReviewRating??'—'} · {item.stats?.actorReviewCount??0} 条评价 · 用户 {item.stats?.totalUsers??'—'} · {pricingLabel(item)}</small></div><button onClick={()=>void selectActor(item)} disabled={schemaBusy}>{actor?.id===item.id?'已选择':'选择此 Actor'} <ArrowRight size={13}/></button><a href={item.url||'https://apify.com/'+item.username+'/'+item.name} target="_blank" rel="noreferrer" aria-label="打开 Actor 页面"><ExternalLink size={13}/></a></article>)}</div>}
    </>:<div className="ldw-provider-note">选择 Apify 时可以直接搜索 Actor Store 并读取 Schema。其他供应商将使用各自的模板 / 数据集 / Action 目录，不能把 Actor 机制混用。</div>}
    {schemaBusy&&<div className="ldw-loading"><Loader2 size={16}/> 正在读取 Actor Schema…</div>}
-   {schema&&actor&&<div className="ldw-schema-panel"><div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个动态输入字段 · Schema 来自 Actor 最新构建</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
+   {schema&&actor&&<div className="ldw-schema-panel"><div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个动态输入字段 · Schema 来自 Actor 最新构建 · {pricingLabel(actor)}</small><small>{Number(actor.currentPricingInfo?.pricePerUnitUsd)>0?'按 '+targetCount+' 条估算约 </div>
+    <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>
+    <details className="ldw-mapping"><summary>高级设置：输出字段映射</summary><p>自动根据常见字段名称匹配企业名称、网站、电话等字段；如 Actor 输出字段特殊，可在这里调整。</p><div className="ldw-mapping-grid">{Object.entries(mapping).map(([key,value])=><label className="ldw-field" key={key}><span>{key}</span><input value={value} onChange={e=>setMapping(current=>({...current,[key]:e.target.value}))}/></label>)}</div></details>
+   </div>}
+  </section>
+  <section className="ldw-card"><div className="ldw-step-title"><span>05</span><div><h3>搜索任务设置</h3><p>确认关键词、数量和收费授权后才会创建执行任务。</p></div></div>
+   <div className="ldw-location-grid"><label className="ldw-field"><span>任务名称</span><input value={taskName} onChange={e=>setTaskName(e.target.value)} placeholder="例如：美国加州牙科诊所潜客"/></label><label className="ldw-field"><span>产品 / 服务</span><input value={product} onChange={e=>setProduct(e.target.value)} placeholder="例如：工业泵、汽车配件、牙科服务"/></label><label className="ldw-field"><span>目标行业</span><input value={industry} onChange={e=>setIndustry(e.target.value)} placeholder="例如：制造业、医疗、批发贸易"/></label><label className="ldw-field"><span>搜索关键词</span><input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="例如：Dental clinic, importer, wholesaler"/></label><label className="ldw-field"><span>目标数量 / 计费条数上限</span><select value={targetCount} onChange={e=>setTargetCount(e.target.value)}><option value="50">最多 50 条</option><option value="100">最多 100 条</option><option value="250">最多 250 条</option><option value="500">最多 500 条</option><option value="1000">最多 1,000 条</option></select><small>Apify 支持的按结果计费 Actor 会使用 maxItems 费用上限。</small></label><label className="ldw-field"><span>单次费用上限（USD）</span><input type="number" min="0.5" max="1000" step="0.5" value={maxCost} onChange={e=>setMaxCost(e.target.value)}/><small>按事件计费 Actor 会使用 Apify maxTotalChargeUsd 限额。</small></label><div className="ldw-field"><span>搜索对象</span><div className="ldw-target-types"><button type="button" className={targetType==='companies'?'selected':''} onClick={()=>setTargetType('companies')}>企业</button><button type="button" className={targetType==='contacts'?'selected':''} onClick={()=>setTargetType('contacts')}>联系人</button><button type="button" className={targetType==='both'?'selected':''} onClick={()=>setTargetType('both')}>企业 + 联系人</button></div></div></div>
+   <label className="ldw-consent"><input type="checkbox" checked={costConsent} onChange={e=>setCostConsent(e.target.checked)}/><span>我确认已查看所选 Actor 的价格和使用政策，并授权启动采集；本次设置的单次费用上限为 ${maxCost||'0'}.</span></label>
+   {error&&<div className="ldw-error">{error}</div>}{notice&&<div className="ldw-notice">{notice}</div>}
+   <div className="ldw-submit-row"><span>创建任务不会自动推广为正式客户；结果先进入待审核线索。</span><button disabled={!schema||!actor||!costConsent||busy} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认并启动搜索'} <ArrowRight size={15}/></button></div>
+  </section>
+ </div>
+}
++(Number(actor.currentPricingInfo?.pricePerUnitUsd)*Number(targetCount)).toFixed(2):'最终费用以 Actor 计费模型和实际使用量为准'}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
     <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>
     <details className="ldw-mapping"><summary>高级设置：输出字段映射</summary><p>自动根据常见字段名称匹配企业名称、网站、电话等字段；如 Actor 输出字段特殊，可在这里调整。</p><div className="ldw-mapping-grid">{Object.entries(mapping).map(([key,value])=><label className="ldw-field" key={key}><span>{key}</span><input value={value} onChange={e=>setMapping(current=>({...current,[key]:e.target.value}))}/></label>)}</div></details>
    </div>}
