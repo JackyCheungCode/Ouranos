@@ -38,3 +38,30 @@ Adapters retain the provider's raw payload. Field mapping converts source-specif
 ## Cost and safety
 
 Pricing is adapter-specific. Store provider-reported credits, usage units, currency, cost amount, cost basis and the provider response metadata on each run. A connection test must prefer a documented, non-billable authentication/metadata endpoint. If a provider offers no such endpoint, Ouranos reports that limitation and does not send a paid scrape just to display “connected”.
+
+## Provider-specific execution contracts
+
+The seven providers must not be flattened into one request format:
+
+| Provider | Concrete execution unit | Inputs / lifecycle to preserve |
+| --- | --- | --- |
+| Apify | Actor ID + build | Each Actor's own input/output schema; run ID; default dataset ID; dataset pagination; Actor-specific pricing |
+| Bright Data | Dataset ID / scraper product | Dataset-specific input fields; sync scrape or async trigger; snapshot ID; progress polling; result download; dataset pricing |
+| Octoparse | AgentTools template or existing task | Template inputSchema; source-tree option keys; parameters serialized as JSON string; task ID; export status and retry guidance; external user ID |
+| Firecrawl | Search, scrape or crawl operation | Different request schemas per operation; crawl job ID; status polling; page limits and credit usage |
+| PhantomBuster | Agent ID + agent argument | Agent-specific argument schema; launch/container ID; output/status polling; result-object or output URL |
+| TexAu | Named REST action | Per-action request/response schema; x-api-key; sync vs async execution ID; action-level credit/billing and webhook/inquiry flow |
+| 跨境魔方 | Named API endpoint | Endpoint-specific filters and country/product/company fields; page size; returned field schema; per-endpoint RMB pricing |
+
+A provider adapter is responsible for its own authentication header, endpoint paths, request serialization, async lifecycle, pagination, retry classification, result extraction and usage/cost parsing. The orchestrator only sees the shared adapter interface and normalized run outcome.
+
+### Initial verified provider behaviors
+
+- Apify uses Bearer API tokens and exposes Actor metadata/build schemas. Its input schema is a JSON Schema-like document and is the source of truth for per-Actor forms.
+- Octoparse AgentTools uses x-api-key; searchTemplates exposes each template's inputSchema and outputSchema. executeTask additionally needs an external user ID and JSON-stringified parameters; exportData returns the async collection/export state.
+- PhantomBuster uses X-Phantombuster-Key-1; launch returns a container ID that is used to poll output/status.
+- TexAu's current API uses https://v3-api.texau.com/api/v1 and x-api-key. It exposes action-specific request schemas and has sync/async actions; successful requests may consume credits.
+- Bright Data's Web Scraper API uses Bearer tokens and a dataset trigger/progress/download lifecycle.
+- Cross-border Magic documents Bearer API-key auth and per-endpoint usage prices. The adapter must check price/expected rows before scheduling a paid endpoint.
+
+Do not use a provider's API key test as proof that every Actor, dataset, template, agent or action is available. Connection authentication and channel adapter readiness are separate statuses.
