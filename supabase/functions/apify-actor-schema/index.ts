@@ -20,12 +20,12 @@ Deno.serve(async(req:Request)=>{
   const secretResponse=await rest("rpc/integration_secret_read",admin,{method:"POST",body:JSON.stringify({p_secret_id:connection.secret_ref})});if(!secretResponse.ok)return json({error:"Unable to read Apify token from Vault"},500,origin);
   const secret=await secretResponse.json();let credentials:Record<string,unknown>={api_key:secret};try{const parsed=JSON.parse(String(secret));if(parsed&&typeof parsed==="object")credentials=parsed;}catch{}const apiKey=String(credentials.api_key||"");if(!apiKey)return json({error:"Apify credential payload is invalid"},500,origin);
   const headers={Authorization:`Bearer ${apiKey}`,Accept:"application/json"};const signal=AbortSignal.timeout(15000);
-  const actorResponse=await fetch(`https://api.apify.com/v2/acts/${encodeURIComponent(actorId)}`,{headers,signal});if(!actorResponse.ok){const msg=actorResponse.status===401?"Apify API Key 无效":actorResponse.status===404?"找不到该 Actor，请检查 Actor ID 或账户权限":`Apify Actor 查询失败（HTTP ${actorResponse.status}）`;return json({error:msg,status_code:actorResponse.status},400,origin);}
+  const actorResponse=await fetch(`https://api.apify.com/v2/actors/${encodeURIComponent(actorId)}`,{headers,signal});if(!actorResponse.ok){const msg=actorResponse.status===401?"Apify API Key 无效":actorResponse.status===404?"找不到该 Actor，请检查 Actor ID 或账户权限":`Apify Actor 查询失败（HTTP ${actorResponse.status}）`;return json({error:msg,status_code:actorResponse.status},400,origin);}
   const actorBody=await actorResponse.json();const actor=actorBody.data||actorBody;
-  const buildResponse=await fetch(`https://api.apify.com/v2/acts/${encodeURIComponent(actorId)}/builds/latest`,{headers,signal});if(!buildResponse.ok)return json({error:`无法读取 Actor 最新构建（HTTP ${buildResponse.status}）`},400,origin);
+  const buildResponse=await fetch(`https://api.apify.com/v2/actors/${encodeURIComponent(actorId)}/builds/default`,{headers,signal});if(!buildResponse.ok)return json({error:`无法读取 Actor 最新构建（HTTP ${buildResponse.status}）`},400,origin);
   const buildBody=await buildResponse.json();const build=buildBody.data||buildBody;
-  let inputSchema=build.input||null;if(!inputSchema&&typeof build.inputSchema==="string"){try{inputSchema=JSON.parse(build.inputSchema)}catch{}}
-  const outputSchema=build.output||build.storages?.dataset||{};
+  let inputSchema=build.actorDefinition?.input||build.input||null;if(!inputSchema&&typeof build.inputSchema==="string"){try{inputSchema=JSON.parse(build.inputSchema)}catch{}}
+  const outputSchema=build.actorDefinition?.output||build.actorDefinition?.storages?.dataset||build.storages?.dataset||{};
   if(!inputSchema||typeof inputSchema!=="object")return json({error:"该 Actor 没有可读取的 input schema，暂不能自动生成配置表单"},422,origin);
   const adapterKey=`apify-${channelKey}-${actorId.toLowerCase().replace(/[^a-z0-9_-]/g,"-").slice(0,110)}`;
   const adapterName=String(actor.title||actor.name||actorId).slice(0,160);
