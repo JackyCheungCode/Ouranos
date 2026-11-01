@@ -190,9 +190,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label)},[channel])
  useEffect(()=>{
   let active=true
-  if(!countryCode){setRegionResults([]);setRegion('__all__');setRegionManual('');setCity('');setMapLocation(null);setRegionLoadError('');return}
+  if(!countryCode){setRegionResults([]);setRegion('__all__');setRegionManual('');setCity('');setMapLocation(null);setRegionLoadError('');setLocationBusy(false);return}
   const countryName=selectedCountry?.geoName||selectedCountry?.name||countryCode
-  setLocationBusy(true);setRegion('__all__');setRegionManual('');setCity('');setCityQuery('');setRegionLoadError('')
+  setLocationBusy(true);setRegion('__all__');setRegionManual('');setCity('');setCityQuery('');setMapLocation(null);setRegionLoadError('')
   const timer=setTimeout(async()=>{
    const [regions,geocode]=await Promise.allSettled([
     osmRegions(countryCode,countryName),
