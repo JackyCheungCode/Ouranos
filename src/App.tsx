@@ -52,7 +52,7 @@ const apps: AppItem[] = [
   { id:'integrations',name:'Integrations',subtitle:'Connect services',group:'admin',icon:Network,color:'#C18A4A',description:'Connect external tools and configure approved integrations.' },
 ]
 const recentIds = ['lead-finder','companies','crm','market-intel']
-const initialFavorites = ['dashboard','lead-finder','crm','ai-research']
+const initialFavorites = ['dashboard','lead-finder','crm','research']
 
 function AppTile({ app, onOpen, favorite, onFavorite }: { app: AppItem; onOpen: (app: AppItem)=>void; favorite: boolean; onFavorite: (id:string)=>void }) {
   const Icon = app.icon
@@ -93,7 +93,7 @@ export default function App() {
       <aside className={sidebarOpen?'sidebar':'sidebar collapsed'}>
         <button className="workspace-switch"><span className="workspace-avatar">O</span><span className="workspace-text"><b>Ouranos Workspace</b><small>Enterprise plan</small></span><ChevronDown size={15}/></button>
         <div className="side-label">WORKSPACE</div>
-        <button className={!active?'side-link selected':'side-link'} onClick={()=>setActive(null)}><Home size={17}/> <span>Apps</span><span className="side-count">24</span></button>
+        <button className={!active?'side-link selected':'side-link'} onClick={()=>setActive(null)}><Home size={17}/> <span>Apps</span><span className="side-count">{apps.length}</span></button>
         <button className="side-link" onClick={()=>{setFilter('favorites');setActive(null)}}><Star size={17}/> <span>Favorites</span></button>
         <button className="side-link" onClick={()=>{setFilter('all');setActive(null)}}><Activity size={17}/> <span>Recent</span></button>
         <div className="side-label side-label-spaced">APP CATEGORIES</div>
