@@ -32,3 +32,10 @@
 .provider-adapter-note,.provider-adapter-success{display:flex;align-items:center;gap:7px;margin-top:12px;padding:9px;background:#f7f7f8;border-radius:3px;font-size:10px;color:#6b7280}
 .provider-adapter-success{background:#eef8f0;color:#287a3e}
 @media(max-width:680px){.provider-adapter-form{grid-template-columns:1fr}.provider-adapter-schema-preview,.provider-adapter-dataset,.provider-adapter-toolbar{grid-column:auto}}
+
+.provider-adapter-sample{margin-top:12px;max-width:760px}
+.provider-adapter-sample label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:600}
+.provider-adapter-sample small{font-size:9px;color:#6b7280;font-weight:400}
+.provider-adapter-sample textarea{width:100%;box-sizing:border-box;border:1px solid #cfd2d6;border-radius:3px;padding:9px;font:10px/1.5 ui-monospace,monospace;color:#374151;background:#fff;resize:vertical}
+.provider-adapter-list article button{display:inline-flex;align-items:center;gap:5px;border:1px solid #d8dadd;border-radius:3px;background:#fff;color:#714b67;padding:6px 8px;font-size:10px;cursor:pointer}
+.provider-adapter-list article button:disabled{opacity:.45;cursor:not-allowed}
