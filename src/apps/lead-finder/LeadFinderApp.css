@@ -131,3 +131,34 @@
 .lead-raw-result-head small{color:var(--muted,#6b7280);font-size:12px}
 .lead-raw-result-item>a{display:inline-flex;align-items:center;gap:5px;font-size:13px}
 .lead-raw-result-json{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:auto;max-height:420px;overflow-y:auto;padding:14px;border-radius:9px;background:var(--surface-muted,#f6f7f8);font-size:12px;line-height:1.55}
+
+
+/* Odoo 20 workspace integration */
+.ouranos-platform .lead-workspace{--lead-ink:#374151;--lead-muted:#6b7280;--lead-border:#d8dadd;--lead-panel:#fff;--lead-soft:#f7f7f8;color:#374151;padding:22px 28px 34px;max-width:1600px;margin:0 auto;font-family:'DM Sans','Noto Sans SC',sans-serif}
+.ouranos-platform .lead-page-head{align-items:center;margin:0 0 14px;padding:0 0 12px;border-bottom:1px solid #e5e7eb}
+.ouranos-platform .lead-page-head h1{font:600 21px 'DM Sans','Noto Sans SC',sans-serif;letter-spacing:0;margin:3px 0 0;color:#34313a}
+.ouranos-platform .lead-eyebrow,.ouranos-platform .lead-step{font-size:9px;letter-spacing:.7px;color:#8b7187}
+.ouranos-platform .lead-mode-pill{padding:6px 9px;border:1px solid #e7dfe7;border-radius:3px;background:#f7f3f7;font-size:10px}
+.ouranos-platform .lead-tabs{gap:18px;margin-bottom:14px;border-bottom:1px solid #d8dadd}
+.ouranos-platform .lead-tabs button{padding:0 3px 9px;font-size:11px;border-radius:0}
+.ouranos-platform .lead-tabs button.active{color:#714b67;border-bottom-color:#714b67}
+.ouranos-platform .lead-card,.ouranos-platform .lead-side-card,.ouranos-platform .lead-content-panel,.ouranos-platform .ldw-card,.ouranos-platform .ldp-card{border-radius:4px;box-shadow:none}
+.ouranos-platform .lead-card,.ouranos-platform .lead-side-card,.ouranos-platform .lead-content-panel{padding:14px}
+.ouranos-platform .lead-quiet-button,.ouranos-platform .lead-primary-button,.ouranos-platform .lead-task-start,.ouranos-platform .ldw-shell button{border-radius:3px}
+.ouranos-platform .lead-quiet-button{padding:7px 9px;font-size:10px}
+.ouranos-platform .lead-primary-button{border-radius:3px;font-size:10px}
+.ouranos-platform .lead-search-layout{gap:12px}
+.ouranos-platform .lead-content-heading{margin-bottom:12px}
+.ouranos-platform .lead-content-heading h2,.ouranos-platform .lead-card-heading h2{font-size:13px}
+.ouranos-platform .lead-content-heading p,.ouranos-platform .lead-card-heading p{font-size:9px}
+.ouranos-platform .ldp-selected-head{margin-bottom:12px}
+.ouranos-platform .ldp-selected-head h2{font-size:16px}
+.ouranos-platform .ldp-selected-head p{display:none}
+.ouranos-platform .ldw-workflow-head p,.ouranos-platform .ldw-step-title p{display:none}
+.ouranos-platform .ldw-workflow-head{margin-bottom:10px}
+.ouranos-platform .ldw-card{padding:13px}
+.ouranos-platform .ldw-step-title{margin-bottom:9px}
+.ouranos-platform .ldw-step-title h3{font-size:12px}
+.ouranos-platform .ldw-provider-note{font-size:9px}
+.ouranos-platform .lead-empty-state{border-radius:4px}
+@media(max-width:720px){.ouranos-platform .lead-workspace{padding:16px 12px 26px}.ouranos-platform .lead-tabs{gap:12px;overflow-x:auto}.ouranos-platform .lead-tabs button{white-space:nowrap}}

@@ -10,13 +10,14 @@ import './LeadDiscoveryWizard.css'
 import type { DiscoveryPageDefinition } from './DiscoveryPageHub'
 
 type Props = { workspaceId: string; userId: string; onTaskCreated: () => void; page: DiscoveryPageDefinition }
-type Actor = { id: string; name: string; username: string; title: string; description: string; url: string; stats?: { totalUsers?: number; actorReviewRating?: number; actorReviewCount?: number }; currentPricingInfo?: Record<string, unknown> }
+type Actor = { id: string; name: string; username: string; title: string; description: string; url: string; adapterKey?:string; stats?: { totalUsers?: number; actorReviewRating?: number; actorReviewCount?: number }; currentPricingInfo?: Record<string, unknown> }
 type SchemaField = { title?: string; description?: string; type?: string | string[]; editor?: string; default?: unknown; prefill?: unknown; example?: unknown; placeholderValue?: string; enum?: unknown[]; items?: SchemaField; properties?: Record<string, SchemaField>; required?: string[]; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; minItems?: number; maxItems?: number; pattern?: string; format?: string }
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
 type MapLocation = { lat:number; lon:number; label:string }
 type ChatMessage = { role:'user'|'assistant'; content:string }
 type DirectoryPlatform = { platform_key:string; platform_name:string; category_key:string; search_terms:string; description:string; sort_order:number }
 type DirectoryProvider = { provider_key:string; provider_name:string; provider_type:string; description:string; is_active:boolean; sort_order:number }
+type ProviderAdapterRow={adapter_key:string;config:Record<string,unknown>;discovery_adapter_catalog:{adapter_name:string;external_actor_id:string;input_schema:JsonSchema;verification_status:string;maintenance_status:string;is_active:boolean;provider_key:string;pricing_model?:Record<string,unknown>}}
 const marketMarkerIcon=divIcon({className:'ldw-map-marker',html:'<span></span>',iconSize:[22,22],iconAnchor:[11,11]})
 const platformGroups = [
  { label: '搜索引擎与地图', items: [['google-maps','Google Maps','google maps business places'],['google-search','Google Search','google search results'],['bing','Bing','bing search results'],['yelp','Yelp','yelp business'] ] },
@@ -41,6 +42,7 @@ const portCatalog = [
  ['USLAX','Los Angeles, United States'],['USLGB','Long Beach, United States'],['USNYC','New York, United States'],['USMIA','Miami, United States'],['CAVAN','Vancouver, Canada'],['CATOR','Toronto, Canada'],['CNSHA','Shanghai, China'],['CNNGB','Ningbo, China'],['CNSZX','Shenzhen, China'],['CNYTN','Yantian, China'],['HKHKG','Hong Kong'],['SGSIN','Singapore'],['KRPUS','Busan, South Korea'],['JPTYO','Tokyo, Japan'],['JPYOK','Yokohama, Japan'],['TWKHH','Kaohsiung, Taiwan'],['NLRTM','Rotterdam, Netherlands'],['DEHAM','Hamburg, Germany'],['BEANR','Antwerp, Belgium'],['GBFXT','Felixstowe, United Kingdom'],['AEJEA','Jebel Ali, United Arab Emirates'],['AEDXB','Dubai, United Arab Emirates'],['INMUN','Mundra, India'],['INNSA','Nhava Sheva, India'],['BRSSZ','Santos, Brazil'],['MXZLO','Manzanillo, Mexico'],['AUSYD','Sydney, Australia'],['ZADUR','Durban, South Africa'],['ESBCN','Barcelona, Spain'],['FRLEH','Le Havre, France']
 ] as const
 
+const providerKeyOf=(name:string)=>({apify:'apify','bright data':'brightdata',brightdata:'brightdata',firecrawl:'firecrawl',octoparse:'octoparse',phantombuster:'phantombuster',texau:'texau','跨境魔方':'kuajingmofang'} as Record<string,string>)[name.trim().toLowerCase()]||name.trim().toLowerCase().replace(/[^a-z0-9]/g,'')
 const providerDescriptions: Record<string,string> = { Apify:'搜索 Apify Store 中可用的 Actors，并读取每个 Actor 自己的输入 Schema。', 'Bright Data':'数据集 / Scraper 产品目录与专属输入参数。', Octoparse:'模板任务与参数 Schema。', Firecrawl:'网站搜索、抓取与提取操作。', PhantomBuster:'Agent 工作流及参数。', TexAu:'自动化 Action 与参数。', '跨境魔方':'跨境电商数据 API 与接口参数。' }
 const schemaKeys = (schema: JsonSchema) => Object.entries(schema.properties || {})
 const stableStringify=(value:unknown):string=>Array.isArray(value)?'['+value.map(stableStringify).join(',')+']':value&&typeof value==='object'?'{'+Object.keys(value as Record<string,unknown>).sort().map(k=>JSON.stringify(k)+':'+stableStringify((value as Record<string,unknown>)[k])).join(',')+'}':JSON.stringify(value)??'null'
@@ -115,6 +117,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [directoryPlatforms,setDirectoryPlatforms] = useState<DirectoryPlatform[]>([])
  const [directoryReady,setDirectoryReady] = useState(false)
  const [directoryProviders,setDirectoryProviders] = useState<DirectoryProvider[]>([])
+ const [providerConnections,setProviderConnections] = useState<Record<string,boolean>>({})
+ const [providerAdapters,setProviderAdapters] = useState<ProviderAdapterRow[]>([])
+ const [selectedAdapterKey,setSelectedAdapterKey] = useState('')
  const [selectedCategory,setSelectedCategory] = useState('search')
  const [aiSidebarOpen,setAiSidebarOpen] = useState(false)
  useEffect(()=>{let active=true;if(!supabase){setDirectoryReady(true);return}
@@ -218,8 +223,19 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const categories = [...new Set(pagePlatforms.map(item=>item.category_key))]
  const visiblePlatforms = pagePlatforms.filter(item=>item.category_key===selectedCategory)
  const categoryLabels:Record<string,string>={social:'社交媒体',search:'搜索与地图',b2b:'B2B 商业平台',commerce:'电商平台',web:'企业网站与商业数据'}
- const canSearchSelectedProvider = provider.toLowerCase()==='apify'
+ const selectedProviderKey=providerKeyOf(provider)
+ const canSearchSelectedProvider = ['apify','brightdata','firecrawl'].includes(selectedProviderKey)&&providerConnections[selectedProviderKey]===true
  useEffect(()=>{const first=page.platformKeys.map(key=>directoryPlatforms.find(item=>item.platform_key===key)).find((item):item is DirectoryPlatform=>Boolean(item));if(first){if(!page.platformKeys.includes(channel))setChannel(first.platform_key);setSelectedCategory(first.category_key);setActorQuery(first.search_terms||first.platform_name)}},[page.id,directoryPlatforms])
+ useEffect(()=>{let active=true;if(!supabase||!workspaceId)return()=>{active=false};supabase.from('integration_connections').select('provider_key,provider_name,status,is_enabled').eq('workspace_id',workspaceId).then(({data})=>{if(!active)return;const rows=data||[];setProviderConnections(Object.fromEntries(rows.map(row=>[String(row.provider_key),row.status==='connected'&&row.is_enabled===true])));setDirectoryProviders(current=>{const known=new Set(current.map(item=>item.provider_key));const extras=rows.filter(row=>!known.has(String(row.provider_key))).map((row,index)=>({provider_key:String(row.provider_key),provider_name:String(row.provider_name||row.provider_key),provider_type:'已接入 API',description:'该服务已在系统设置连接；采集执行适配器需按渠道配置。',is_active:true,sort_order:900+index}));return [...current,...extras]})});return()=>{active=false}},[workspaceId])
+ const loadProviderAdapters=async()=>{
+  if(!supabase||!workspaceId||selectedProviderKey==='apify'){setProviderAdapters([]);return}
+  const {data,error:queryError}=await supabase.from('workspace_adapter_selections').select('adapter_key,config,discovery_adapter_catalog!inner(adapter_name,external_actor_id,input_schema,verification_status,maintenance_status,is_active,provider_key,pricing_model)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true).eq('discovery_adapter_catalog.provider_key',selectedProviderKey).order('priority')
+  if(queryError){setError(queryError.message);setProviderAdapters([]);return}
+  const rows=(data||[]) as unknown as ProviderAdapterRow[]
+  setProviderAdapters(rows.filter(row=>row.discovery_adapter_catalog.verification_status==='verified'&&row.discovery_adapter_catalog.maintenance_status==='maintained'&&row.discovery_adapter_catalog.is_active===true))
+ }
+ useEffect(()=>{void loadProviderAdapters()},[workspaceId,channel,selectedProviderKey])
+
  const selectedCountry = countries.find(c=>c.code===countryCode)
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
  const toggleCountry = (code:string) => {
@@ -229,8 +245,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   else if(!next.includes(countryCode)||!countryCode||!selectedCountries.includes(code))setCountryCode(next[next.length-1])
  }
 
- useEffect(()=>{ setActor(null); setSchema(null); setActors([]); setApprovedActors([]); setApprovedOffset(0); setHasMoreApproved(false); setCandidateOffset(0); setHasMoreCandidates(false); setValues({}); setActorVerificationStatus('unverified'); setActorMaintenanceStatus('unmaintained'); setError(''); setNotice('') },[channel])
- useEffect(()=>{ setActor(null);setSchema(null);setValues({});setActorVerificationStatus('unverified');setActorMaintenanceStatus('unmaintained');setError('');setNotice('') },[provider])
+ useEffect(()=>{ setActor(null); setSchema(null); setSelectedAdapterKey(''); setProviderAdapters([]); setActors([]); setApprovedActors([]); setApprovedOffset(0); setHasMoreApproved(false); setCandidateOffset(0); setHasMoreCandidates(false); setValues({}); setActorVerificationStatus('unverified'); setActorMaintenanceStatus('unmaintained'); setError(''); setNotice('') },[channel])
+ useEffect(()=>{ setActor(null);setSchema(null);setSelectedAdapterKey('');setValues({});setActorVerificationStatus('unverified');setActorMaintenanceStatus('unmaintained');setError('');setNotice('') },[provider])
  useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label);const current=directoryPlatforms.find(item=>item.platform_key===channel);if(current)setSelectedCategory(current.category_key)},[channel,directoryPlatforms])
  useEffect(()=>{
   let active=true
@@ -266,7 +282,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
 
  const loadApprovedActors = async (offset=0,append=false) => {
-  if(!supabase||!workspaceId){setApprovedActors([]);setApprovedOffset(0);setHasMoreApproved(false);return}
+  if(!supabase||!workspaceId||selectedProviderKey!=='apify'){setApprovedActors([]);setApprovedOffset(0);setHasMoreApproved(false);return}
   setApprovedBusy(true)
   try {
    const connection=await supabase.from('integration_connections').select('status,is_enabled').eq('workspace_id',workspaceId).eq('provider_key','apify').maybeSingle()
@@ -286,7 +302,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     const id=String(row.external_actor_id||'');const [username,name]=id.split('~')
     const caps=(row.capabilities||{}) as Record<string,unknown>
     const types=Array.isArray(row.supported_record_types)?(row.supported_record_types as string[]).map(x=>x==='company'?'企业':'联系人').join(' / '):'客户资料'
-    return {id,title:String(row.adapter_name||name||id),name:name||id,username:username||'',description:'已审核 · 已在当前工作空间启用 · 支持'+types+' · Build '+String(row.adapter_version||''),url:String(caps.actor_url||''),currentPricingInfo:(row.pricing_model||{}) as Record<string,unknown>}
+    return {id,title:String(row.adapter_name||name||id),name:name||id,username:username||'',adapterKey:String(row.adapter_key||''),description:'已审核 · 已在当前工作空间启用 · 支持'+types+' · Build '+String(row.adapter_version||''),url:String(caps.actor_url||''),currentPricingInfo:(row.pricing_model||{}) as Record<string,unknown>}
    }).filter(item=>item.username&&item.name)
    setApprovedActors(mapped)
    setApprovedOffset(offset+rows.length);setHasMoreApproved(rows.length===5)
@@ -310,14 +326,21 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const nextSchema=(data.input_schema || {}) as JsonSchema
   const requirements=deriveSchemaRequirements(nextSchema)
    let initial:Record<string,unknown>=Object.fromEntries(schemaKeys(nextSchema).map(([key,field])=>[key,getDefaultValue(field,requirements.requiredFields.has(key))]))
-   const {data:configuredSelections}=await supabase.from('workspace_adapter_selections').select('config,discovery_adapter_catalog!inner(external_actor_id)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true)
+   const {data:configuredSelections}=await supabase.from('workspace_adapter_selections').select('adapter_key,config,discovery_adapter_catalog!inner(external_actor_id)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true)
    const configured=(configuredSelections||[]).find((row:any)=>row.discovery_adapter_catalog?.external_actor_id===actorId)
+   setSelectedAdapterKey(String(configured?.adapter_key||item.adapterKey||''))
    const configuredConfig=(configured?.config||{}) as Record<string,unknown>
    const defaults=(configuredConfig.input_defaults||{}) as Record<string,unknown>
    initial={...initial,...Object.fromEntries(Object.entries(defaults).filter(([key])=>Object.prototype.hasOwnProperty.call(nextSchema.properties||{},key)))}
   setSchema(nextSchema);setValues(initial);
   setNotice(data.verification_status==='verified'&&data.maintenance_status==='maintained'?'已读取 Actor 最新输入 Schema。该数据源已通过客户输出审核。':'已读取 Actor 最新输入 Schema。该 Actor 尚未通过直接客户资料审核，当前只能预览参数，不能启动正式采集。')
   setSchemaBusy(false)
+ }
+ const selectProviderAdapter=(row:ProviderAdapterRow)=>{
+  const catalog=row.discovery_adapter_catalog;const nextSchema=(catalog.input_schema||{}) as JsonSchema
+  setSelectedAdapterKey(row.adapter_key);setActor({id:catalog.external_actor_id,name:catalog.external_actor_id,username:selectedProviderKey,title:catalog.adapter_name,description:'已审核 · 已启用 · '+selectedProviderKey,url:'',adapterKey:row.adapter_key,currentPricingInfo:catalog.pricing_model||{}})
+  setSchema(nextSchema);setActorPickerOpen(false);setValues({...Object.fromEntries(Object.entries(nextSchema.properties||{}).map(([key,field])=>[key,getDefaultValue(field,(nextSchema.required||[]).includes(key))])),...((row.config?.input_defaults||{}) as Record<string,unknown>)})
+  setActorVerificationStatus(catalog.verification_status);setActorMaintenanceStatus(catalog.maintenance_status);setError('');setNotice('已读取该采集器的参数 Schema。填写参数后可直接创建任务。')
  }
  const renderField = ([key,field]:[string,SchemaField]) => {
   const type=fieldType(field)
@@ -478,14 +501,14 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   try {
    const actorInput:Record<string,unknown>={...schemaValidation.payload}
     const taskTitle=taskName.trim()||product.trim()||keywords.trim()||actor.title
-   const actorId=actor.username+'~'+actor.name
+   const actorId=selectedProviderKey==='apify'?actor.username+'~'+actor.name:actor.name
     const schemaHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stableStringify(schema))).then(d=>[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''))
-    const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel,ai_analysis:aiGenerated?{model:aiModel,user_request:aiRequest,conversation:chatMessages,summary:aiSummary,strategy:aiStrategy,actor_input:actorInput,field_explanations:aiFieldExplanations,missing_information:aiMissingInformation,warnings:aiWarnings,analyzed_at:new Date().toISOString()}:null}
+    const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel,provider_key:selectedProviderKey,adapter_key:selectedAdapterKey,ai_analysis:aiGenerated?{model:aiModel,user_request:aiRequest,conversation:chatMessages,summary:aiSummary,strategy:aiStrategy,actor_input:actorInput,field_explanations:aiFieldExplanations,missing_information:aiMissingInformation,warnings:aiWarnings,analyzed_at:new Date().toISOString()}:null}
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspaceId,created_by:userId,name:taskTitle,status:'draft',target_profile:profile,selected_channels:[channel],target_count:Number(targetCount)}).select('id').single()
    if(taskError)throw new Error(taskError.message)
-   const {data:selections,error:selectionQueryError}=await supabase.from('workspace_adapter_selections').select('id,config,discovery_adapter_catalog!inner(external_actor_id,verification_status,maintenance_status,is_active)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true)
+   const {data:selections,error:selectionQueryError}=await supabase.from('workspace_adapter_selections').select('id,adapter_key,config,discovery_adapter_catalog!inner(external_actor_id,provider_key,verification_status,maintenance_status,is_active)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true).eq('discovery_adapter_catalog.provider_key',selectedProviderKey)
    if(selectionQueryError)throw selectionQueryError
-   const selection=(selections||[]).find((row:any)=>row.discovery_adapter_catalog?.external_actor_id===actorId&&row.discovery_adapter_catalog?.verification_status==='verified'&&row.discovery_adapter_catalog?.maintenance_status==='maintained'&&row.discovery_adapter_catalog?.is_active===true)
+   const selection=(selections||[]).find((row:any)=>row.adapter_key===selectedAdapterKey&&row.discovery_adapter_catalog?.external_actor_id===actorId&&row.discovery_adapter_catalog?.verification_status==='verified'&&row.discovery_adapter_catalog?.maintenance_status==='maintained'&&row.discovery_adapter_catalog?.is_active===true)
    if(!selection)throw new Error('当前 Actor 已不在可用目录中，请刷新页面并联系管理员检查配置。')
    const config={...(selection.config||{}),max_cost:Number(maxCost),max_items:Number(targetCount)}
    const {error:selectionError}=await supabase.from('workspace_adapter_selections').update({config,updated_at:new Date().toISOString()}).eq('id',selection.id).eq('workspace_id',workspaceId)
@@ -521,12 +544,12 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     </section>
     <section className="ldw-card">
      <div className="ldw-step-title"><span>3</span><div><h3>选择服务商</h3><p>服务商与平台是独立目录；只有已接入执行接口的服务商可以继续。</p></div></div>
-     <div className="ldw-provider-grid ldw-provider-grid-manual">{directoryProviders.map(item=>{const enabled=item.provider_key==='apify';const selected=provider.toLowerCase()===item.provider_key;return <button type="button" key={item.provider_key} disabled={!enabled} className={selected?'selected':''} onClick={()=>setProvider(item.provider_name)}><span className="ldw-provider-name"><b>{item.provider_name}</b>{selected&&<Check size={13}/>}</span><small>{item.description||item.provider_type}{enabled?' · 已接入 Actor 搜索与 Schema 读取':' · 目录已登记，执行接口尚未接入'}</small></button>})}</div>
+     <div className="ldw-provider-grid ldw-provider-grid-manual">{directoryProviders.filter(item=>availableProviders.map(providerKeyOf).includes(providerKeyOf(item.provider_name||item.provider_key))||providerConnections[providerKeyOf(item.provider_name||item.provider_key)]===true).map(item=>{const key=providerKeyOf(item.provider_name||item.provider_key);const enabled=['apify','brightdata','firecrawl'].includes(key)&&providerConnections[key]===true;const selected=selectedProviderKey===key;return <button type="button" key={item.provider_key} disabled={!enabled} className={selected?'selected':''} onClick={()=>setProvider(item.provider_name)}><span className="ldw-provider-name"><b>{item.provider_name}</b>{selected&&<Check size={13}/>}</span><small>{item.description||item.provider_type}{enabled?' · 已连接':providerConnections[key]?' · 已连接，执行适配器待接入':' · 请先在系统设置中连接'}</small></button>})}</div>
      {!directoryProviders.length&&<div className="ldw-provider-note">服务商目录暂不可用。</div>}
     </section>
     <section className="ldw-card">
      <div className="ldw-step-title"><span>4</span><div><h3>选择采集器 / Actor</h3><p>仅展示管理员在 Actor 配置中心绑定到当前渠道、审核通过并启用的 Actor。</p></div></div>
-     {actor&&!actorPickerOpen?<div className="ldw-selected-actor-summary"><div><b>{actor.title||actor.name}</b><small>{actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'已通过审核':'待审核 · 仅可预览 Schema'} · {pricingLabel(actor)}</small></div><button type="button" onClick={()=>setActorPickerOpen(true)}><ChevronDown size={14}/> 更换 / 展开选择器</button></div>:canSearchSelectedProvider?<><div className="ldw-approved-actor-list"><div className="ldw-actor-list-heading"><b>已审核 · 可直接执行</b><span>每次最多显示 5 个</span></div>{approvedActors.length>0?approvedActors.map(item=><button type="button" key={item.id} className={actor?.id===item.id?'selected':''} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description}</small><small>{pricingLabel(item)}</small></span><span>{actor?.id===item.id?'已选择':'选择'} <ArrowRight size={12}/></span></button>):<p className="ldw-provider-note">当前没有同时满足审核通过、维护正常、客户资料输出、工作空间启用和 Apify 连接正常的可执行 Actor。请联系管理员在 Actor 配置中心添加并完成审核。</p>}{approvedOffset>5&&<button type="button" className="ldw-load-more-actors" onClick={()=>void loadApprovedActors(Math.max(0,approvedOffset-10),false)} disabled={approvedBusy}>上一批已审核 Actor</button>}{hasMoreApproved&&<button type="button" className="ldw-load-more-actors" onClick={()=>void loadApprovedActors(approvedOffset,false)} disabled={approvedBusy}>{approvedBusy?'正在加载…':'下一批已审核 Actor（5 个）'}</button>}</div><div className="ldw-actor-search"><input value={actorQuery} onChange={event=>setActorQuery(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();void searchActors()}}} placeholder="输入 Actor 名称或采集关键词"/><button type="button" onClick={()=>void searchActors()} disabled={actorBusy||!actorQuery.trim()}>{actorBusy?<Loader2 size={13}/>:<Search size={13}/>} 搜索 Apify Store</button></div>{actorBusy&&<div className="ldw-loading"><Loader2 size={14}/> 正在搜索 Actor…</div>}{actors.length>0&&<div className="ldw-ai-actor-options"><b>待审核候选（{actors.length}）</b><p>Apify Store 搜索结果尚未经过真实客户资料审核；选择后仅读取 Schema，不代表可以执行。</p>{actors.map(item=><button type="button" key={item.id} className={actor?.id===item.id?'selected':''} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description||item.username+'/'+item.name}</small><small>{pricingLabel(item)}</small></span><span>{actor?.id===item.id?'已选择':'选择'} <ArrowRight size={12}/></span></button>)}</div>}{candidateOffset>5&&<button type="button" className="ldw-load-more-actors" onClick={()=>void searchActors(undefined,false,true)} disabled={actorBusy}>上一批候选</button>}{hasMoreCandidates&&<button type="button" className="ldw-load-more-actors" onClick={()=>void searchActors(undefined,true)} disabled={actorBusy}>{actorBusy?'正在加载…':'下一批候选（5 个）'}</button>}</>:<div className="ldw-provider-note">当前服务商尚未接入搜索和执行接口。为避免错误调用，不会将此选择转发到其他服务商。</div>}
+     {actor&&!actorPickerOpen?<div className="ldw-selected-actor-summary"><div><b>{actor.title||actor.name}</b><small>{actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'已通过审核':'待审核 · 仅可预览 Schema'} · {pricingLabel(actor)}</small></div><button type="button" onClick={()=>setActorPickerOpen(true)}><ChevronDown size={14}/> 更换 / 展开选择器</button></div>:canSearchSelectedProvider&&selectedProviderKey!=='apify'?<div className="ldw-approved-actor-list"><div className="ldw-actor-list-heading"><b>已审核 · 可直接执行</b><span>{providerAdapters.length} 个采集器</span></div>{providerAdapters.length?providerAdapters.map(row=><button type="button" key={row.adapter_key} className={selectedAdapterKey===row.adapter_key?'selected':''} onClick={()=>selectProviderAdapter(row)}><span><b>{row.discovery_adapter_catalog.adapter_name}</b><small>{row.discovery_adapter_catalog.external_actor_id}</small><small>{row.discovery_adapter_catalog.verification_status} · {row.discovery_adapter_catalog.maintenance_status}</small></span><span>{selectedAdapterKey===row.adapter_key?'已选择':'选择'} <ArrowRight size={12}/></span></button>):<p className="ldw-provider-note">当前渠道没有已审核并启用的 {provider} 采集器。请前往系统设置登记采集器、完成样本审核并启用。</p>}</div>:canSearchSelectedProvider?<><div className="ldw-approved-actor-list"><div className="ldw-actor-list-heading"><b>已审核 · 可直接执行</b><span>每次最多显示 5 个</span></div>{approvedActors.length>0?approvedActors.map(item=><button type="button" key={item.id} className={actor?.id===item.id?'selected':''} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description}</small><small>{pricingLabel(item)}</small></span><span>{actor?.id===item.id?'已选择':'选择'} <ArrowRight size={12}/></span></button>):<p className="ldw-provider-note">当前没有同时满足审核通过、维护正常、客户资料输出、工作空间启用和 Apify 连接正常的可执行 Actor。请联系管理员在 Actor 配置中心添加并完成审核。</p>}{approvedOffset>5&&<button type="button" className="ldw-load-more-actors" onClick={()=>void loadApprovedActors(Math.max(0,approvedOffset-10),false)} disabled={approvedBusy}>上一批已审核 Actor</button>}{hasMoreApproved&&<button type="button" className="ldw-load-more-actors" onClick={()=>void loadApprovedActors(approvedOffset,false)} disabled={approvedBusy}>{approvedBusy?'正在加载…':'下一批已审核 Actor（5 个）'}</button>}</div><div className="ldw-actor-search"><input value={actorQuery} onChange={event=>setActorQuery(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();void searchActors()}}} placeholder="输入 Actor 名称或采集关键词"/><button type="button" onClick={()=>void searchActors()} disabled={actorBusy||!actorQuery.trim()}>{actorBusy?<Loader2 size={13}/>:<Search size={13}/>} 搜索 Apify Store</button></div>{actorBusy&&<div className="ldw-loading"><Loader2 size={14}/> 正在搜索 Actor…</div>}{actors.length>0&&<div className="ldw-ai-actor-options"><b>待审核候选（{actors.length}）</b><p>Apify Store 搜索结果尚未经过真实客户资料审核；选择后仅读取 Schema，不代表可以执行。</p>{actors.map(item=><button type="button" key={item.id} className={actor?.id===item.id?'selected':''} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description||item.username+'/'+item.name}</small><small>{pricingLabel(item)}</small></span><span>{actor?.id===item.id?'已选择':'选择'} <ArrowRight size={12}/></span></button>)}</div>}{candidateOffset>5&&<button type="button" className="ldw-load-more-actors" onClick={()=>void searchActors(undefined,false,true)} disabled={actorBusy}>上一批候选</button>}{hasMoreCandidates&&<button type="button" className="ldw-load-more-actors" onClick={()=>void searchActors(undefined,true)} disabled={actorBusy}>{actorBusy?'正在加载…':'下一批候选（5 个）'}</button>}</>:<div className="ldw-provider-note">当前服务商尚未接入搜索和执行接口。为避免错误调用，不会将此选择转发到其他服务商。</div>}
     </section>
     {schema&&actor?<section className="ldw-card ldw-manual-schema-card">
      <div className="ldw-step-title"><span>5</span><div><h3>按 Schema 填写参数</h3><p>字段名称以中文展示；必填、类型、范围和 Actor 原始字段均保留。</p></div></div>

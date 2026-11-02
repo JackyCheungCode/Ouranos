@@ -1,0 +1,4 @@
+import { Activity,ChevronRight,Grid2X2 } from 'lucide-react'
+import type { PlatformApp } from './appRegistry'
+type Props={app:PlatformApp;onHome:()=>void}
+export default function ModulePlaceholder({app,onHome}:Props){const Icon=app.icon;return <div className="platform-module"><div className="platform-breadcrumb"><button onClick={onHome}><Grid2X2 size={14}/> 应用</button><ChevronRight size={13}/><span>{app.name}</span></div><div className="platform-module-title"><span className="platform-app-icon" style={{background:app.color}}><Icon size={25}/></span><div><h1>{app.name}</h1><p>{app.tagline}</p></div></div><div className="platform-placeholder"><div className="platform-placeholder-art"><span/><span/><span/><Icon size={32}/></div><div className="platform-eyebrow">MODULE FOUNDATION</div><h2>{app.name}模块已就绪</h2><p>当前阶段仅搭建应用入口与模块化页面框架，业务功能将在后续阶段逐步设计和接入。</p><span className="platform-coming-soon"><Activity size={13}/> 功能规划中</span></div></div>}
