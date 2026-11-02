@@ -10,10 +10,8 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import LeadDiscoveryWizard from './LeadDiscoveryWizard'
 import DiscoveryPageHub, { type DiscoveryPageDefinition } from './DiscoveryPageHub'
-import ApifyActorManager from '../system-integrations/ApifyActorManager'
-import '../system-integrations/SystemIntegrationsApp.css'
 
-type Tab = 'search' | 'tasks' | 'review' | 'actors'
+type Tab = 'search' | 'tasks' | 'review'
 type TargetType = 'companies' | 'contacts' | 'both'
 type Country = { code:string; name:string; flag:string; geoName:string }
 type Channel = { id:string; name:string; detail:string; logo:string; providers:string[]; status:string }
@@ -143,13 +141,6 @@ export default function LeadFinderApp() {
  const [inboxError,setInboxError] = useState('')
  const [duplicateCandidates,setDuplicateCandidates] = useState<{id:string;record_id:string;candidate_record_id:string;match_type:string;confidence:number;resolution:string}[]>([])
  const [tab,setTab] = useState<Tab>('search')
- const [apifyCanSync,setApifyCanSync] = useState(false)
- useEffect(()=>{
-  if(!supabase||!workspace){setApifyCanSync(false);return}
-  let alive=true
-  supabase.from('integration_connections').select('status,is_enabled').eq('workspace_id',workspace.id).eq('provider_key','apify').maybeSingle().then(({data})=>{if(alive)setApifyCanSync(data?.status==='connected'&&data?.is_enabled===true)})
-  return()=>{alive=false}
- },[workspace?.id])
  const [selectedDiscoveryPage,setSelectedDiscoveryPage] = useState<DiscoveryPageDefinition|null>(null)
  const [product,setProduct] = useState('')
  const [industry,setIndustry] = useState('')
@@ -296,10 +287,7 @@ export default function LeadFinderApp() {
    <button className={tab==='search'?'active':''} onClick={()=>{setTab('search');setActiveTask(null);setSelectedDiscoveryPage(null)}}><Target size={16}/> 创建搜索</button>
    <button className={tab==='tasks'?'active':''} onClick={()=>{setTab('tasks');setActiveTask(null)}}><Workflow size={16}/> 搜索任务 <span>{tasks.length}</span></button>
    <button className={tab==='review'?'active':''} onClick={()=>{setTab('review');setActiveTask(null)}}><Inbox size={16}/> 待处理线索 <span>{inboxRecords.filter(r=>r.review_status!=='promoted').length}</span></button>
-   <button className={tab==='actors'?'active':''} onClick={()=>{setTab('actors');setActiveTask(null);setSelectedDiscoveryPage(null)}}><Settings2 size={16}/> Actor 配置中心</button>
   </div>
-
-  {tab==='actors'&&<div className="lead-content-panel"><div className="lead-content-heading"><div><h2>Actor 配置中心</h2><p>统一导入 Actor、读取 Schema、配置默认参数、绑定搜索渠道并完成真实客户输出审核。只有已审核、维护正常且启用的 Actor 会出现在搜索任务中。</p></div></div><ApifyActorManager canSync={apifyCanSync}/></div>}
 
   {tab==='search'&&(selectedDiscoveryPage ? <div className="ldp-selected-page">
    <div className="ldp-selected-head"><button type="button" onClick={()=>setSelectedDiscoveryPage(null)}>← 返回 12 类发现入口</button><div><h2>{selectedDiscoveryPage.title}</h2><p>{selectedDiscoveryPage.description}</p></div></div>
