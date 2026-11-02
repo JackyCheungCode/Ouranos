@@ -356,3 +356,17 @@
 .dark .ldw-provider-grid-manual button:disabled{background:#252b34}
 
 .ldw-ai-sidebar .ldw-submit-row{display:none}
+
+
+/* Actor review tiers and five-item pagination */
+.ldw-approved-actor-list{display:flex;flex-direction:column;gap:9px;margin-bottom:16px;padding:13px;border:1px solid var(--odoo-line);border-radius:8px;background:var(--odoo-panel)}
+.ldw-actor-list-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ldw-actor-list-heading b{font-size:13px}
+.ldw-actor-list-heading span{font-size:11px;color:var(--odoo-muted)}
+.ldw-approved-actor-list>button:not(.ldw-load-more-actors){display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:11px 12px;text-align:left;border:1px solid var(--odoo-line);border-radius:7px;background:var(--odoo-card);color:var(--odoo-text);cursor:pointer}
+.ldw-approved-actor-list>button.selected{border-color:var(--odoo-primary)}
+.ldw-approved-actor-list>button>span:first-child{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ldw-approved-actor-list>button small{font-size:11px;color:var(--odoo-muted);overflow-wrap:anywhere}
+.ldw-load-more-actors{align-self:center;padding:8px 14px;border:1px solid var(--odoo-line);border-radius:6px;background:var(--odoo-panel);color:var(--odoo-text);font-size:12px;cursor:pointer}
+.ldw-load-more-actors:disabled{opacity:.55;cursor:wait}
+.ldw-ai-actor-options>p{font-size:12px;color:var(--odoo-muted);margin:5px 0 10px}
