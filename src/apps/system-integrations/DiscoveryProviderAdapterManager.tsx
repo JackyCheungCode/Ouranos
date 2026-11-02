@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, CircleHelp, Database, ExternalLink, Loader2, Plus, RefreshCw, Search, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, CircleHelp, Loader2, Plus, RefreshCw, Search, ShieldCheck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 
-type ProviderKey='brightdata'|'firecrawl'
 type SchemaField={type?:string;title?:string;description?:string;default?:unknown;enum?:unknown[];items?:SchemaField;properties?:Record<string,SchemaField>;required?:string[];editor?:string;minimum?:number;maximum?:number}
 type JsonSchema={type?:string;title?:string;properties?:Record<string,SchemaField>;required?:string[]}
 type Dataset={id:string;name:string;description:string;input_schema?:JsonSchema|null}
