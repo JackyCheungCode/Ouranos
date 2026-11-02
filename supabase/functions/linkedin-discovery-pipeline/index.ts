@@ -73,7 +73,7 @@ async function handle(req:Request){
   if(action==="poll_enrichment"){
    const key=await getApifyKey(admin,workspaceId);
    if(!run.actor_b_run_id||!run.actor_b_dataset_id)return json({error:"Actor B 尚未启动"},409,origin);const stateBody=await apify(key,`actor-runs/${enc(String(run.actor_b_run_id))}`);const state=asObject(stateBody.data||stateBody);const offset=Number(run.actor_b_offset||0);const items=await fetchBatch(key,String(run.actor_b_dataset_id),offset);
-   const selectedRows=await readJson(await rest(`linkedin_candidates?select=id,profile_url,profile_slug,contact_email,contact_phone&run_id=eq.${enc(runId)}&workspace_id=eq.${enc(workspaceId)}&clean_status=eq.keep&selected_for_enrichment=eq.true&limit=250`,admin));
+   const selectedRows=await readJson(await rest(`linkedin_candidates?select=id,profile_url,profile_slug,contact_email,contact_phone&run_id=eq.${enc(runId)}&workspace_id=eq.${enc(workspaceId)}&limit=1500`,admin));
    const keyOf=(value:string)=>{const slug=slugOf(value);return slug?slug.toLowerCase():value.toLowerCase().split("?")[0].split("#")[0].replace(new RegExp("/+$"),"");};
    const byProfile=new Map<string,any>();for(const row of selectedRows){byProfile.set(keyOf(String(row.profile_url||"")),row);if(row.profile_slug)byProfile.set(String(row.profile_slug).toLowerCase(),row);}
    let updated=0,unmatched=0,withoutContact=0;
