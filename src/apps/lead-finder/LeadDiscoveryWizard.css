@@ -322,3 +322,5 @@
 
 .ldw-chat-message>span.ldw-chat-avatar{font-size:initial;letter-spacing:normal;margin:1px 0 0;color:inherit}
 .ldw-chat-message>span.ldw-chat-avatar.user{color:#6f596b}
+
+.ldw-field-guide{display:grid;gap:5px;padding:8px 9px;border-radius:7px;background:var(--muted,#f7f5f7);border:1px solid var(--border,#e8e3e9)}.ldw-field-guide>small{font-size:10px;line-height:1.55;color:var(--muted-foreground,#706976)}.ldw-field-guide>small b{color:var(--foreground,#34303a);font-weight:650}.ldw-field-guide code{font-size:10px;overflow-wrap:anywhere;color:var(--foreground,#34303a)}
