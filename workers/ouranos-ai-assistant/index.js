@@ -122,7 +122,11 @@ function isRecord(value) {
 }
 async function runIntent(env, model, body, origin) {
   const platforms = Array.isArray(body.supported_platforms) ? body.supported_platforms.slice(0, 80) : [];
-  const candidates = Array.isArray(body.actor_candidates) ? body.actor_candidates.slice(0, 16) : [];
+  const candidates = Array.isArray(body.actor_candidates) ? body.actor_candidates.slice(0, 16).map(item => ({
+    id: clip(item?.id || "", 180), actor_id: clip(item?.actor_id || "", 180),
+    name: clip(item?.name || "", 220), description: clip(item?.description || "", 700),
+    pricing: clip(item?.pricing || "", 220),
+  })) : [];
   const conversation = normalizeHistory(body.conversation);
   const system = [
     "你是 Ouranos 的业务需求接待与采集器推荐助手。用简体中文理解用户目标，识别最合适的平台。",
