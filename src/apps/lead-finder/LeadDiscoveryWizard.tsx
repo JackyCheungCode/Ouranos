@@ -357,7 +357,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      if(platform){
       setChannel(platform.id);setRecognizedPlatform(platform.name)
       if(platform.id==='amazon' || providerByPlatform[platform.id]?.includes('Apify')){
-       const term=searchTerms[platform.id]||platform.id
+       const term=[searchTerms[platform.id]||platform.name,requestText.slice(0,120)].filter(Boolean).join(' ')
        const storeUrl=new URL('https://api.apify.com/v2/store')
        storeUrl.searchParams.set('search',term);storeUrl.searchParams.set('limit','20');storeUrl.searchParams.set('sortBy','popularity');storeUrl.searchParams.set('responseFormat','full')
        const storeResponse=await fetch(storeUrl.toString(),{headers:{Accept:'application/json'}})
