@@ -65,4 +65,6 @@ A provider Actor must be explicitly reviewed before it can run as a lead source:
 
 Reading an Actor's Input Schema does not constitute output verification. New Actors are stored as unverified and inactive by default. Re-syncing an unchanged Actor build preserves its review status; a changed build is sent back for review. Enqueue rejects unverified, unmaintained, or non-customer outputs.
 
+Approval requires a successful Apify Run ID produced by the Actor's current default Build. The backend verifies the run's Actor, Build and status, then inspects real Dataset records for company/contact fields; a manual note or checkbox alone cannot approve an Actor. Running a sample Actor may incur Apify usage charges, so use a small, cost-conscious sample.
+
 Input fields remain Actor-defined and are submitted with their original keys and enum values. Output field mapping is optional; the ingestion worker uses its supported common-field fallbacks while preserving each complete raw source payload. No post, comment, video, product listing or raw search-result snippet is itself treated as a customer record.
