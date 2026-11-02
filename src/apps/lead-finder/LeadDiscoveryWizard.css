@@ -381,3 +381,6 @@
 .dark .ldw-selected-actor-summary{background:#20252e}
 .dark .ldw-selected-actor-summary button{background:#191e25;color:#e7e8ec}
 @media(max-width:600px){.ldw-selected-actor-summary{align-items:flex-start;flex-direction:column}.ldw-selected-actor-summary button{min-height:34px}}
+
+/* Search task creation must never expose unreviewed Actor Store candidates. */
+.ldw-actor-search,.ldw-ai-actor-search,.ldw-ai-actor-options{display:none!important}
