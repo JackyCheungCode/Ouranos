@@ -289,7 +289,10 @@ export default function LeadFinderApp() {
    <button className={tab==='search'?'active':''} onClick={()=>{setTab('search');setActiveTask(null);setSelectedDiscoveryPage(null)}}><Target size={16}/> 创建搜索</button>
    <button className={tab==='tasks'?'active':''} onClick={()=>{setTab('tasks');setActiveTask(null)}}><Workflow size={16}/> 搜索任务 <span>{tasks.length}</span></button>
    <button className={tab==='review'?'active':''} onClick={()=>{setTab('review');setActiveTask(null)}}><Inbox size={16}/> 待处理线索 <span>{inboxRecords.filter(r=>r.review_status!=='promoted').length}</span></button>
+   <button className={tab==='actors'?'active':''} onClick={()=>{setTab('actors');setActiveTask(null);setSelectedDiscoveryPage(null)}}><Settings2 size={16}/> Actor 配置中心</button>
   </div>
+
+  {tab==='actors'&&<div className="lead-content-panel"><div className="lead-content-heading"><div><h2>Actor 配置中心</h2><p>统一导入 Actor、读取 Schema、配置默认参数、绑定搜索渠道并完成真实客户输出审核。只有已审核、维护正常且启用的 Actor 会出现在搜索任务中。</p></div></div><ApifyActorManager canSync={apifyCanSync}/></div>}
 
   {tab==='search'&&(selectedDiscoveryPage ? <div className="ldp-selected-page">
    <div className="ldp-selected-head"><button type="button" onClick={()=>setSelectedDiscoveryPage(null)}>← 返回 12 类发现入口</button><div><h2>{selectedDiscoveryPage.title}</h2><p>{selectedDiscoveryPage.description}</p></div></div>
