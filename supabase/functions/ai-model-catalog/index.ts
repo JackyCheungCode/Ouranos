@@ -13,7 +13,7 @@ Deno.serve(async(req:Request)=>{
  try{
   const authorization=req.headers.get("authorization");const url=Deno.env.get("SUPABASE_URL");const anon=publishableKey();const admin=serviceKey();if(!authorization||!url||!anon||!admin)return json({error:"Authentication is required"},401,origin);
   const userResponse=await fetch(url+"/auth/v1/user",{headers:{apikey:anon,Authorization:authorization}});if(!userResponse.ok)return json({error:"Invalid or expired session"},401,origin);const user=await userResponse.json();
-  const body=await req.json();const workspace=String(body.workspace_id??"");const provider=String(body.provider_key??"");const key=String(body.api_key??"");const account=String(body.account_id??"");const base=String(body.base_url??"");
+  const body=await req.json();const workspace=String(body.workspace_id??"");const provider=String(body.provider_key??"");const key=String(body.api_key??"");const account=String(body.account_id??"");const secretKey=String(body.secret_key??"");const base=String(body.base_url??"");
   if(!workspace||!key||key.length>8192||!/^[a-z0-9-]{2,64}$/.test(provider))return json({error:"Invalid model catalog request"},400,origin);
   const membership=await rest("workspace_members?select=role&workspace_id=eq."+encodeURIComponent(workspace)+"&user_id=eq."+encodeURIComponent(user.id)+"&limit=1",admin);if(!membership.ok)return json({error:"Unable to verify workspace access"},500,origin);let members=await membership.json();if(!members.length){const owner=await rest("workspaces?select=id&owner_id=eq."+encodeURIComponent(user.id)+"&id=eq."+encodeURIComponent(workspace)+"&limit=1",admin);if(!owner.ok||(await owner.json()).length===0)return json({error:"Workspace access denied"},403,origin);}
   const headers:Record<string,string>={Authorization:"Bearer "+key,Accept:"application/json"};let endpoint="";let method="GET";
@@ -26,6 +26,7 @@ Deno.serve(async(req:Request)=>{
    case "zhipu":endpoint="https://open.bigmodel.cn/api/paas/v4/models";break;
    case "moonshot":endpoint="https://api.moonshot.cn/v1/models";break;
    case "siliconflow":endpoint="https://api.siliconflow.cn/v1/models";break;
+   case "baidu-qianfan":{if(!secretKey)return json({error:"百度千帆需要 API Key 和 Secret Key"},400,origin);const tokenResponse=await fetch("https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id="+encodeURIComponent(key)+"&client_secret="+encodeURIComponent(secretKey),{method:"POST",signal:AbortSignal.timeout(15000)});if(!tokenResponse.ok)return json({error:"百度千帆 API Key / Secret Key 验证失败"},400,origin);const tokenData=await tokenResponse.json();if(!tokenData.access_token)return json({error:"百度千帆未返回访问令牌"},400,origin);return json({models:fallback[provider]||[],source:"fallback"},200,origin);}
    case "openrouter":endpoint="https://openrouter.ai/api/v1/models";break;
    case "groq":endpoint="https://api.groq.com/openai/v1/models";break;
    case "cerebras":endpoint="https://api.cerebras.ai/v1/models";break;
