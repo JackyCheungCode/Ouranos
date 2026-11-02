@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertCircle, CheckCircle2, ChevronRight, Code2, Database, ExternalLink, FlaskConical, Plus, RefreshCw, Search, Settings2, ShieldCheck, Trash2, Save, Play, X, Power, Layers3 } from 'lucide-react'
+import { Activity, AlertCircle, CheckCircle2, ChevronRight, Code2, Database, ExternalLink, Plus, RefreshCw, Search, Settings2, ShieldCheck, Trash2, Save, Play, X, Power, Layers3 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 
@@ -110,7 +110,7 @@ export default function ApifyActorManager({canSync}:{canSync:boolean}){
    const result={run_id:data.run_id||null,status:String(data.status||'UNKNOWN'),sample:Array.isArray(data.sample)?data.sample:[],items_count:typeof data.items_count==='number'?data.items_count:null}
    setTestResults(current=>({...current,[row.id]:result}))
    if(result.run_id)setReviewRunIds(current=>({...current,[row.id]:result.run_id||''}))
-   setMessage(`测试运行结束：${result.status}。Run ID 已填入审核表单；测试结果不会自动批准 Actor。`)
+   setMessage(`测试运行已提交：${result.status}。Run ID 已填入审核表单；测试结果不会自动批准 Actor。`)
   }catch(e){setError(e instanceof Error?e.message:'Actor 测试失败')}
   finally{setTestBusy(false)}
  }
