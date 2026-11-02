@@ -10,7 +10,7 @@ import './LeadDiscoveryWizard.css'
 import type { DiscoveryPageDefinition } from './DiscoveryPageHub'
 
 type Props = { workspaceId: string; userId: string; onTaskCreated: () => void; page: DiscoveryPageDefinition }
-type Actor = { id: string; name: string; username: string; title: string; description: string; url: string; stats?: { totalUsers?: number; actorReviewRating?: number; actorReviewCount?: number }; currentPricingInfo?: Record<string, unknown> }
+type Actor = { id: string; name: string; username: string; title: string; description: string; url: string; adapterKey?:string; stats?: { totalUsers?: number; actorReviewRating?: number; actorReviewCount?: number }; currentPricingInfo?: Record<string, unknown> }
 type SchemaField = { title?: string; description?: string; type?: string | string[]; editor?: string; default?: unknown; prefill?: unknown; example?: unknown; placeholderValue?: string; enum?: unknown[]; items?: SchemaField; properties?: Record<string, SchemaField>; required?: string[]; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; minItems?: number; maxItems?: number; pattern?: string; format?: string }
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
 type MapLocation = { lat:number; lon:number; label:string }
@@ -41,6 +41,7 @@ const portCatalog = [
  ['USLAX','Los Angeles, United States'],['USLGB','Long Beach, United States'],['USNYC','New York, United States'],['USMIA','Miami, United States'],['CAVAN','Vancouver, Canada'],['CATOR','Toronto, Canada'],['CNSHA','Shanghai, China'],['CNNGB','Ningbo, China'],['CNSZX','Shenzhen, China'],['CNYTN','Yantian, China'],['HKHKG','Hong Kong'],['SGSIN','Singapore'],['KRPUS','Busan, South Korea'],['JPTYO','Tokyo, Japan'],['JPYOK','Yokohama, Japan'],['TWKHH','Kaohsiung, Taiwan'],['NLRTM','Rotterdam, Netherlands'],['DEHAM','Hamburg, Germany'],['BEANR','Antwerp, Belgium'],['GBFXT','Felixstowe, United Kingdom'],['AEJEA','Jebel Ali, United Arab Emirates'],['AEDXB','Dubai, United Arab Emirates'],['INMUN','Mundra, India'],['INNSA','Nhava Sheva, India'],['BRSSZ','Santos, Brazil'],['MXZLO','Manzanillo, Mexico'],['AUSYD','Sydney, Australia'],['ZADUR','Durban, South Africa'],['ESBCN','Barcelona, Spain'],['FRLEH','Le Havre, France']
 ] as const
 
+const providerKeyOf=(name:string)=>({apify:'apify','bright data':'brightdata',brightdata:'brightdata',firecrawl:'firecrawl',octoparse:'octoparse',phantombuster:'phantombuster',texau:'texau','跨境魔方':'kuajingmofang'} as Record<string,string>)[name.trim().toLowerCase()]||name.trim().toLowerCase().replace(/[^a-z0-9]/g,'')
 const providerDescriptions: Record<string,string> = { Apify:'搜索 Apify Store 中可用的 Actors，并读取每个 Actor 自己的输入 Schema。', 'Bright Data':'数据集 / Scraper 产品目录与专属输入参数。', Octoparse:'模板任务与参数 Schema。', Firecrawl:'网站搜索、抓取与提取操作。', PhantomBuster:'Agent 工作流及参数。', TexAu:'自动化 Action 与参数。', '跨境魔方':'跨境电商数据 API 与接口参数。' }
 const schemaKeys = (schema: JsonSchema) => Object.entries(schema.properties || {})
 const stableStringify=(value:unknown):string=>Array.isArray(value)?'['+value.map(stableStringify).join(',')+']':value&&typeof value==='object'?'{'+Object.keys(value as Record<string,unknown>).sort().map(k=>JSON.stringify(k)+':'+stableStringify((value as Record<string,unknown>)[k])).join(',')+'}':JSON.stringify(value)??'null'
@@ -115,6 +116,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [directoryPlatforms,setDirectoryPlatforms] = useState<DirectoryPlatform[]>([])
  const [directoryReady,setDirectoryReady] = useState(false)
  const [directoryProviders,setDirectoryProviders] = useState<DirectoryProvider[]>([])
+ const [providerConnections,setProviderConnections] = useState<Record<string,boolean>>({})
+ const [providerAdapters,setProviderAdapters] = useState<ProviderAdapterRow[]>([])
+ const [selectedAdapterKey,setSelectedAdapterKey] = useState('')
  const [selectedCategory,setSelectedCategory] = useState('search')
  const [aiSidebarOpen,setAiSidebarOpen] = useState(false)
  useEffect(()=>{let active=true;if(!supabase){setDirectoryReady(true);return}
@@ -218,9 +222,19 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const categories = [...new Set(pagePlatforms.map(item=>item.category_key))]
  const visiblePlatforms = pagePlatforms.filter(item=>item.category_key===selectedCategory)
  const categoryLabels:Record<string,string>={social:'社交媒体',search:'搜索与地图',b2b:'B2B 商业平台',commerce:'电商平台',web:'企业网站与商业数据'}
- const canSearchSelectedProvider = provider.toLowerCase()==='apify'
+ const selectedProviderKey=providerKeyOf(provider)
+ const canSearchSelectedProvider = ['apify','brightdata','firecrawl'].includes(selectedProviderKey)&&providerConnections[selectedProviderKey]===true
  useEffect(()=>{const first=page.platformKeys.map(key=>directoryPlatforms.find(item=>item.platform_key===key)).find((item):item is DirectoryPlatform=>Boolean(item));if(first){if(!page.platformKeys.includes(channel))setChannel(first.platform_key);setSelectedCategory(first.category_key);setActorQuery(first.search_terms||first.platform_name)}},[page.id,directoryPlatforms])
- const selectedCountry = countries.find(c=>c.code===countryCode)
+ useEffect(()=>{let active=true;if(!supabase||!workspaceId)return()=>{active=false};supabase.from('integration_connections').select('provider_key,status,is_enabled').eq('workspace_id',workspaceId).then(({data})=>{if(!active)return;setProviderConnections(Object.fromEntries((data||[]).map(row=>[String(row.provider_key),row.status==='connected'&&row.is_enabled===true]))) });return()=>{active=false}},[workspaceId])
+ const loadProviderAdapters=async()=>{
+  if(!supabase||!workspaceId||selectedProviderKey==='apify'){setProviderAdapters([]);return}
+  const {data,error:queryError}=await supabase.from('workspace_adapter_selections').select('adapter_key,config,discovery_adapter_catalog!inner(adapter_name,external_actor_id,input_schema,verification_status,maintenance_status,is_active,provider_key,pricing_model)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true).eq('discovery_adapter_catalog.provider_key',selectedProviderKey).order('priority')
+  if(queryError){setError(queryError.message);setProviderAdapters([]);return}
+  const rows=(data||[]) as unknown as ProviderAdapterRow[]
+  setProviderAdapters(rows.filter(row=>row.discovery_adapter_catalog.verification_status==='verified'&&row.discovery_adapter_catalog.maintenance_status==='maintained'&&row.discovery_adapter_catalog.is_active===true))
+ }
+ useEffect(()=>{void loadProviderAdapters()},[workspaceId,channel,selectedProviderKey])
+\n const selectedCountry = countries.find(c=>c.code===countryCode)
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
  const toggleCountry = (code:string) => {
   const next=selectedCountries.includes(code)?selectedCountries.filter(x=>x!==code):[...selectedCountries,code]
@@ -229,8 +243,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   else if(!next.includes(countryCode)||!countryCode||!selectedCountries.includes(code))setCountryCode(next[next.length-1])
  }
 
- useEffect(()=>{ setActor(null); setSchema(null); setActors([]); setApprovedActors([]); setApprovedOffset(0); setHasMoreApproved(false); setCandidateOffset(0); setHasMoreCandidates(false); setValues({}); setActorVerificationStatus('unverified'); setActorMaintenanceStatus('unmaintained'); setError(''); setNotice('') },[channel])
- useEffect(()=>{ setActor(null);setSchema(null);setValues({});setActorVerificationStatus('unverified');setActorMaintenanceStatus('unmaintained');setError('');setNotice('') },[provider])
+ useEffect(()=>{ setActor(null); setSchema(null); setSelectedAdapterKey(''); setProviderAdapters([]); setActors([]); setApprovedActors([]); setApprovedOffset(0); setHasMoreApproved(false); setCandidateOffset(0); setHasMoreCandidates(false); setValues({}); setActorVerificationStatus('unverified'); setActorMaintenanceStatus('unmaintained'); setError(''); setNotice('') },[channel])
+ useEffect(()=>{ setActor(null);setSchema(null);setSelectedAdapterKey('');setValues({});setActorVerificationStatus('unverified');setActorMaintenanceStatus('unmaintained');setError('');setNotice('') },[provider])
  useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label);const current=directoryPlatforms.find(item=>item.platform_key===channel);if(current)setSelectedCategory(current.category_key)},[channel,directoryPlatforms])
  useEffect(()=>{
   let active=true
@@ -266,7 +280,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
 
  const loadApprovedActors = async (offset=0,append=false) => {
-  if(!supabase||!workspaceId){setApprovedActors([]);setApprovedOffset(0);setHasMoreApproved(false);return}
+  if(!supabase||!workspaceId||selectedProviderKey!=='apify'){setApprovedActors([]);setApprovedOffset(0);setHasMoreApproved(false);return}
   setApprovedBusy(true)
   try {
    const connection=await supabase.from('integration_connections').select('status,is_enabled').eq('workspace_id',workspaceId).eq('provider_key','apify').maybeSingle()
@@ -286,7 +300,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     const id=String(row.external_actor_id||'');const [username,name]=id.split('~')
     const caps=(row.capabilities||{}) as Record<string,unknown>
     const types=Array.isArray(row.supported_record_types)?(row.supported_record_types as string[]).map(x=>x==='company'?'企业':'联系人').join(' / '):'客户资料'
-    return {id,title:String(row.adapter_name||name||id),name:name||id,username:username||'',description:'已审核 · 已在当前工作空间启用 · 支持'+types+' · Build '+String(row.adapter_version||''),url:String(caps.actor_url||''),currentPricingInfo:(row.pricing_model||{}) as Record<string,unknown>}
+    return {id,title:String(row.adapter_name||name||id),name:name||id,username:username||'',adapterKey:String(row.adapter_key||''),description:'已审核 · 已在当前工作空间启用 · 支持'+types+' · Build '+String(row.adapter_version||''),url:String(caps.actor_url||''),currentPricingInfo:(row.pricing_model||{}) as Record<string,unknown>}
    }).filter(item=>item.username&&item.name)
    setApprovedActors(mapped)
    setApprovedOffset(offset+rows.length);setHasMoreApproved(rows.length===5)
@@ -310,8 +324,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const nextSchema=(data.input_schema || {}) as JsonSchema
   const requirements=deriveSchemaRequirements(nextSchema)
    let initial:Record<string,unknown>=Object.fromEntries(schemaKeys(nextSchema).map(([key,field])=>[key,getDefaultValue(field,requirements.requiredFields.has(key))]))
-   const {data:configuredSelections}=await supabase.from('workspace_adapter_selections').select('config,discovery_adapter_catalog!inner(external_actor_id)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true)
+   const {data:configuredSelections}=await supabase.from('workspace_adapter_selections').select('adapter_key,config,discovery_adapter_catalog!inner(external_actor_id)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true)
    const configured=(configuredSelections||[]).find((row:any)=>row.discovery_adapter_catalog?.external_actor_id===actorId)
+   setSelectedAdapterKey(String(configured?.adapter_key||item.adapterKey||''))
    const configuredConfig=(configured?.config||{}) as Record<string,unknown>
    const defaults=(configuredConfig.input_defaults||{}) as Record<string,unknown>
    initial={...initial,...Object.fromEntries(Object.entries(defaults).filter(([key])=>Object.prototype.hasOwnProperty.call(nextSchema.properties||{},key)))}
