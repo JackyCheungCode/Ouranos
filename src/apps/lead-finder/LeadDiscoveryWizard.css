@@ -402,3 +402,21 @@
 .ldw-facebook-advanced[open] summary{margin-bottom:14px;color:var(--odoo-text)}
 .ldw-facebook-advanced .ldw-form-grid{margin-top:12px}
 .dark .ldw-facebook-advanced{background:#20252e}
+
+/* Facebook people discovery: shared form with a fixed three-Actor selector */
+.ldw-facebook-task-card{display:grid;gap:14px}
+.ldw-facebook-task-card .ldw-step-title{margin-bottom:0}
+.ldw-facebook-task-card .ldw-facebook-actor-step{padding-top:12px;border-top:1px solid var(--odoo-line)}
+.ldw-facebook-task-card .ldw-facebook-actor-options{display:grid;gap:8px}
+.ldw-facebook-task-card .ldw-facebook-actor-options>button{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid var(--odoo-line);border-radius:6px;background:var(--odoo-card);color:var(--odoo-text);text-align:left;cursor:pointer}
+.ldw-facebook-task-card .ldw-facebook-actor-options>button.selected{border-color:var(--odoo-primary);background:var(--odoo-soft)}
+.ldw-facebook-task-card .ldw-facebook-actor-options>button:disabled{opacity:.55;cursor:not-allowed}
+.ldw-facebook-task-card .ldw-facebook-actor-options>button>span:first-child{display:grid;gap:5px;min-width:0}
+.ldw-facebook-task-card .ldw-facebook-actor-options b{font-size:12px}
+.ldw-facebook-task-card .ldw-facebook-actor-options small{font-size:11px;color:var(--odoo-muted);line-height:1.5}
+.ldw-facebook-task-card .ldw-facebook-actor-options>button>span:last-child{white-space:nowrap;color:var(--odoo-primary);font-size:11px}
+.ldw-facebook-capability-note{padding:11px 12px;border:1px solid var(--odoo-line);border-radius:6px;background:var(--odoo-soft);font-size:11px;line-height:1.65}
+.ldw-facebook-capability-note ul{margin:6px 0 0;padding-left:18px}
+.ldw-facebook-capability-note li{margin:4px 0;color:var(--odoo-muted)}
+.dark .ldw-facebook-capability-note{background:#20252e}
+@media(max-width:640px){.ldw-facebook-task-card .ldw-facebook-actor-options>button{align-items:flex-start;flex-direction:column}.ldw-facebook-task-card .ldw-facebook-actor-options>button>span:last-child{white-space:normal}}
