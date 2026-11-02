@@ -265,6 +265,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   if(!supabase||!workspaceId){setApprovedActors([]);setHasMoreApproved(false);return}
   setApprovedBusy(true)
   try {
+   const connection=await supabase.from('integration_connections').select('status,is_enabled').eq('workspace_id',workspaceId).eq('provider_key','apify').maybeSingle()
+   if(connection.error)throw connection.error
+   if(!connection.data||connection.data.status!=='connected'||connection.data.is_enabled!==true){setApprovedActors([]);setApprovedOffset(0);setHasMoreApproved(false);return}
    const selections=await supabase.from('workspace_adapter_selections').select('adapter_key').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true)
    if(selections.error)throw selections.error
    const enabledKeys=(selections.data||[]).map(row=>String(row.adapter_key)).filter(Boolean)
