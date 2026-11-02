@@ -41,11 +41,18 @@ Deno.serve(async(req:Request)=>{
     const catalog=(await adapterResponse.json())[0];if(!catalog||!catalog.is_active)return json({error:`适配器 ${selection.adapter_key} 尚未启用`},409,origin);if(catalog.verification_status!=="verified"||catalog.maintenance_status!=="maintained")return json({error:`适配器 ${selection.adapter_key} 尚未通过客户资料输出审核或维护状态检查，不能执行`,verification_status:catalog.verification_status,maintenance_status:catalog.maintenance_status},409,origin);if(!Array.isArray(catalog.supported_record_types)||!catalog.supported_record_types.some((type:unknown)=>type==="company"||type==="contact"))return json({error:`适配器 ${selection.adapter_key} 尚未确认能够输出企业或联系人档案`},422,origin);
     const connection=connectionMap.get(String(catalog.provider_key)) as Record<string,unknown>|undefined;
     if(!connection||connection.status!=="connected"||connection.is_enabled!==true)return json({error:`请先连接并启用服务商：${catalog.provider_key}`},409,origin);
-    const config=(selection.config||{}) as Record<string,unknown>;const defaults=(config.input_defaults||{}) as Record<string,unknown>;const mapping=(config.input_mapping||{}) as Record<string,string>;const outputMapping=(config.field_mapping||catalog.field_mapping||{}) as Record<string,unknown>;
-    const input:Record<string,unknown>={...defaults};
-    for(const [inputField,profilePath] of Object.entries(mapping)){const value=getPath(searchProfile,profilePath);if(value!==undefined&&value!==null&&value!=="")setPath(input,inputField,value);}
-    if(input.customGeolocation&&typeof input.customGeolocation==='object'&&!Array.isArray(input.customGeolocation)&&Object.keys(input.customGeolocation as Record<string,unknown>).length===0)delete input.customGeolocation;const schema=(catalog.input_schema||{}) as Record<string,unknown>;const required=Array.isArray(schema.required)?schema.required as string[]:[];
-    const missingFields=required.filter(field=>input[field]===undefined||input[field]===null||input[field]==="");
+    const config=(selection.config||{}) as Record<string,unknown>;const outputMapping={} as Record<string,unknown>;
+    const submittedActorId=String(profile.actor_id||"");
+    if(submittedActorId&&submittedActorId!==String(catalog.external_actor_id||""))return json({error:`任务中的 Actor 与已选适配器不一致：${selection.adapter_key}`,expected_actor_id:catalog.external_actor_id,submitted_actor_id:submittedActorId},409,origin);
+    const submittedInput=profile.actor_input;
+    if(!submittedInput||typeof submittedInput!=="object"||Array.isArray(submittedInput))return json({error:`任务缺少 Actor Schema 参数对象：${selection.adapter_key}`},422,origin);
+    const input={...(submittedInput as Record<string,unknown>)};
+    const schema=(catalog.input_schema||{}) as Record<string,unknown>;
+    const properties=(schema.properties&&typeof schema.properties==="object"?schema.properties:{}) as Record<string,unknown>;
+    const unknownFields=Object.keys(input).filter(field=>!(field in properties));
+    if(unknownFields.length)return json({error:`Actor 参数包含当前 Schema 不存在的字段：${selection.adapter_key}`,unknown_input_fields:unknownFields},422,origin);
+    const required=Array.isArray(schema.required)?schema.required as string[]:[];
+    const missingFields=required.filter(field=>input[field]===undefined||input[field]===null||input[field]===""||(Array.isArray(input[field])&&!(input[field] as unknown[]).length));
     if(missingFields.length)return json({error:`渠道 ${selection.channel_key} 的 Actor 缺少必填参数`,adapter_key:selection.adapter_key,missing_input_fields:missingFields},422,origin);
     const pricing=(catalog.pricing_model||{}) as Record<string,unknown>;const maxCost=Number(config.max_cost||0);
     if(catalog.provider_key==="kuajingmofang"&&maxCost<=0)return json({error:"跨境魔方按接口计费，请先为该适配器设置单次费用上限（人民币）"},409,origin);
