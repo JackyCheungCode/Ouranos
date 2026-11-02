@@ -42,11 +42,12 @@ Deno.serve(async(req:Request)=>{
     const connection=connectionMap.get(String(catalog.provider_key)) as Record<string,unknown>|undefined;
     if(!connection||connection.status!=="connected"||connection.is_enabled!==true)return json({error:`请先连接并启用服务商：${catalog.provider_key}`},409,origin);
     const config=(selection.config||{}) as Record<string,unknown>;const defaults=(config.input_defaults||{}) as Record<string,unknown>;const mapping=(config.input_mapping||{}) as Record<string,string>;const outputMapping=(config.field_mapping||catalog.field_mapping||{}) as Record<string,unknown>;
-    const hasSubmittedActorInput=profile.actor_input&&typeof profile.actor_input==="object"&&!Array.isArray(profile.actor_input);\n    const submittedActorInput=hasSubmittedActorInput?profile.actor_input as Record<string,unknown>:{};
+    const hasSubmittedActorInput=profile.actor_input&&typeof profile.actor_input==="object"&&!Array.isArray(profile.actor_input);
+    const submittedActorInput=hasSubmittedActorInput?profile.actor_input as Record<string,unknown>:{};
     // The live Schema form is authoritative. Keep defaults/mappings only as a
     // compatibility fallback for older draft tasks that predate actor_input.
-    const input:Record<string,unknown>=Object.keys(submittedActorInput).length?{...submittedActorInput}:{...defaults};
-    if(!Object.keys(submittedActorInput).length){
+    const input:Record<string,unknown>=hasSubmittedActorInput?{...submittedActorInput}:{...defaults};
+    if(!hasSubmittedActorInput){
       for(const [inputField,profilePath] of Object.entries(mapping)){const value=getPath(searchProfile,profilePath);if(value!==undefined&&value!==null&&value!=="")setPath(input,inputField,value);}
     }
     const schema=(catalog.input_schema||{}) as Record<string,unknown>;
