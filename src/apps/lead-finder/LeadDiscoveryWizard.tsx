@@ -7,8 +7,9 @@ import { divIcon } from 'leaflet'
 import type { PathOptions } from 'leaflet'
 import { countries } from './countries'
 import './LeadDiscoveryWizard.css'
+import type { DiscoveryPageDefinition } from './DiscoveryPageHub'
 
-type Props = { workspaceId: string; userId: string; onTaskCreated: () => void }
+type Props = { workspaceId: string; userId: string; onTaskCreated: () => void; page: DiscoveryPageDefinition }
 type Actor = { id: string; name: string; username: string; title: string; description: string; url: string; stats?: { totalUsers?: number; actorReviewRating?: number; actorReviewCount?: number }; currentPricingInfo?: Record<string, unknown> }
 type SchemaField = { title?: string; description?: string; type?: string | string[]; editor?: string; default?: unknown; prefill?: unknown; example?: unknown; placeholderValue?: string; enum?: unknown[]; items?: SchemaField; properties?: Record<string, SchemaField>; required?: string[]; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; minItems?: number; maxItems?: number; pattern?: string; format?: string }
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
@@ -105,8 +106,8 @@ function MarketMap({selected,location}:{selected:typeof countries;location:MapLo
  return <div className="ldw-map"><MapContainer center={location?[location.lat,location.lon]:[24,5]} zoom={location?5:1.25} minZoom={1} maxZoom={12} scrollWheelZoom={false} worldCopyJump style={{height:220,width:'100%'}}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>{geo&&<GeoJSON key={selected.map(c=>c.code).sort().join(',')} data={geo} style={style}/>}<MapFocus location={location}/>{location&&<Marker position={[location.lat,location.lon]} icon={marketMarkerIcon}><Popup>{location.label}</Popup></Marker>}</MapContainer><div>{location?'地图已定位：'+location.label:'OpenStreetMap · 选择城市或行政区后自动定位'}</div></div>
 }
 
-export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated }: Props) {
- const [channel,setChannel] = useState('google-maps')
+export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated, page }: Props) {
+ const [channel,setChannel] = useState(page.platformKeys[0] || 'google-maps')
  const [provider,setProvider] = useState('Apify')
  const [directoryPlatforms,setDirectoryPlatforms] = useState<DirectoryPlatform[]>([])
  const [directoryReady,setDirectoryReady] = useState(false)
@@ -136,7 +137,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [regionResults,setRegionResults] = useState<Array<{place_id:number;display_name:string;name?:string;lat?:number;lon?:number}>>([])
  const [locationBusy,setLocationBusy] = useState(false)
  const [citySearchBusy,setCitySearchBusy] = useState(false)
- const [actorQuery,setActorQuery] = useState('google maps business places')
+ const [actorQuery,setActorQuery] = useState('')
+ const [actorVerificationStatus,setActorVerificationStatus] = useState('unverified')
+ const [actorMaintenanceStatus,setActorMaintenanceStatus] = useState('unmaintained')
  const [actors,setActors] = useState<Actor[]>([])
  const [actorBusy,setActorBusy] = useState(false)
  const [actor,setActor] = useState<Actor|null>(null)
@@ -201,10 +204,12 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  },[schema,values])
  useEffect(()=>{if(aiGenerated&&aiAnalyzedContext&&aiAnalyzedContext!==aiContextKey){setAiApplied(false);setAiError('市场或搜索任务配置已变化。之前的 AI 分析不能直接应用，请重新分析。')}},[aiContextKey])
  const availableProviders = providerByPlatform[channel] || ['Apify']
- const categories = [...new Set(directoryPlatforms.map(item=>item.category_key))]
- const visiblePlatforms = directoryPlatforms.filter(item=>item.category_key===selectedCategory)
+ const pagePlatforms = directoryPlatforms.filter(item=>page.platformKeys.includes(item.platform_key))
+ const categories = [...new Set(pagePlatforms.map(item=>item.category_key))]
+ const visiblePlatforms = pagePlatforms.filter(item=>item.category_key===selectedCategory)
  const categoryLabels:Record<string,string>={social:'社交媒体',search:'搜索与地图',b2b:'B2B 商业平台',commerce:'电商平台',web:'企业网站与商业数据'}
  const canSearchSelectedProvider = provider.toLowerCase()==='apify'
+ useEffect(()=>{const first=page.platformKeys.map(key=>directoryPlatforms.find(item=>item.platform_key===key)).find((item):item is DirectoryPlatform=>Boolean(item));if(first){if(!page.platformKeys.includes(channel))setChannel(first.platform_key);setSelectedCategory(first.category_key);setActorQuery(first.search_terms||first.platform_name)}},[page.id,directoryPlatforms])
  const selectedCountry = countries.find(c=>c.code===countryCode)
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
  const toggleCountry = (code:string) => {
@@ -214,8 +219,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   else if(!next.includes(countryCode)||!countryCode||!selectedCountries.includes(code))setCountryCode(next[next.length-1])
  }
 
- useEffect(()=>{ setActor(null); setSchema(null); setActors([]); setValues({});  setError(''); setNotice('') },[channel])
- useEffect(()=>{ setActor(null);setSchema(null);setValues({});setError('');setNotice('') },[provider])
+ useEffect(()=>{ setActor(null); setSchema(null); setActors([]); setValues({}); setActorVerificationStatus('unverified'); setActorMaintenanceStatus('unmaintained'); setError(''); setNotice('') },[channel])
+ useEffect(()=>{ setActor(null);setSchema(null);setValues({});setActorVerificationStatus('unverified');setActorMaintenanceStatus('unmaintained');setError('');setNotice('') },[provider])
  useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label);const current=directoryPlatforms.find(item=>item.platform_key===channel);if(current)setSelectedCategory(current.category_key)},[channel,directoryPlatforms])
  useEffect(()=>{
   let active=true
@@ -271,11 +276,13 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const actorId=item.username+'~'+item.name
   const {data,error:invokeError}=await supabase.functions.invoke('apify-actor-schema',{body:{workspace_id:workspaceId,actor_id:actorId,channel_key:channel}})
   if(invokeError||data?.error){setError(data?.error||invokeError?.message||'读取 Actor Schema 失败');setActor(null);setSchemaBusy(false);return}
+  setActorVerificationStatus(String(data.verification_status||'unverified'))
+  setActorMaintenanceStatus(String(data.maintenance_status||'unmaintained'))
   const nextSchema=(data.input_schema || {}) as JsonSchema
   const requirements=deriveSchemaRequirements(nextSchema)
    const initial=Object.fromEntries(schemaKeys(nextSchema).map(([key,field])=>[key,getDefaultValue(field,requirements.requiredFields.has(key))]))
   setSchema(nextSchema);setValues(initial);
-  setNotice('已读取 Actor 最新输入 Schema。以下字段由 Actor 定义，尚未启动采集。')
+  setNotice(data.verification_status==='verified'&&data.maintenance_status==='maintained'?'已读取 Actor 最新输入 Schema。该数据源已通过客户输出审核。':'已读取 Actor 最新输入 Schema。该 Actor 尚未通过直接客户资料审核，当前只能预览参数，不能启动正式采集。')
   setSchemaBusy(false)
  }
  const renderField = ([key,field]:[string,SchemaField]) => {
@@ -357,7 +364,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   try{
    const {data:sessionData,error:sessionError}=await supabase.auth.getSession()
    if(sessionError||!sessionData.session?.access_token)throw new Error('登录状态已失效，请重新登录。')
-   const supportedPlatforms=directoryPlatforms.length?directoryPlatforms.map(item=>({id:item.platform_key,name:item.platform_name})):platformGroups.flatMap(group=>group.items.map(([id,name])=>({id,name})))
+   const supportedPlatforms=pagePlatforms.length?pagePlatforms.map(item=>({id:item.platform_key,name:item.platform_name})):platformGroups.flatMap(group=>group.items.filter(([id])=>page.platformKeys.includes(id)).map(([id,name])=>({id,name})))
    const response=await fetch('https://ouranos-ai-assistant.xg-y.workers.dev',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+sessionData.session.access_token},
@@ -440,6 +447,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
   if(!schema||!actor)return
+  if(actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'){setError('该 Actor 尚未通过直接客户资料审核或维护状态检查，暂不能启动正式采集。请在数据源审核完成后再试。');return}
   if(!schemaValidation.valid){const [firstPath,firstMessage]=Object.entries(schemaValidation.errors)[0]||[];const issue=firstPath?schemaPathLabel(schema||{},firstPath)+'：'+firstMessage:'';setError('发现 '+Object.keys(schemaValidation.errors).length+' 项字段问题。'+(issue?'请先检查「'+issue+'」。':''));if(firstPath){const anchor=schemaPathAnchor(firstPath.split('.')[0].split('[')[0]);window.setTimeout(()=>document.getElementById(anchor)?.scrollIntoView({behavior:'smooth',block:'center'}),0)}return}
   if(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0){setError('请设置大于 0 的单次费用上限。');return}
   setBusy(true);setError('')
@@ -470,15 +478,16 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   return model+price
  }
  return <div className="ldw-shell ldw-manual-first">
-  <div className="ldw-workflow-head"><div><span className="ldw-eyebrow">MANUAL DISCOVERY</span><h2>手动配置数据采集</h2><p>按平台目录选择数据源，读取实际 Schema 后填写参数。AI 仅作为可选辅助。</p></div><button type="button" className="ldw-ai-sidebar-trigger" aria-expanded={aiSidebarOpen} onClick={()=>setAiSidebarOpen(value=>!value)}><Sparkles size={14}/>{aiSidebarOpen?'收起 AI 助手':'打开 AI 助手'}</button></div>
+  <div className="ldw-workflow-head"><div><span className="ldw-eyebrow">MANUAL DISCOVERY</span><h2>{page.title} · 数据源配置</h2><p>{page.description} 选择平台、服务商和 Actor 后，系统读取真实 Schema 并生成中文参数表单。</p></div><button type="button" className="ldw-ai-sidebar-trigger" aria-expanded={aiSidebarOpen} onClick={()=>setAiSidebarOpen(value=>!value)}><Sparkles size={14}/>{aiSidebarOpen?'收起 AI 助手':'打开 AI 助手'}</button></div>
+  <div className="ldp-page-context"><div><b>本页重点筛选</b><span>{page.filters.join(' · ')}</span></div><div><b>目标客户资料</b><span>{page.outputs}</span></div><small>{page.rule}</small></div>
   <div className="ldw-manual-layout">
    <main className="ldw-manual-main">
     <section className="ldw-card">
-     <div className="ldw-step-title"><span>1</span><div><h3>选择数据大类</h3><p>先确定你要采集的数据来源类型。</p></div></div>
+     <div className="ldw-step-title"><span>1</span><div><h3>选择发现类别</h3><p>当前入口：{page.title}。平台范围已按该页面限定。</p></div></div>
      {directoryReady&&categories.length>0?<div className="ldw-category-grid">{categories.map(key=><button type="button" key={key} className={selectedCategory===key?'selected':''} onClick={()=>{setSelectedCategory(key);const first=directoryPlatforms.find(item=>item.category_key===key);if(first)setChannel(first.platform_key)}}>{categoryLabels[key]||key}</button>)}</div>:<div className="ldw-loading">{directoryReady?'平台目录暂不可用，请刷新页面重试。':'正在同步平台目录…'}</div>}
     </section>
     <section className="ldw-card">
-     <div className="ldw-step-title"><span>2</span><div><h3>选择具体平台</h3><p>同一大类下可选择不同平台，平台目录由数据库维护。</p></div></div>
+     <div className="ldw-step-title"><span>2</span><div><h3>选择具体平台</h3><p>仅显示当前发现页面支持的平台，目录由数据库维护。</p></div></div>
      <div className="ldw-platform-grid ldw-platform-grid-manual">{visiblePlatforms.map(item=><button type="button" key={item.platform_key} className={channel===item.platform_key?'selected':''} onClick={()=>{setChannel(item.platform_key);setActorQuery(item.search_terms||item.platform_name)}}><img className="ldw-brand-logo" src={platformLogo(item.platform_key)} alt="" onError={event=>{event.currentTarget.style.display='none'}}/><span>{item.platform_name}</span>{channel===item.platform_key&&<Check size={13}/>}</button>)}</div>
      {!visiblePlatforms.length&&<div className="ldw-loading">当前类别暂无已启用平台。</div>}
      {directoryPlatforms.find(item=>item.platform_key===channel)?.description&&<p className="ldw-provider-note">{directoryPlatforms.find(item=>item.platform_key===channel)?.description}</p>}
@@ -494,11 +503,11 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     </section>
     {schema&&actor?<section className="ldw-card ldw-manual-schema-card">
      <div className="ldw-step-title"><span>5</span><div><h3>按 Schema 填写参数</h3><p>字段名称以中文展示；必填、类型、范围和 Actor 原始字段均保留。</p></div></div>
-     <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个输入字段 · 来自 Actor 最新构建的真实 Schema</small><small>{pricingLabel(actor)}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
+     <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个输入字段 · 来自 Actor 最新构建的真实 Schema</small><small>{pricingLabel(actor)}</small></div><span><ShieldCheck size={13}/> Schema 已读取 · {actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'客户输出已审核':'待客户输出审核'}</span></div>
      {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span></li>)}</ol></div>}
      <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>
      <div className="ldw-request-preview"><div className="ldw-request-preview-heading"><b>最终提交数据预览</b><span>{Object.keys(schemaValidation.payload).length} 个字段</span></div><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过':<>发现 {Object.keys(schemaValidation.errors).length} 项字段问题：{Object.entries(schemaValidation.errors).slice(0,3).map(([path,message],index)=><span key={path}>{index>0?'；':''}<a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema||{},path)}</a>：{message}</span>)}{Object.keys(schemaValidation.errors).length>3?'；其余问题请查看上方错误清单':''}</>}</div></div>
-     <div className="ldw-submit-row"><span>仅当 Schema 校验通过并确认费用上限后，才会创建任务并提交执行。</span><button disabled={!schema||!actor||busy||!schemaValidation.valid||!canSearchSelectedProvider} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
+     <div className="ldw-submit-row"><span>{actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'Schema 校验通过并确认费用上限后，才会创建任务。':'当前 Actor 尚未通过客户输出审核，不能创建正式采集任务。'}</span><button disabled={!schema||!actor||busy||!schemaValidation.valid||!canSearchSelectedProvider||actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
     </section>:<div className="ldw-chat-hint">完成前四步后，选择 Actor 即可读取 Schema 并显示手动参数表单。</div>}
    </main>
    {aiSidebarOpen&&<aside className="ldw-ai-sidebar">

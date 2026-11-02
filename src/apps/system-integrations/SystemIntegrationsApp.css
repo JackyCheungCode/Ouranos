@@ -112,3 +112,13 @@
 .int-cost-grid article>small{font-size:8px;color:var(--int-muted);line-height:1.45}
 .dark .int-cost-grid article>strong{color:#d0b7d0}
 @media(max-width:650px){.int-cost-grid{grid-template-columns:1fr 1fr}.int-cost-summary-head{flex-direction:column}}
+
+.apify-output-review-note{display:flex;flex-direction:column;gap:5px;margin:12px 0;padding:11px 12px;border:1px solid #eadfe9;border-radius:6px;background:#faf7fa;color:#675b68;font-size:12px}
+.apify-output-review-note b{font-size:12px;color:#4f4050}
+.apify-output-review-note span{font-weight:700;color:#805e7d}
+.apify-output-review-note small{font-size:11px;line-height:1.55;color:#817783}
+
+.apify-output-review-types{display:flex;gap:18px;flex-wrap:wrap}
+.apify-output-review-types label{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#5e5361}
+.apify-output-review-note textarea{width:100%;min-height:56px;resize:vertical;border:1px solid #ddd4df;border-radius:5px;padding:8px;font:inherit;font-size:11px;color:#4e4651;background:#fff}
+.apify-output-review-note .apify-save-inputs{align-self:flex-start}
