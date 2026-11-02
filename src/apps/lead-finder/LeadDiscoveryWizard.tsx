@@ -339,6 +339,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   setNotice(data.verification_status==='verified'&&data.maintenance_status==='maintained'?'已读取 Actor 最新输入 Schema。该数据源已通过客户输出审核。':'已读取 Actor 最新输入 Schema。该 Actor 尚未通过直接客户资料审核，当前只能预览参数，不能启动正式采集。')
   setSchemaBusy(false)
  }
+ useEffect(()=>{if(page.id!=="facebook-pages"||!canSearchSelectedProvider||actor||schemaBusy)return;void selectActor({id:"coregent~facebook-pages-leads-scraper",name:"facebook-pages-leads-scraper",username:"coregent",title:"Facebook Pages & Business Leads Scraper",description:"按关键词与地区发现企业主页，提取公开商务资料。",url:"https://apify.com/coregent/facebook-pages-leads-scraper"})},[page.id,canSearchSelectedProvider,actor?.id,schemaBusy])
  const selectProviderAdapter=(row:ProviderAdapterRow)=>{
   const catalog=row.discovery_adapter_catalog;const nextSchema=(catalog.input_schema||{}) as JsonSchema
   setSelectedAdapterKey(row.adapter_key);setActor({id:catalog.external_actor_id,name:catalog.external_actor_id,username:selectedProviderKey,title:catalog.adapter_name,description:'已审核 · 已启用 · '+selectedProviderKey,url:'',adapterKey:row.adapter_key,currentPricingInfo:catalog.pricing_model||{}})
@@ -499,11 +500,11 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   if(!schema||!actor)return
   if(actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'){setError('该 Actor 尚未通过直接客户资料审核或维护状态检查，暂不能启动正式采集。请在数据源审核完成后再试。');return}
   if(!schemaValidation.valid){const [firstPath,firstMessage]=Object.entries(schemaValidation.errors)[0]||[];const issue=firstPath?schemaPathLabel(schema||{},firstPath)+'：'+firstMessage:'';setError('发现 '+Object.keys(schemaValidation.errors).length+' 项字段问题。'+(issue?'请先检查「'+issue+'」。':''));if(firstPath){const anchor=schemaPathAnchor(firstPath.split('.')[0].split('[')[0]);window.setTimeout(()=>document.getElementById(anchor)?.scrollIntoView({behavior:'smooth',block:'center'}),0)}return}
-  if(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0){setError('请设置大于 0 的单次费用上限。');return}
+  if(page.id!=='facebook-pages'&&(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0)){setError('请设置大于 0 的单次费用上限。');return}
   setBusy(true);setError('')
   try {
    const actorInput:Record<string,unknown>={...schemaValidation.payload}
-   if(page.id==='facebook-pages'){if(facebookHasEmail)actorInput.hasEmail=true;if(facebookHasPhone)actorInput.hasPhone=true;if(facebookHasWebsite)actorInput.hasWebsite=true}
+   if(page.id==='facebook-pages'){for(const [key,value] of Object.entries(values)){if(value!==undefined&&value!==null&&value!==''&&/^(has.?email|has.?phone|has.?website)$/i.test(key))actorInput[key]=value}}
     const taskTitle=taskName.trim()||product.trim()||keywords.trim()||actor.title
    const actorId=selectedProviderKey==='apify'?actor.username+'~'+actor.name:actor.name
     const schemaHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stableStringify(schema))).then(d=>[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''))
@@ -553,15 +554,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      {!directoryProviders.length&&<div className="ldw-provider-note">服务商目录暂不可用。</div>}
     </section>
     </>}
-    {page.id === "facebook-pages" && <section className="ldw-card ldw-facebook-task-card">
-     <div className="ldw-step-title"><span>1</span><div><h3>填写本次发现任务需求</h3><p>先设定任务名称、目标数量与费用上限，再填写 Actor 搜索条件。</p></div></div>
-     <div className="ldw-form-grid">
-      <label className="ldw-field"><span className="ldw-field-label">任务名称</span><input value={taskName} onChange={event=>setTaskName(event.target.value)} placeholder="例如：美国户外用品经销商发现"/></label>
-      <label className="ldw-field"><span className="ldw-field-label">目标客户数量</span><input type="number" min="1" max="50000" value={targetCount} onChange={event=>{const value=event.target.value;setTargetCount(value);if(schema?.properties?.maxResults)setValues(current=>({...current,maxResults:value===""?"":Number(value)}))}} /><small>本次希望收集的企业主页数量，实际数量受搜索索引和地区覆盖影响。</small></label>
-      <label className="ldw-field"><span className="ldw-field-label">单次任务费用上限（USD） *</span><input type="number" min="0.01" step="0.01" value={maxCost} onChange={event=>setMaxCost(event.target.value)} /><small>Actor 页面当前标价约 $4 / 1,000 个返回主页；官网补全、主页透明度等可选功能可能产生额外费用。</small></label>
-      <label className="ldw-field"><span className="ldw-field-label">联系方式筛选</span><span><input type="checkbox" checked={facebookHasEmail} onChange={event=>setFacebookHasEmail(event.target.checked)}/> 仅保留公开邮箱</span><span><input type="checkbox" checked={facebookHasPhone} onChange={event=>setFacebookHasPhone(event.target.checked)}/> 仅保留公开电话</span><span><input type="checkbox" checked={facebookHasWebsite} onChange={event=>setFacebookHasWebsite(event.target.checked)}/> 仅保留公开官网</span><small>这些筛选由 Actor 的 API 支持，但未出现在其可视化 Schema 字段中；系统仅在用户主动勾选时提交。</small></label>
-     </div>
-    </section>}
+    {page.id !== "facebook-pages" && <>
     <section className="ldw-card">
      <div className="ldw-step-title"><span>{page.id === "facebook-pages" ? "2" : "4"}</span><div><h3>{page.id === "facebook-pages" ? "确认 Facebook 发现引擎" : "选择采集器 / Actor"}</h3><p>{page.id === "facebook-pages" ? "本渠道固定使用一个按关键词和地区发现企业主页的 Apify Actor。" : "仅展示管理员在 Actor 配置中心绑定到当前渠道、审核通过并启用的 Actor。"}</p></div></div>
      {actor && !actorPickerOpen ? (
@@ -597,14 +590,15 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
       page.id === "facebook-pages" ? <div className="ldw-provider-note">请先前往「系统设置 → 集成」连接并测试 Apify API Key，完成后返回本页读取固定 Actor 的真实 Schema。关键词发现还需要为该 Actor 配置搜索服务商 API Key。</div> : <div className="ldw-provider-note">当前服务商尚未接入搜索和执行接口。为避免错误调用，不会将此选择转发到其他服务商。</div>
      )}
     </section>
+    </>}
     {schema&&actor?<section className="ldw-card ldw-manual-schema-card">
-     <div className="ldw-step-title"><span>{page.id === "facebook-pages" ? "3" : "5"}</span><div><h3>按 Actor Schema 填写发现条件</h3><p>字段名称以中文展示；必填、类型、范围和 Actor 原始字段均保留。</p></div></div>
+     <div className="ldw-step-title"><span>{page.id === "facebook-pages" ? "1" : "5"}</span><div><h3>{page.id === "facebook-pages" ? "填写 Facebook 客户发现条件" : "按 Actor Schema 填写发现条件"}</h3><p>{page.id === "facebook-pages" ? "填写关键词、目标地区和采集数量即可开始；其他高级参数使用 Actor 默认值。" : "字段名称以中文展示；必填、类型、范围和 Actor 原始字段均保留。"}</p></div></div>
      <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个输入字段 · 来自 Actor 最新构建的真实 Schema</small><small>{pricingLabel(actor)}</small></div><span><ShieldCheck size={13}/> Schema 已读取 · {actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'客户输出已审核':'待客户输出审核'}</span></div>
      {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span></li>)}</ol></div>}
-     <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>
+     {page.id === "facebook-pages" ? (() => { const requirements=deriveSchemaRequirements(schema); const fields=schemaKeys(schema); const core=fields.filter(([key])=>{const k=key.toLowerCase();return requirements.requiredFields.has(key)||requirements.atLeastOneGroups.some(group=>group.includes(key))||/search.?queries|search.?terms|search.?query|keywords?|^query$|locations?|country(code)?|^city$|region|state|province|max.?results|max.?items|has.?email|has.?phone|has.?website/.test(k)}); const advanced=fields.filter(([key])=>!core.some(([coreKey])=>coreKey===key)); return <><div className="ldw-form-grid">{core.map(renderField)}</div>{advanced.length>0&&<details className="ldw-facebook-advanced"><summary>高级参数（{advanced.length} 项，通常无需修改）</summary><div className="ldw-form-grid">{advanced.map(renderField)}</div></details>}</> })() : <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>}
      <div className="ldw-request-preview"><div className="ldw-request-preview-heading"><b>最终提交数据预览</b><span>{Object.keys(schemaValidation.payload).length} 个字段</span></div><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过':<>发现 {Object.keys(schemaValidation.errors).length} 项字段问题：{Object.entries(schemaValidation.errors).slice(0,3).map(([path,message],index)=><span key={path}>{index>0?'；':''}<a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema||{},path)}</a>：{message}</span>)}{Object.keys(schemaValidation.errors).length>3?'；其余问题请查看上方错误清单':''}</>}</div></div>
      <div className="ldw-submit-row"><span>{actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'Schema 校验通过并确认费用上限后，才会创建任务。':'当前 Actor 尚未通过客户输出审核，不能创建正式采集任务。'}</span><button disabled={!schema||!actor||busy||!schemaValidation.valid||!canSearchSelectedProvider||actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
-    </section>:<div className="ldw-chat-hint">完成前四步后，选择 Actor 即可读取 Schema 并显示手动参数表单。</div>}
+    </section>:page.id === "facebook-pages" ? <section className="ldw-card"><div className="ldw-step-title"><span>1</span><div><h3>准备 Facebook 发现引擎</h3><p>系统自动读取固定 Actor 的真实 Schema，无需手动选择采集器。</p></div></div>{schemaBusy?<div className="ldw-loading"><Loader2 size={15}/> 正在读取 Facebook 发现参数…</div>:canSearchSelectedProvider?<div className="ldw-provider-note">正在准备 Facebook Actor 参数；若没有自动开始，请刷新页面重试。</div>:<div className="ldw-provider-note">请先前往「系统设置 → 集成」连接并测试 Apify。连接完成后，本页会自动读取 Facebook Actor 参数。</div>}</section>:<div className="ldw-chat-hint">完成前四步后，选择 Actor 即可读取 Schema 并显示手动参数表单。</div>}
    </main>
    {aiSidebarOpen&&<aside className="ldw-ai-sidebar">
   <section className="ldw-card ldw-ai-step ldw-chat-card ldw-chat-first">
