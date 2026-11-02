@@ -109,7 +109,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [provider,setProvider] = useState('Apify')
  const [directoryPlatforms,setDirectoryPlatforms] = useState<DirectoryPlatform[]>([])
  const [directoryReady,setDirectoryReady] = useState(false)
- useEffect(()=>{let active=true;if(!supabase){setDirectoryReady(true);return}Promise.all([supabase.from('discovery_platforms').select('platform_key,platform_name,category_key,search_terms,description,sort_order').eq('is_active',true).order('sort_order'),supabase.from('discovery_providers').select('provider_key,provider_name,provider_type').eq('is_active',true).order('provider_name')]).then(([platforms,providers])=>{if(!active)return;if(!platforms.error&&platforms.data?.length)setDirectoryPlatforms(platforms.data as DirectoryPlatform[]);if(providers.error)console.warn('Provider directory unavailable:',providers.error.message);setDirectoryReady(true)}).catch(()=>{if(active)setDirectoryReady(true)});return()=>{active=false}},[])
+ useEffect(()=>{let active=true;if(!supabase){setDirectoryReady(true);return}supabase.from('discovery_platforms').select('platform_key,platform_name,category_key,search_terms,description,sort_order').eq('is_active',true).order('sort_order').then(({data,error})=>{if(!active)return;if(!error&&data?.length)setDirectoryPlatforms(data as DirectoryPlatform[]);setDirectoryReady(true)}).catch(()=>{if(active)setDirectoryReady(true)});return()=>{active=false}},[])
  const [countryCode,setCountryCode] = useState('')
  const [selectedCountries,setSelectedCountries] = useState<string[]>([])
  const [countryQuery,setCountryQuery] = useState('')
