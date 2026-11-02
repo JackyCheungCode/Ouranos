@@ -14,6 +14,7 @@ type SchemaField = { title?: string; description?: string; type?: string | strin
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
 type MapLocation = { lat:number; lon:number; label:string }
 type ChatMessage = { role:'user'|'assistant'; content:string }
+type DirectoryPlatform = { platform_key:string; platform_name:string; category_key:string; search_terms:string; description:string; sort_order:number }
 const marketMarkerIcon=divIcon({className:'ldw-map-marker',html:'<span></span>',iconSize:[22,22],iconAnchor:[11,11]})
 const platformGroups = [
  { label: '搜索引擎与地图', items: [['google-maps','Google Maps','google maps business places'],['google-search','Google Search','google search results'],['bing','Bing','bing search results'],['yelp','Yelp','yelp business'] ] },
@@ -106,6 +107,9 @@ function MarketMap({selected,location}:{selected:typeof countries;location:MapLo
 export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated }: Props) {
  const [channel,setChannel] = useState('google-maps')
  const [provider,setProvider] = useState('Apify')
+ const [directoryPlatforms,setDirectoryPlatforms] = useState<DirectoryPlatform[]>([])
+ const [directoryReady,setDirectoryReady] = useState(false)
+ useEffect(()=>{let active=true;if(!supabase){setDirectoryReady(true);return}Promise.all([supabase.from('discovery_platforms').select('platform_key,platform_name,category_key,search_terms,description,sort_order').eq('is_active',true).order('sort_order'),supabase.from('discovery_providers').select('provider_key,provider_name,provider_type').eq('is_active',true).order('provider_name')]).then(([platforms,providers])=>{if(!active)return;if(!platforms.error&&platforms.data?.length)setDirectoryPlatforms(platforms.data as DirectoryPlatform[]);if(providers.error)console.warn('Provider directory unavailable:',providers.error.message);setDirectoryReady(true)}).catch(()=>{if(active)setDirectoryReady(true)});return()=>{active=false}},[])
  const [countryCode,setCountryCode] = useState('')
  const [selectedCountries,setSelectedCountries] = useState<string[]>([])
  const [countryQuery,setCountryQuery] = useState('')
@@ -236,7 +240,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const searchActors = async (queryOverride?:string) => {
   setActorBusy(true);setError('');setNotice('')
   try {
-   const term=(queryOverride||actorQuery).trim() || searchTerms[channel] || channel
+   const term=(queryOverride||actorQuery).trim() || directoryPlatforms.find(item=>item.platform_key===channel)?.search_terms || searchTerms[channel] || channel
    const url=new URL('https://api.apify.com/v2/store')
    url.searchParams.set('search',term);url.searchParams.set('limit','20');url.searchParams.set('sortBy','popularity');url.searchParams.set('responseFormat','full')
    const response=await fetch(url.toString(),{headers:{Accept:'application/json'}})
@@ -339,7 +343,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   try{
    const {data:sessionData,error:sessionError}=await supabase.auth.getSession()
    if(sessionError||!sessionData.session?.access_token)throw new Error('登录状态已失效，请重新登录。')
-   const supportedPlatforms=platformGroups.flatMap(group=>group.items.map(([id,name])=>({id,name})))
+   const supportedPlatforms=directoryPlatforms.length?directoryPlatforms.map(item=>({id:item.platform_key,name:item.platform_name})):platformGroups.flatMap(group=>group.items.map(([id,name])=>({id,name})))
    const response=await fetch('https://ouranos-ai-assistant.xg-y.workers.dev',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+sessionData.session.access_token},
