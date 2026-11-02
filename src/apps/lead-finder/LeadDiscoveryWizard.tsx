@@ -346,9 +346,10 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  const selectFacebookActor=(option:typeof facebookProfileActors[number])=>{
   const configured=approvedActors.find(item=>item.username===option.username&&item.name===option.name)
-  if(!configured){setError('该 Actor 尚未在当前工作空间完成登记、审核并启用，暂不能选择。');return}
-  setActor(configured);setSelectedAdapterKey(configured.adapterKey||'');setSchema(null);setValues({});setActorPickerOpen(false)
-  setActorVerificationStatus('verified');setActorMaintenanceStatus('maintained');setError('');setNotice('已选择 '+option.title+'。通用表单参数将按该 Actor 的固定接口格式提交，不读取动态 Schema。')
+  const selected:Actor=configured||{id:option.username+'~'+option.name,username:option.username,name:option.name,title:option.title,description:option.description,url:'https://apify.com/'+option.username+'/'+option.name}
+  setActor(selected);setSelectedAdapterKey(configured?.adapterKey||'');setSchema(null);setValues({});setActorPickerOpen(false)
+  setActorVerificationStatus(configured?'verified':'unverified');setActorMaintenanceStatus(configured?'maintained':'unmaintained');setError('')
+  setNotice(configured?'已选择 '+option.title+'。通用表单参数将按该 Actor 的固定接口格式提交，不读取动态 Schema。':'已选择 '+option.title+'。该 Actor 尚未在当前工作空间完成登记、样本审核和启用；你可以先填写条件，审核通过后即可执行。')
  }
  const selectProviderAdapter=(row:ProviderAdapterRow)=>{
   const catalog=row.discovery_adapter_catalog;const nextSchema=(catalog.input_schema||{}) as JsonSchema
@@ -636,14 +637,14 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      </div>
      <div className="ldw-step-title ldw-facebook-actor-step"><span>2</span><div><h3>选择一个抓取 Actor</h3><p>三个 Actor 使用同一套表单，系统会自动转换成各自需要的参数。</p></div></div>
      <div className="ldw-facebook-actor-options">
-      {facebookProfileActors.map(option=>{const configured=approvedActors.find(item=>item.username===option.username&&item.name===option.name);const selected=actor?.username===option.username&&actor?.name===option.name;return <button type="button" key={option.username} className={selected?'selected':''} disabled={!configured||!canSearchSelectedProvider} onClick={()=>selectFacebookActor(option)}>
-       <span><b>{option.title}</b><small>{option.description}</small><small>{configured?'已登记 · 已审核 · 已启用':'尚未在当前工作空间完成登记 / 审核 / 启用'}</small></span><span>{selected?'已选择':configured?'选择 Actor':'暂不可用'} <ArrowRight size={12}/></span>
+      {facebookProfileActors.map(option=>{const configured=approvedActors.find(item=>item.username===option.username&&item.name===option.name);const selected=actor?.username===option.username&&actor?.name===option.name;return <button type="button" key={option.username} className={selected?'selected':''} disabled={!canSearchSelectedProvider} onClick={()=>selectFacebookActor(option)}>
+       <span><b>{option.title}</b><small>{option.description}</small><small>{configured?'已登记 · 已审核 · 已启用':'可选择 · 待登记 / 样本审核 / 启用'}</small></span><span>{selected?'已选择':configured?'选择 Actor':'选择（待审核）'} <ArrowRight size={12}/></span>
       </button>})}
      </div>
      {!canSearchSelectedProvider&&<div className="ldw-provider-note">请先在「系统设置 → 集成」连接并启用 Apify，之后才能选择 Actor。</div>}
-     {actor&&<div className="ldw-selected-actor-summary"><div><b>{actor.title}</b><small>Actor ID：{actor.username}~{actor.name} · 审核通过</small></div><a href={actor.username==='silentflow'?'https://apify.com/silentflow/facebook-search-profiles-scraper':actor.username==='alien_force'?'https://apify.com/alien_force/facebook-search-scraper':'https://apify.com/memo23/facebook-search-scraper'} target="_blank" rel="noreferrer">查看 Actor 文档</a></div>}
+     {actor&&<div className="ldw-selected-actor-summary"><div><b>{actor.title}</b><small>Actor ID：{actor.username}~{actor.name} · {actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'已审核并启用':'待登记 / 样本审核 / 启用'}</small></div><a href={actor.username==='silentflow'?'https://apify.com/silentflow/facebook-search-profiles-scraper':actor.username==='alien_force'?'https://apify.com/alien_force/facebook-search-scraper':'https://apify.com/memo23/facebook-search-scraper'} target="_blank" rel="noreferrer">查看 Actor 文档</a></div>}
      <div className="ldw-facebook-capability-note"><b>地区筛选差异</b><ul><li><b>Silentflow：</b>城市可使用 Facebook 地点筛选；国家 / 地区按公开资料中的城市、家乡、工作或学校信息匹配。</li><li><b>Alien Force：</b>通过 Facebook 地点解析过滤 People 结果；地点名称无法解析时可能跳过过滤。</li><li><b>Memo23：</b>本表单将城市和国家拼入关键词提高相关性，不等同于精准地区过滤；其精确城市筛选需要 Facebook Place UID。</li></ul></div>
-     <div className="ldw-submit-row"><span>{actor?'已选 Actor。提交前请确认目标地区与数量；执行仍受数据源审核及费用策略约束。':'请先填写关键词和国家，并选择一个已审核启用的 Actor。'}</span><button disabled={!actor||!keywords.trim()||!countryCode||busy||!canSearchSelectedProvider||actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
+     <div className="ldw-submit-row"><span>{actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'已选 Actor 且审核通过。确认地区与数量后可创建任务。':actor?'已选 Actor，但尚未完成登记、样本审核和启用；当前不能启动正式采集。':'请先填写关键词和国家，并选择一个 Actor。'}</span><button disabled={!actor||!keywords.trim()||!countryCode||busy||!canSearchSelectedProvider||actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
     </section> : schema&&actor ? <section className="ldw-card ldw-manual-schema-card">
      <div className="ldw-step-title"><span>5</span><div><h3>按 Actor Schema 填写发现条件</h3><p>字段名称以中文展示；必填、类型、范围和 Actor 原始字段均保留。</p></div></div>
      <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个输入字段 · 来自 Actor 最新构建的真实 Schema</small><small>{pricingLabel(actor)}</small></div><span><ShieldCheck size={13}/> Schema 已读取 · {actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'客户输出已审核':'待客户输出审核'}</span></div>
