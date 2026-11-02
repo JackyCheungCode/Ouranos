@@ -10,8 +10,10 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import LeadDiscoveryWizard from './LeadDiscoveryWizard'
 import DiscoveryPageHub, { type DiscoveryPageDefinition } from './DiscoveryPageHub'
+import ApifyActorManager from '../system-integrations/ApifyActorManager'
+import '../system-integrations/SystemIntegrationsApp.css'
 
-type Tab = 'search' | 'tasks' | 'review'
+type Tab = 'search' | 'tasks' | 'review' | 'actors'
 type TargetType = 'companies' | 'contacts' | 'both'
 type Country = { code:string; name:string; flag:string; geoName:string }
 type Channel = { id:string; name:string; detail:string; logo:string; providers:string[]; status:string }
