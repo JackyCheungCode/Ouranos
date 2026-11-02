@@ -354,3 +354,5 @@
 @media(max-width:760px){.ldw-manual-layout:has(.ldw-ai-sidebar){grid-template-columns:1fr}.ldw-ai-sidebar{position:relative;top:auto;max-height:none}.ldw-ai-sidebar .ldw-chat-history{max-height:240px}.ldw-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ldw-provider-grid-manual{grid-template-columns:1fr 1fr}.ldw-platform-grid-manual{grid-template-columns:repeat(2,minmax(0,1fr))}.ldw-workflow-head{align-items:flex-start}.ldw-workflow-head h2{font-size:19px}}
 .dark .ldw-category-grid button,.dark .ldw-ai-sidebar-trigger{background:#252b34;color:#e7e8ec;border-color:#414854}
 .dark .ldw-provider-grid-manual button:disabled{background:#252b34}
+
+.ldw-ai-sidebar .ldw-submit-row{display:none}
