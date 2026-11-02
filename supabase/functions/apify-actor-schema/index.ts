@@ -28,7 +28,7 @@ Deno.serve(async(req:Request)=>{
   }
   if(action==="test"){
    const input=body.test_input&&typeof body.test_input==="object"&&!Array.isArray(body.test_input)?body.test_input:{};
-   const runResponse=await fetch(`https://api.apify.com/v2/acts/${encodeURIComponent(actorId)}/runs?waitForFinish=60`,{method:"POST",headers:{...headers,"Content-Type":"application/json"},body:JSON.stringify(input),signal});
+   const runResponse=await fetch(`https://api.apify.com/v2/acts/${encodeURIComponent(actorId)}/runs?waitForFinish=30`,{method:"POST",headers:{...headers,"Content-Type":"application/json"},body:JSON.stringify(input),signal});
    if(!runResponse.ok){const detail=await runResponse.text();return json({error:`Actor 测试启动失败（HTTP ${runResponse.status}）：${detail.slice(0,500)}`},400,origin);}
    const runBody=await runResponse.json();const run=runBody.data||runBody;let sample:unknown[]=[];
    if(run.defaultDatasetId){const datasetResponse=await fetch(`https://api.apify.com/v2/datasets/${encodeURIComponent(run.defaultDatasetId)}/items?limit=5&clean=true&format=json`,{headers,signal});if(datasetResponse.ok){const data=await datasetResponse.json();sample=Array.isArray(data)?data:[];}}
