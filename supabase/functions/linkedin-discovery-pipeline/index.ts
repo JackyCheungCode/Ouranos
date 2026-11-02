@@ -15,7 +15,7 @@ async function getApifyKey(admin:string,workspaceId:string){const c=await readJs
 async function apify(key:string,path:string,init:RequestInit={}){const headers=new Headers(init.headers);headers.set("Authorization",`Bearer ${key}`);headers.set("Accept","application/json");if(init.body)headers.set("Content-Type","application/json");return readJson(await fetch(`https://api.apify.com/v2/${path}`,{...init,headers,signal:AbortSignal.timeout(60000)}));}
 async function memberCheck(admin:string,workspaceId:string,userId:string){const m=await readJson(await rest(`workspace_members?select=role&workspace_id=eq.${enc(workspaceId)}&user_id=eq.${enc(userId)}&limit=1`,admin));if(m.length)return true;const w=await readJson(await rest(`workspaces?select=id&owner_id=eq.${enc(userId)}&id=eq.${enc(workspaceId)}&limit=1`,admin));return w.length>0;}
 async function getRun(admin:string,workspaceId:string,runId:string){const rows=await readJson(await rest(`linkedin_discovery_runs?select=*&id=eq.${enc(runId)}&workspace_id=eq.${enc(workspaceId)}&limit=1`,admin));if(!rows[0])throw new Error("找不到该 LinkedIn 发现任务");return rows[0];}
-async function updateRun(admin:string,workspaceId:string,runId:string,payload:Record<string,unknown>){return rest(`linkedin_discovery_runs?id=eq.${enc(runId)}&workspace_id=eq.${enc(workspaceId)}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({...payload,updated_at:new Date().toISOString()})});}
+async function updateRun(admin:string,workspaceId:string,runId:string,payload:Record<string,unknown>){const response=await rest(`linkedin_discovery_runs?id=eq.${enc(runId)}&workspace_id=eq.${enc(workspaceId)}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({...payload,updated_at:new Date().toISOString()})});if(!response.ok)throw new Error("LinkedIn 任务状态写入失败："+(await response.text()).slice(0,300));return response;}
 function profileUrl(row:Record<string,any>){const raw=String(row.url||row.profileUrl||row.profile_url||row.linkedinUrl||row.linkedin_url||row.linkedin_profile_url||"").trim();if(!raw)return "";if(/^https?:\/\//i.test(raw))return raw.replace(/^http:/,"https:").replace(/[?#].*$/,"").replace(/\/$/,"")+"/";return `https://www.linkedin.com/in/${raw.replace(/^\/+|\/+$/g,"")}/`;}
 function slugOf(url:string){return url.match(/linkedin\.com\/in\/([^/?#]+)/i)?.[1]||"";}
 async function fetchBatch(key:string,datasetId:string,offset:number){const data=await apify(key,`datasets/${enc(datasetId)}/items?clean=true&format=json&offset=${offset}&limit=100`);return Array.isArray(data)?data:Array.isArray(data.items)?data.items:[];}
@@ -72,14 +72,37 @@ async function handle(req:Request){
   }
   if(action==="poll_enrichment"){
    const key=await getApifyKey(admin,workspaceId);
-   if(!run.actor_b_run_id||!run.actor_b_dataset_id)return json({error:"Actor B 尚未启动"},409,origin);const stateBody=await apify(key,`actor-runs/${enc(String(run.actor_b_run_id))}`);const state=asObject(stateBody.data||stateBody);const offset=Number(run.actor_b_offset||0);const items=await fetchBatch(key,String(run.actor_b_dataset_id),offset);let enriched=0;
-   for(const raw of items){const item=asObject(raw);const url=profileUrl(item)||profileUrl(asObject(item.profile||{}));const contact=asObject(item.contactInfo||item.contact||{});const emailList=Array.isArray(item.emails)?item.emails.map((x:any)=>typeof x==="string"?x:String(asObject(x).email||"")).find(Boolean):"";const phoneList=Array.isArray(item.phones)?item.phones.map((x:any)=>typeof x==="string"?x:String(asObject(x).phone||"")).find(Boolean):"";const email=String(item.publicEmail||item.public_email||item.email||item.emailAddress||item.workEmail||item.contactEmail||item.verifiedEmail||contact.email||emailList||"");const phone=String(item.publicPhone||item.public_phone||item.phone||item.phoneNumber||item.mobile||item.contactPhone||contact.phone||phoneList||"");if(!url)continue;const patch={contact_email:email||null,contact_phone:phone||null,email_source:email?"datadoping/linkedin-profile-scraper":null,phone_source:phone?"datadoping/linkedin-profile-scraper":null,profile_data:item,enriched_at:new Date().toISOString(),last_error:null,updated_at:new Date().toISOString()};const r=await rest(`linkedin_candidates?run_id=eq.${enc(runId)}&workspace_id=eq.${enc(workspaceId)}&profile_url=eq.${enc(url)}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(patch)});if(r.ok)enriched++;}
+   if(!run.actor_b_run_id||!run.actor_b_dataset_id)return json({error:"Actor B 尚未启动"},409,origin);const stateBody=await apify(key,`actor-runs/${enc(String(run.actor_b_run_id))}`);const state=asObject(stateBody.data||stateBody);const offset=Number(run.actor_b_offset||0);const items=await fetchBatch(key,String(run.actor_b_dataset_id),offset);
+   const selectedRows=await readJson(await rest(`linkedin_candidates?select=id,profile_url,profile_slug,contact_email,contact_phone&run_id=eq.${enc(runId)}&workspace_id=eq.${enc(workspaceId)}&clean_status=eq.keep&selected_for_enrichment=eq.true&limit=250`,admin));
+   const keyOf=(value:string)=>{const slug=slugOf(value);return slug?slug.toLowerCase():value.toLowerCase().split("?")[0].split("#")[0].replace(new RegExp("/+$"),"");};
+   const byProfile=new Map<string,any>();for(const row of selectedRows){byProfile.set(keyOf(String(row.profile_url||"")),row);if(row.profile_slug)byProfile.set(String(row.profile_slug).toLowerCase(),row);}
+   let updated=0,unmatched=0,withoutContact=0;
+   for(const raw of items){
+    const item=asObject(raw),nested=asObject(item.profile||item.linkedinProfile||item.data||{});
+    const url=profileUrl(item)||profileUrl(nested)||profileUrl(asObject(item.person||{}));
+    const profileKey=keyOf(url);
+    const matched=byProfile.get(profileKey)||byProfile.get(slugOf(url).toLowerCase());
+    if(!matched){unmatched++;continue;}
+    const contact=asObject(item.contactInfo||item.contact_info||item.contact||item.contactDetails||item.publicContactInfo||nested.contactInfo||nested.contact||{});
+    const emails=Array.isArray(item.emails)?item.emails:Array.isArray(item.emailAddresses)?item.emailAddresses:[];
+    const phones=Array.isArray(item.phones)?item.phones:Array.isArray(item.phoneNumbers)?item.phoneNumbers:[];
+    const firstValue=(values:any[],field:string)=>values.map(x=>typeof x==="string"?x:String(asObject(x)[field]||asObject(x).value||"")).find(Boolean)||"";
+    const email=String(item.publicEmail||item.public_email||item.email||item.emailAddress||item.workEmail||item.contactEmail||item.verifiedEmail||contact.publicEmail||contact.email||contact.workEmail||firstValue(emails,"email")||nested.email||"").trim();
+    const phone=String(item.publicPhone||item.public_phone||item.phone||item.phoneNumber||item.mobile||item.contactPhone||contact.publicPhone||contact.phone||contact.mobile||firstValue(phones,"phone")||nested.phone||"").trim();
+    const patch:Record<string,unknown>={profile_data:item,enriched_at:new Date().toISOString(),last_error:null,updated_at:new Date().toISOString()};
+    if(email){patch.contact_email=email;patch.email_source="datadoping/linkedin-profile-scraper";}
+    if(phone){patch.contact_phone=phone;patch.phone_source="datadoping/linkedin-profile-scraper";}
+    if(!email&&!phone)withoutContact++;
+    const response=await rest(`linkedin_candidates?id=eq.${enc(String(matched.id))}&run_id=eq.${enc(runId)}&workspace_id=eq.${enc(workspaceId)}`,admin,{method:"PATCH",headers:{Prefer:"return=representation"},body:JSON.stringify(patch)});
+    const changed=await readJson(response);
+    if(Array.isArray(changed)&&changed.length>0)updated+=changed.length;
+   }
    const nextOffset=offset+items.length;const actorStatus=String(state.status||"");const done=["SUCCEEDED","FAILED","ABORTED","TIMED-OUT"].includes(actorStatus);const failed=["FAILED","ABORTED","TIMED-OUT"].includes(actorStatus);const complete=done&&items.length<100;const countRows=await readJson(await rest(`linkedin_candidates?select=id&run_id=eq.${enc(runId)}&workspace_id=eq.${enc(workspaceId)}&enriched_at=not.is.null`,admin));
    await updateRun(admin,workspaceId,runId,{status:failed?"failed":complete?"completed":"enriching",actor_b_status:actorStatus,actor_b_offset:nextOffset,enriched_count:countRows.length,actual_cost:Number(state.usageTotalUsd)||run.actual_cost||null,completed_at:complete?new Date().toISOString():null,error_message:failed?String(state.statusMessage||actorStatus):null});
-   if(items.length)await log(admin,workspaceId,runId,"enrichment_collect",`Actor B 返回 ${items.length} 条资料，已更新 ${enriched} 条候选人`,"success",{offset,next_offset:nextOffset,enriched});
+   if(items.length)await log(admin,workspaceId,runId,"enrichment_collect",`Actor B 返回 ${items.length} 条资料，数据库实际更新 ${updated} 条候选人`,updated===items.length?"success":"warning",{offset,next_offset:nextOffset,returned:items.length,updated,unmatched,without_contact:withoutContact});
    if(failed)await log(admin,workspaceId,runId,"enrichment_failed","Actor B 执行失败："+String(state.statusMessage||actorStatus),"error",{status:actorStatus});
    else if(complete)await log(admin,workspaceId,runId,"completed",`联系方式补全完成，已处理 ${countRows.length} 条候选人`,"success",{enriched:countRows.length});
-   return json({ok:true,status:failed?"failed":complete?"completed":"enriching",enriched,count:countRows.length,actor_status:actorStatus},200,origin);
+   return json({ok:true,status:failed?"failed":complete?"completed":"enriching",enriched:updated,count:countRows.length,returned:items.length,unmatched,without_contact:withoutContact,actor_status:actorStatus},200,origin);
   }
   return json({error:"Unsupported action"},400,origin);
  }catch(error){return json({error:error instanceof Error?error.message:"Unexpected LinkedIn pipeline error"},500,req.headers.get("origin"));}
