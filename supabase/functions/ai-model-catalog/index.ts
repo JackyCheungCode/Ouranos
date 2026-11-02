@@ -20,7 +20,7 @@ Deno.serve(async(req:Request)=>{
   switch(provider){
    case "openai":endpoint="https://api.openai.com/v1/models";break;
    case "anthropic":endpoint="https://api.anthropic.com/v1/models";headers["x-api-key"]=key;delete headers.Authorization;headers["anthropic-version"]="2023-06-01";break;
-   case "google-ai":endpoint="https://generativelanguage.googleapis.com/v1beta/models?key="+encodeURIComponent(key);delete headers.Authorization;break;
+   case "google-ai":endpoint="https://generativelanguage.googleapis.com/v1beta/models";delete headers.Authorization;headers["x-goog-api-key"]=key;break;
    case "deepseek":endpoint="https://api.deepseek.com/models";break;
    case "qwen":endpoint="https://dashscope.aliyuncs.com/compatible-mode/v1/models";break;
    case "zhipu":endpoint="https://open.bigmodel.cn/api/paas/v4/models";break;
