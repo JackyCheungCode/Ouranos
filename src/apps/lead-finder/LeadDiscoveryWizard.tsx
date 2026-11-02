@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Check, ChevronDown, ExternalLink, HelpCircle, Loader2, MapPin, Search, ShieldCheck, Sparkles, MessageCircle, Send } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ExternalLink, HelpCircle, Loader2, MapPin, Search, ShieldCheck, Sparkles, MessageCircle, Send, UserRound } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from 'react-leaflet'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
@@ -53,6 +53,7 @@ const schemaPathLabel=(schema:JsonSchema,path:string)=>{let properties=schema.pr
 const schemaPathAnchor=(path:string)=>'schema-field-'+encodeURIComponent(path).replace(/%/g,'-')
 const isEmptyRequired=(value:unknown)=>value===undefined||value===null||value===''||(Array.isArray(value)&&value.length===0)||(typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value as object).length===0)
 const getDefaultValue = (field: SchemaField, required=false) => field.default ?? (fieldType(field)==='boolean' ? false : fieldType(field)==='array' ? (required?'':field.editor==='stringList'?'':'[]') : fieldType(field)==='object' ? (required?'':'{}') : '')
+const normalizeValuesForAi=(schema:JsonSchema,values:Record<string,unknown>)=>Object.fromEntries(schemaKeys(schema).flatMap(([key,field])=>{const raw=values[key];if(isEmptyRequired(raw))return [];const type=fieldType(field);if(type==='integer'||type==='number'){const number=Number(raw);return Number.isFinite(number)?[[key,number]]:[]}if(type==='array'||type==='object'){if(typeof raw==='string'){try{return [[key,JSON.parse(raw)]]}catch{return []}}return [[key,raw]]}return [[key,raw]]}))
 const nominatim = async (params: Record<string,string>) => {
  const url = new URL('https://nominatim.openstreetmap.org/search')
  Object.entries({format:'jsonv2',addressdetails:'1',dedupe:'1',limit:'30',...params}).forEach(([k,v])=>url.searchParams.set(k,v))
@@ -143,6 +144,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [recognizedPlatform,setRecognizedPlatform] = useState('')
  const [aiMissingInformation,setAiMissingInformation] = useState<string[]>([])
  const [aiFieldExplanations,setAiFieldExplanations] = useState<Record<string,string>>({})
+ const [aiSuggestions,setAiSuggestions] = useState<string[]>([])
  const [manualConfigOpen,setManualConfigOpen] = useState(false)
  const [autoAnalysisKey,setAutoAnalysisKey] = useState('')
  const [keywords,setKeywords] = useState('')
@@ -245,7 +247,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  const selectActor = async (item: Actor) => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
-  setActor(item);setSchema(null);setValues({});setAiGenerated(null);setAiSummary('');setAiStrategy('');setAiWarnings([]);setAiMissingInformation([]);setAiFieldExplanations({});setAiApplied(false);setAiAnalyzedContext('');setAutoAnalysisKey('');setAiError('');setSchemaBusy(true);setError('');setNotice('');
+  setActor(item);setSchema(null);setValues({});setAiGenerated(null);setAiSummary('');setAiStrategy('');setAiWarnings([]);setAiSuggestions([]);setAiMissingInformation([]);setAiFieldExplanations({});setAiApplied(false);setAiAnalyzedContext('');setAutoAnalysisKey('');setAiError('');setSchemaBusy(true);setError('');setNotice('');
   setChatMessages(current=>[current[0],...current.filter(message=>message.role==='user'),{role:'assistant',content:'已选择 '+(item.title||item.name)+'。我正在读取它的真实输入 Schema，随后会根据参数要求继续与你确认。'}])
   const actorId=item.username+'~'+item.name
   const {data,error:invokeError}=await supabase.functions.invoke('apify-actor-schema',{body:{workspace_id:workspaceId,actor_id:actorId,channel_key:channel}})
@@ -343,7 +345,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      mode,model:aiModel,user_request:requestText,conversation:messages.slice(-20),
      supported_platforms:supportedPlatforms,channel,actor_id:activeActor?activeActor.username+'~'+activeActor.name:'',actor_name:activeActor?.title||'',actor_description:activeActor?.description||'',
      actor_schema:activeSchema,
-     previous_actor_input:activeSchema?schemaValidation.payload:{},
+     previous_actor_input:activeSchema?normalizeValuesForAi(activeSchema,values):{},
      market:{countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},
      task_limits:{task_name:taskName,product,industry,keywords,target_type:targetType,target_count:Number(targetCount),max_cost_usd:Number(maxCost)}
     })
@@ -382,6 +384,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    setAiGenerated(generated)
    setAiSummary(String(result.summary||''));setAiStrategy(String(result.strategy||''))
    setAiWarnings(Array.isArray(result.warnings)?result.warnings.map(String):[])
+   setAiSuggestions(Array.isArray(result.suggestions)?result.suggestions.map(String):[])
    setAiMissingInformation(Array.isArray(result.missing_information)?result.missing_information.map(String):[])
    setAiFieldExplanations(result.field_explanations&&typeof result.field_explanations==='object'?result.field_explanations as Record<string,string>:{})
    const mapped=Object.fromEntries(Object.entries(generated).map(([key,value])=>{
@@ -449,7 +452,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  return <div className="ldw-shell">
   <section className="ldw-card ldw-ai-step ldw-chat-card ldw-chat-first">
    <div className="ldw-step-title"><span><MessageCircle size={16}/></span><div><h3>AI 采集助手</h3><p>描述业务目标，AI 将识别平台并搜索候选 Actor；你在对话中选择后，AI 再读取 Schema 并填写参数。</p></div></div>
-   <div className="ldw-chat-history" aria-live="polite">{chatMessages.map((message,index)=><div key={index} className={'ldw-chat-message '+message.role}><span>{message.role==='assistant'?'AI 助手':'你'}</span><p>{message.content}</p></div>)}{aiBusy&&<div className="ldw-chat-message assistant"><span>AI 助手</span><p className="ldw-chat-thinking"><Loader2 size={13}/> 正在理解需求并搜索可用 Actor…</p></div>}</div>
+   <div className="ldw-chat-history" aria-live="polite">{chatMessages.map((message,index)=><div key={index} className={'ldw-chat-message '+message.role}><span className={'ldw-chat-avatar '+(message.role==='assistant'?'ai':'user')} aria-hidden="true">{message.role==='assistant'?<Sparkles size={15}/>:<UserRound size={15}/>}</span><div className="ldw-chat-message-body"><span>{message.role==='assistant'?'AI 助手':'你'}</span><p>{message.content}</p></div></div>)}{aiBusy&&<div className="ldw-chat-message assistant"><span className="ldw-chat-avatar ai" aria-hidden="true"><Sparkles size={15}/></span><div className="ldw-chat-message-body"><span>AI 助手</span><p className="ldw-chat-thinking"><Loader2 size={13}/> 正在理解需求并分析参数…</p></div></div>}</div>
    {!actor&&recognizedPlatform&&<div className="ldw-ai-actor-picker"><div className="ldw-ai-actor-search"><input value={actorQuery} onChange={e=>setActorQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();void searchActors()}}} placeholder="搜索 Actor，例如 amazon seller scraper"/><button type="button" onClick={()=>void searchActors()} disabled={actorBusy||!actorQuery.trim()}>{actorBusy?<Loader2 size={13}/>:<Search size={13}/>} 搜索 Actor</button></div>{actorBusy&&<p>正在搜索 Apify Store…</p>}{actors.length>0&&<div className="ldw-ai-actor-options"><b>选择一个 Actor（{actors.length}）</b><p>由你决定使用哪个采集器。AI 会在你选择后读取真实 Schema 并继续对话。</p>{actors.slice(0,8).map(item=><button type="button" key={item.id} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description||item.username+' / '+item.name}</small><small>{pricingLabel(item)}</small></span><span>选择 <ArrowRight size={12}/></span></button>)}</div>}</div>}
    <div className="ldw-chat-composer"><textarea rows={3} value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void submitChat()}}} placeholder="例如：我销售手机数据线，想寻找美国亚马逊上相关品类的卖家…" /><button type="button" onClick={()=>void submitChat()} disabled={!chatInput.trim()||aiBusy}><Send size={14}/> 发送</button></div>
    {aiError&&<div className="ldw-error">{aiError}</div>}
@@ -458,7 +461,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    {schema&&actor&&<div className="ldw-ai-live-preview">
     <div className="ldw-ai-result-heading"><b>实时参数预览</b><span>{actor.title} · {pricingLabel(actor)}</span></div>
     {aiSummary&&<div className="ldw-ai-summary"><b>需求理解</b><p>{aiSummary}</p></div>}
-    {aiStrategy&&<div className="ldw-ai-summary"><b>采集策略</b><p>{aiStrategy}</p></div>}
+    {aiStrategy&&<div className="ldw-ai-summary"><b>AI 采集建议</b><p>{aiStrategy}</p></div>}
+    {aiSuggestions.length>0&&<div className="ldw-ai-recommendations"><b><Sparkles size={13}/> 可以进一步优化</b><ul>{aiSuggestions.map((suggestion,index)=><li key={index}>{suggestion}</li>)}</ul></div>}
     <div className="ldw-ai-preview-status"><span>Schema 校验：{schemaValidation.valid?'通过':'待完善'}</span><span>已生成字段：{Object.keys(schemaValidation.payload).length} / {schemaKeys(schema).length}</span><span>待确认：{aiMissingInformation.length}</span></div>
     {aiMissingInformation.length>0&&<div className="ldw-ai-warnings"><b>还需要确认</b><ul>{aiMissingInformation.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
     {aiWarnings.length>0&&<div className="ldw-ai-warnings"><b>能力或参数提醒</b><ul>{aiWarnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul></div>}
