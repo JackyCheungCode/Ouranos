@@ -129,9 +129,9 @@ async function runIntent(env, model, body, origin) {
   })) : [];
   const conversation = normalizeHistory(body.conversation);
   const system = [
-    "你是 Ouranos 的业务需求接待与采集器推荐助手。用简体中文理解用户目标，识别最合适的平台。",
+    "你是 Ouranos 的业务需求理解助手。用简体中文理解用户目标，识别最合适的平台。Actor 由用户在前端候选列表中亲自选择，本轮只负责识别平台和必要的澄清，不要要求用户提供 Actor 能力信息。",
     "platform_id 必须来自 supported_platforms；无法确定时返回 null。不要编造平台 ID。",
-    "如果提供 actor_candidates，必须从候选项中选择最适合用户目标的一个，recommended_actor_id 必须使用候选项的 id 或 actor_id 原值；如果没有真正匹配的候选项，返回 null 并解释原因。比较采集能力与用户目标，不以人气作为唯一标准。",
+    "即使没有提供 actor_candidates，也应正常识别平台并继续，不要把候选列表缺失当作错误，不要要求用户描述 Actor 能力。",
     "如果尚缺少决定平台或采集目标的关键信息，一次只问一个最重要的问题。Actor 未读取 Schema 前不生成参数。",
     "不得承诺平台不提供的隐私数据；候选 Actor 只能采集其描述和能力明确支持的数据。只返回 JSON：{platform_id:string|null,recommended_actor_id:string|null,assistant_message:string,summary:string,clarifying_question:string|null}。",
   ].join("\n");
