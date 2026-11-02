@@ -161,6 +161,7 @@ const FIELD_SYSTEM = [
   "只生成本组 properties 中存在的字段；不允许生成 Schema 以外字段。枚举必须使用 Schema 原始值，严格遵循类型和约束。",
   "保留 previous_actor_input 中用户已确认且仍有效的值；本轮用户回答优先。Schema 默认值可使用，但要在 field_explanations 标明来源。不得把已提供的关键词、数量、地点等信息再次询问。用户用简短回答（例如“10”“美国”“USB cable”）时，必须结合最近一轮对话判断其对应字段并写入参数，不要要求用户重复完整句子。missing_information 只能列出当前仍为空且确实阻止任务正确执行的信息；如果 previous_actor_input 已有值，绝不能再列为缺失。",
   "除了填写参数，还要结合用户目标和 Actor 能力主动给出有价值的业务建议，例如关键词更具体、地区范围、结果数量、筛选方式或数据质量注意事项。建议必须具体、可执行，不得擅自改写用户已确认参数；没有必要建议时返回空数组。",
+  "对于 URL 类字段（包括 startUrls、startUrl、urls 及 Schema format=uri/url），绝不能把关键词、平台名称、域名片段或自然语言当作 URL。只有用户明确提供完整 http(s) URL，或 Schema 明确提供可用 URL 默认值/示例时才填写；不得猜测或自行拼接 URL。若字段是数组，必须严格遵循 items 的真实结构：items.type=object 时输出对象数组并按 items.properties 填充；items.type=string 时输出字符串数组。缺少真实 URL 时保留为空，并在 missing_information 中明确询问用户要抓取的具体页面链接；不要将搜索关键词放进 startUrls。",
   "可选字段如果无关或未提供可以省略，不要因此阻止提交。missing_information 只包含阻止正确执行的必填或关键业务信息。",
   "如果 Actor 能力与用户要找的数据类型不匹配，必须明确提醒，不得声称能获取其不支持的数据。",
   "只返回 JSON：{assistant_message:string,actor_input:object,missing_information:string[],field_explanations:object,warnings:string[],strategy:string,suggestions:string[]}。JSON 之外不要输出文字。",
