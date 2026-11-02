@@ -294,7 +294,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    const response=await fetch(url.toString(),{headers:{Accept:'application/json'}})
    if(!response.ok)throw new Error('Apify Store 搜索失败，请稍后重试')
    const body=await response.json();const items=(body.data?.items || []) as Actor[]
-   setActors(current=>append?[...current,...items]:items);setCandidateOffset(append?candidateOffset+items.length:items.length);setHasMoreCandidates(items.length===5);if(!items.length&&!append)setNotice('没有找到匹配的 Actor。可以调整关键词再搜索。')
+   const approvedIds=new Set(approvedActors.map(item=>item.username+'~'+item.name))
+   const candidates=items.filter(item=>!approvedIds.has(item.username+'~'+item.name))
+   setActors(current=>append?[...current,...candidates]:candidates);setCandidateOffset(append?candidateOffset+items.length:items.length);setHasMoreCandidates(items.length===5);if(!candidates.length&&!append)setNotice('没有找到新的待审核候选 Actor。可以调整关键词再搜索。')
   }catch(e){setError(e instanceof Error?e.message:'无法搜索 Apify Store')}
   finally{setActorBusy(false)}
  }
