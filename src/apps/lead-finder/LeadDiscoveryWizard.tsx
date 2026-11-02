@@ -312,7 +312,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    let initial=Object.fromEntries(schemaKeys(nextSchema).map(([key,field])=>[key,getDefaultValue(field,requirements.requiredFields.has(key))]))
    const {data:configuredSelections}=await supabase.from('workspace_adapter_selections').select('config,discovery_adapter_catalog!inner(external_actor_id)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true)
    const configured=(configuredSelections||[]).find((row:any)=>row.discovery_adapter_catalog?.external_actor_id===actorId)
-   const defaults=(configured?.config?.input_defaults||{}) as Record<string,unknown>
+   const configuredConfig=(configured?.config||{}) as Record<string,unknown>
+   const defaults=(configuredConfig.input_defaults||{}) as Record<string,unknown>
    initial={...initial,...Object.fromEntries(Object.entries(defaults).filter(([key])=>Object.prototype.hasOwnProperty.call(nextSchema.properties||{},key)))}
   setSchema(nextSchema);setValues(initial);
   setNotice(data.verification_status==='verified'&&data.maintenance_status==='maintained'?'已读取 Actor 最新输入 Schema。该数据源已通过客户输出审核。':'已读取 Actor 最新输入 Schema。该 Actor 尚未通过直接客户资料审核，当前只能预览参数，不能启动正式采集。')
