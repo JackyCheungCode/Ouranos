@@ -85,7 +85,7 @@ export default function ApifyActorManager({canSync}:{canSync:boolean}){
  const addActor=async(id:string)=>{
   if(!id.trim())return
   setBusy(true);setError('');setMessage('')
-  try{const data=await invoke({action:'schema',actor_id:id.trim()});setActorId('');setMessage(`已添加 ${data.actor_name}，读取到 ${Object.keys(data.input_schema?.properties||{}).length} 个输入字段。当前保持停用，完成测试和审核后再启用。`);setStoreResults([]);await load();setSelectedId(data.adapter_key?selections.find(row=>row.adapter_key===data.adapter_key)?.id||'':'')}
+  try{const data=await invoke({action:'schema',actor_id:id.trim()});setActorId('');setMessage(`已添加 ${data.actor_name}，读取到 ${Object.keys(data.input_schema?.properties||{}).length} 个输入字段。当前保持停用，完成测试和审核后再启用。`);setStoreResults([]);await load()}
   catch(e){setError(e instanceof Error?e.message:'读取 Actor Schema 失败')}
   finally{setBusy(false)}
  }
