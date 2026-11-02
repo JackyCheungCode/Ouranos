@@ -111,7 +111,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [directoryPlatforms,setDirectoryPlatforms] = useState<DirectoryPlatform[]>([])
  const [directoryReady,setDirectoryReady] = useState(false)
  const [directoryProviders,setDirectoryProviders] = useState<DirectoryProvider[]>([])
- const [selectedCategory,setSelectedCategory] = useState('social')
+ const [selectedCategory,setSelectedCategory] = useState('search')
  const [aiSidebarOpen,setAiSidebarOpen] = useState(false)
  useEffect(()=>{let active=true;if(!supabase){setDirectoryReady(true);return}
   Promise.all([
@@ -136,7 +136,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [regionResults,setRegionResults] = useState<Array<{place_id:number;display_name:string;name?:string;lat?:number;lon?:number}>>([])
  const [locationBusy,setLocationBusy] = useState(false)
  const [citySearchBusy,setCitySearchBusy] = useState(false)
- const [actorQuery,setActorQuery] = useState('')
+ const [actorQuery,setActorQuery] = useState('google maps business places')
  const [actors,setActors] = useState<Actor[]>([])
  const [actorBusy,setActorBusy] = useState(false)
  const [actor,setActor] = useState<Actor|null>(null)
@@ -214,7 +214,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   else if(!next.includes(countryCode)||!countryCode||!selectedCountries.includes(code))setCountryCode(next[next.length-1])
  }
 
- useEffect(()=>{ setProvider(availableProviders[0] || 'Apify'); setActor(null); setSchema(null); setActors([]); setValues({});  setError(''); setNotice('') },[channel])
+ useEffect(()=>{ setActor(null); setSchema(null); setActors([]); setValues({});  setError(''); setNotice('') },[channel])
  useEffect(()=>{ setActor(null);setSchema(null);setValues({});setError('');setNotice('') },[provider])
  useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label)},[channel])
  useEffect(()=>{
