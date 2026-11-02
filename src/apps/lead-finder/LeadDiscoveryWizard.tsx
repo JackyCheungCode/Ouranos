@@ -440,7 +440,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
   if(!schema||!actor)return
-  if(aiApplied&&aiAnalyzedContext!==aiContextKey){setError('市场或搜索任务配置已变化，之前的 AI 参数已过期。请重新分析并确认参数，或重新检查后再提交。');return}
   if(!schemaValidation.valid){setError('请先修正 Schema 字段中的 '+Object.keys(schemaValidation.errors).length+' 项校验问题。');return}
   if(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0){setError('请设置大于 0 的单次费用上限。');return}
   setBusy(true);setError('')
@@ -499,7 +498,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span></li>)}</ol></div>}
      <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>
      <div className="ldw-request-preview"><div className="ldw-request-preview-heading"><b>最终提交数据预览</b><span>{Object.keys(schemaValidation.payload).length} 个字段</span></div><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过':`请修正 ${Object.keys(schemaValidation.errors).length} 项字段问题`}</div></div>
-     <div className="ldw-submit-row"><span>仅当 Schema 校验通过并确认费用上限后，才会创建任务并提交执行。</span><button disabled={!schema||!actor||busy||!schemaValidation.valid||aiMissingInformation.length>0||!canSearchSelectedProvider} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
+     <div className="ldw-submit-row"><span>仅当 Schema 校验通过并确认费用上限后，才会创建任务并提交执行。</span><button disabled={!schema||!actor||busy||!schemaValidation.valid||!canSearchSelectedProvider} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
     </section>:<div className="ldw-chat-hint">完成前四步后，选择 Actor 即可读取 Schema 并显示手动参数表单。</div>}
    </main>
    {aiSidebarOpen&&<aside className="ldw-ai-sidebar">
