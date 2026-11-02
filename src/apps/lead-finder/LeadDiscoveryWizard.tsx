@@ -138,7 +138,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [aiError,setAiError] = useState('')
  const [aiApplied,setAiApplied] = useState(false)
  const [aiAnalyzedContext,setAiAnalyzedContext] = useState('')
- const [chatMessages,setChatMessages] = useState<ChatMessage[]>([{role:'assistant',content:'你好！先用自然语言告诉我你想在哪个平台寻找什么类型的潜在客户。我会先识别平台；你手动选择 Actor 后，我会读取它的真实参数要求，继续逐项与你确认。'}])
+ const [chatMessages,setChatMessages] = useState<ChatMessage[]>([{role:'assistant',content:'你好！请先描述你想寻找什么客户或数据。我会通过对话确认目标平台、自动筛选并推荐最合适的 Actor，再读取它的真实 Schema 填写参数。你确认最终提交数据后，我才会启动采集。'}])
  const [chatInput,setChatInput] = useState('')
  const [recognizedPlatform,setRecognizedPlatform] = useState('')
  const [aiMissingInformation,setAiMissingInformation] = useState<string[]>([])
@@ -152,7 +152,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [targetCount,setTargetCount] = useState('100')
  const [maxCost,setMaxCost] = useState('10')
  const [taskName,setTaskName] = useState('')
- const [costConsent,setCostConsent] = useState(false)
  const [busy,setBusy] = useState(false)
  const [error,setError] = useState('')
  const [notice,setNotice] = useState('')
@@ -355,10 +354,35 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    if(mode==='intent'){
     if(result.platform_id){
      const platform=supportedPlatforms.find(item=>item.id===result.platform_id)
-     if(platform){setChannel(platform.id);setRecognizedPlatform(platform.name)}
+     if(platform){
+      setChannel(platform.id);setRecognizedPlatform(platform.name)
+      if(platform.id==='amazon' || providerByPlatform[platform.id]?.includes('Apify')){
+       const term=searchTerms[platform.id]||platform.id
+       const storeUrl=new URL('https://api.apify.com/v2/store')
+       storeUrl.searchParams.set('search',term);storeUrl.searchParams.set('limit','20');storeUrl.searchParams.set('sortBy','popularity');storeUrl.searchParams.set('responseFormat','full')
+       const storeResponse=await fetch(storeUrl.toString(),{headers:{Accept:'application/json'}})
+       if(!storeResponse.ok)throw new Error('无法读取平台可用的 Actor，请稍后重试。')
+       const storeBody=await storeResponse.json()
+       const candidates=(storeBody.data?.items||[]) as Actor[]
+       setActors(candidates)
+       if(candidates.length){
+        const recommendationResponse=await fetch('https://ouranos-ai-assistant.xg-y.workers.dev',{
+         method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+sessionData.session.access_token},
+         body:JSON.stringify({mode:'intent',model:aiModel,user_request:requestText,conversation:messages.slice(-20),supported_platforms:supportedPlatforms,actor_candidates:candidates.slice(0,16).map(item=>({id:item.id,actor_id:item.username+'~'+item.name,name:item.title||item.name,description:item.description||'',pricing:pricingLabel(item)})),channel:platform.id})
+        })
+        const recommendation=await recommendationResponse.json()
+        const recommended=candidates.find(item=>item.id===recommendation?.recommended_actor_id||item.username+'~'+item.name===recommendation?.recommended_actor_id)
+        if(recommendationResponse.ok&&recommended){
+         setChatMessages(current=>[...current,{role:'assistant',content:String(recommendation.assistant_message||('我已为你推荐 '+recommended.title+'，正在读取它的真实参数 Schema。'))}])
+         await selectActor(recommended)
+         return
+        }
+       }
+      }
+     }
     }
     setAiSummary(String(result.summary||''))
-    setChatMessages(current=>[...current,{role:'assistant',content:String(result.assistant_message||'我已理解你的需求。请展开手动配置，搜索并选择一个 Actor。')}])
+    setChatMessages(current=>[...current,{role:'assistant',content:String(result.assistant_message||'我已理解你的需求。请继续补充目标范围，我会据此推荐平台和采集器。')}])
     return
    }
    const generated=(result.actor_input||{}) as Record<string,unknown>
@@ -398,7 +422,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const startSearch = async () => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
-  if(!schema||!actor||!costConsent)return
+  if(!schema||!actor)return
   if(aiApplied&&aiAnalyzedContext!==aiContextKey){setError('市场或搜索任务配置已变化，之前的 AI 参数已过期。请重新分析并确认参数，或重新检查后再提交。');return}
   if(!schemaValidation.valid){setError('请先修正 Schema 字段中的 '+Object.keys(schemaValidation.errors).length+' 项校验问题。');return}
   if(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0){setError('请设置大于 0 的单次费用上限。');return}
@@ -431,81 +455,36 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  return <div className="ldw-shell">
   <div className="ldw-intro"><div><span className="ldw-eyebrow">LEAD DISCOVERY WORKSPACE</span><h2>发现潜在客户</h2><p>先定义目标市场和搜索任务，再选择采集器；AI 将依据真实 Schema 生成参数。</p></div><span className="ldw-status"><Sparkles size={14}/> 动态采集配置</span></div>
-  <div className="ldw-odoo-flow" aria-label="潜客发现流程">{[['01','来源平台'],['02','数据供应商'],['03','目标市场'],['04','搜索任务限制'],['05','选择 Actor'],['06','AI 分析与参数']].map(([n,label])=><div className="ldw-odoo-flow-item" key={n}><span>{n}</span><b>{label}</b></div>)}</div>
-  <button type="button" className="ldw-manual-toggle" aria-expanded={manualConfigOpen} onClick={()=>setManualConfigOpen(value=>!value)}><span><b>手动配置</b><small>{recognizedPlatform?'已识别平台：'+recognizedPlatform:'平台、Actor、目标市场和抓取设置'}{actor?' · 已选择：'+actor.title:''}</small></span><span>{manualConfigOpen?'收起配置':'展开配置'} <ChevronDown size={15}/></span></button>
-  {manualConfigOpen&&<div className="ldw-manual-config-body">
-  <div className="ldw-step-grid">
-   <section className="ldw-card"><div className="ldw-step-title"><span>01</span><div><h3>选择客户来源平台</h3><p>先确定你要从哪里发现潜在客户。按类别收纳，点击展开。</p></div></div>
-    <div className="ldw-platform-groups">{platformGroups.map(group=><div className="ldw-platform-group" key={group.label}>
-     <button type="button" className="ldw-platform-group-trigger" aria-expanded={expandedPlatformGroup===group.label} onClick={()=>setExpandedPlatformGroup(current=>current===group.label?'':group.label)}><span><b>{group.label}</b><small>{group.items.length} 个渠道{group.items.some(([id])=>id===channel)?' · 当前选择':''}</small></span><ChevronDown size={15}/></button>
-     {expandedPlatformGroup===group.label&&<div className="ldw-platform-grid">{group.items.map(([id,name])=><button key={id} className={channel===id?'selected':''} onClick={()=>{setChannel(id);setRecognizedPlatform(name)}}><img className="ldw-brand-logo" src={platformLogo(id)} alt="" loading="lazy"/><span>{name}</span>{channel===id&&<Check size={14}/>}</button>)}</div>}
-    </div>)}</div>
-   </section>
-   <section className="ldw-card"><div className="ldw-step-title"><span>02</span><div><h3>选择数据供应商</h3><p>仅显示当前平台有对应产品的供应商。</p></div></div>
-    <div className="ldw-provider-grid">{availableProviders.map(name=><button key={name} className={provider===name?'selected':''} onClick={()=>setProvider(name)}><span className="ldw-provider-name">{providerLogo(name)?<img className="ldw-brand-logo" src={providerLogo(name)} alt="" loading="lazy"/>:<span className="ldw-brand-fallback">{name.slice(0,1)}</span>}<b>{name}</b>{provider===name&&<Check size={13}/>}</span><small>{providerDescriptions[name]||'查看该供应商支持的采集能力。'}</small></button>)}</div>
-    {provider!=='Apify'&&<div className="ldw-provider-note">该供应商已列入平台目录；此版本的动态 Actor Schema 流程先支持 Apify。其他供应商需要各自的产品目录与参数 Schema，不能错误地套用 Apify Actor。</div>}
-   </section>
-  </div>
-  <section className="ldw-card"><div className="ldw-step-title"><span>03</span><div><h3>选择目标市场</h3><p>国家沿用 Ouranos 现有国家目录；地区和城市从 OpenStreetMap 动态查询。</p></div></div>
-   <div className="ldw-location-grid ldw-country-grid">
-    <div className="ldw-field ldw-country-field"><span>目标国家 / 地区</span><button type="button" className="ldw-country-trigger" onClick={()=>setCountryOpen(v=>!v)}><span>{selectedCountryItems.length?selectedCountryItems.map(c=>c.flag).join(' ')+'  '+selectedCountryItems.length+' 个国家 / 地区':'全球（不限制）'}</span><ChevronDown size={14}/></button>
-     {countryOpen&&<div className="ldw-country-popover"><div className="ldw-country-search"><Search size={13}/><input value={countryQuery} onChange={e=>setCountryQuery(e.target.value)} placeholder="搜索国家或地区"/></div><div className="ldw-country-actions"><button type="button" onClick={()=>{setSelectedCountries([]);setCountryCode('');setRegion('');setCity('')}}>清空</button><button type="button" onClick={()=>setSelectedCountries(countries.map(c=>c.code))}>选择列表全部</button></div><div className="ldw-country-list">{countries.filter(c=>(c.name+c.code+c.geoName).toLowerCase().includes(countryQuery.toLowerCase())).map(c=><button type="button" key={c.code} className={selectedCountries.includes(c.code)?'selected':''} onClick={()=>toggleCountry(c.code)}><span>{c.flag}</span><span>{c.name}</span>{selectedCountries.includes(c.code)&&<Check size={13}/>}</button>)}</div><small>支持多国筛选；地区和城市范围由下方指定的国家联动。</small></div>}
-    </div>
-    <div className="ldw-map-wrap"><MarketMap selected={selectedCountryItems} location={mapLocation}/></div>
-    <label className="ldw-field"><span>地区所属国家</span><select value={countryCode} onChange={e=>{setCountryCode(e.target.value);setRegion('__all__');setRegionManual('');setCity('');setCityQuery('');setMapLocation(null)}} disabled={!selectedCountries.length}><option value="">选择国家</option>{selectedCountryItems.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select><small>可从已选国家中指定一个国家筛选州 / 省和城市。</small></label>
-    <label className="ldw-field"><span>州 / 省 / 行政区</span><select value={region} onChange={e=>{const next=e.target.value;setRegion(next);setRegionManual('');setCity('');setCityQuery('');const found=regionResults.find(r=>(r.name||r.display_name)===next);if(found?.lat&&found?.lon)setMapLocation({lat:found.lat,lon:found.lon,label:next})}} disabled={!countryCode||locationBusy}><option value="__all__">{locationBusy?'正在加载行政区…':'全部（不限制州 / 省 / 行政区）'}</option>{regionResults.map(r=><option key={r.place_id} value={r.name||r.display_name}>{r.name||r.display_name}</option>)}</select><input value={regionManual||(region!=='__all__'?region:'')} onChange={e=>{setRegionManual(e.target.value);setRegion(e.target.value);setMapLocation(null)}} disabled={!countryCode} placeholder="也可以手动输入州 / 省 / 行政区"/><small>{locationBusy?'正在读取行政区划…':regionResults.length?'已读取 '+regionResults.length+' 个地区；也可以手动输入。':regionLoadError?regionLoadError+' 可手动输入，不影响继续创建任务。':'行政区服务暂不可用时，可手动输入。'}</small></label>
-    <div className="ldw-field ldw-city-field"><span>城市</span><div className="ldw-city-search-row"><input disabled={!countryCode} value={cityQuery||city} onChange={e=>{setCityQuery(e.target.value);setCity('')}} onKeyDown={e=>{if(e.key==='Enter')void searchCities()}} placeholder="输入城市名称…"/><button type="button" disabled={!countryCode||citySearchBusy||!cityQuery.trim()} onClick={()=>void searchCities()}><Search size={12}/>{citySearchBusy?'搜索中':'搜索'}</button></div>{cityResults.length>0&&<div className="ldw-city-results">{cityResults.map(item=><button type="button" key={item.place_id} onClick={()=>{setCity(item.name||item.display_name);if(item.lat&&item.lon)setMapLocation({lat:Number(item.lat),lon:Number(item.lon),label:item.display_name});setCityQuery('');setCityResults([])}}><MapPin size={13}/><span>{item.display_name}</span></button>)}</div>}<small>选择国家和地区后，点击搜索查询 OpenStreetMap 城市。</small></div>
-   </div>
-   <div className="ldw-osm-credit">地点数据 © OpenStreetMap contributors · Nominatim · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">数据与使用政策</a></div>
-  </section>
-  <section className="ldw-card"><div className="ldw-step-title"><span>04</span><div><h3>搜索任务设置</h3><p>确认关键词、数量和收费授权后才会创建执行任务。</p></div></div>
-   <div className="ldw-location-grid">
-    <label className="ldw-field"><span>任务名称</span><input value={taskName} onChange={e=>setTaskName(e.target.value)} placeholder="例如：美国加州牙科诊所潜客"/></label>
-    <label className="ldw-field"><span>产品 / 服务</span><input value={product} onChange={e=>setProduct(e.target.value)} placeholder="例如：工业泵、汽车配件、牙科服务"/></label>
-    <label className="ldw-field"><span>目标行业</span><input value={industry} onChange={e=>setIndustry(e.target.value)} placeholder="例如：制造业、医疗、批发贸易"/></label>
-    <label className="ldw-field"><span>搜索关键词</span><input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="例如：Dental clinic, importer, wholesaler"/></label>
-    <label className="ldw-field"><span>目标数量 / 计费条数上限</span><select value={targetCount} onChange={e=>setTargetCount(e.target.value)}><option value="50">最多 50 条</option><option value="100">最多 100 条</option><option value="250">最多 250 条</option><option value="500">最多 500 条</option><option value="1000">最多 1,000 条</option></select><small>系统会尝试将数量映射到 Actor 输入字段；maxItems 只限制按结果计费条数，不保证 Actor 返回总量。</small></label>
-    <label className="ldw-field"><span>单次费用上限（USD）</span><input type="number" min="0.5" max="1000" step="0.5" value={maxCost} onChange={e=>setMaxCost(e.target.value)}/><small>费用上限通过 Apify 支持的 PAY_PER_EVENT / PRICE_PER_DATASET_ITEM API 限额执行；其他定价模型以 Actor 规则为准。</small></label>
-    <div className="ldw-field"><span>搜索对象</span><div className="ldw-target-types"><button type="button" className={targetType==='companies'?'selected':''} onClick={()=>setTargetType('companies')}>企业</button><button type="button" className={targetType==='contacts'?'selected':''} onClick={()=>setTargetType('contacts')}>联系人</button><button type="button" className={targetType==='both'?'selected':''} onClick={()=>setTargetType('both')}>企业 + 联系人</button></div></div>
-   </div>
-   <label className="ldw-consent"><input type="checkbox" checked={costConsent} onChange={e=>setCostConsent(e.target.checked)}/><span>我确认已查看所选 Actor 的价格和使用政策，并授权启动采集；本次预算设置为 ${maxCost||'0'}（按 Actor 支持的计费模型执行限额）。</span></label>
-   {error&&<div className="ldw-error">{error}</div>}{notice&&<div className="ldw-notice">{notice}</div>}
-  </section>
-  <section className="ldw-card"><div className="ldw-step-title"><span>05</span><div><h3>选择 Actor / 采集器</h3><p>Apify Store 提供公开 Actor 搜索；选择后读取该 Actor 的真实输入 Schema。</p></div></div>
-   {provider==='Apify'?<><div className="ldw-actor-search"><input value={actorQuery} onChange={e=>setActorQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void searchActors()}} placeholder={'搜索 '+(searchTerms[channel]||channel)+'…'}/><button onClick={()=>void searchActors()} disabled={actorBusy}><Search size={14}/>{actorBusy?'搜索中…':'搜索 Apify Actors'}</button></div>
-    {actors.length>0&&<><div className="ldw-actor-result-summary"><span>找到 {actors.length} 个 Actor · 默认显示前 4 个</span><button type="button" onClick={()=>setShowAllActors(v=>!v)}>{showAllActors?'收起列表':'显示全部 Actor'} <ChevronDown size={13}/></button></div><div className="ldw-actor-list">{(showAllActors?actors:actors.slice(0,4)).map(item=><article key={item.id} className={'ldw-actor-card '+(actor?.id===item.id?'selected':'')}><div><b>{item.title||item.name}</b><small>{item.username}/{item.name}</small><p>{item.description||'暂无描述'}</p><small>评分 {item.stats?.actorReviewRating??'—'} · {item.stats?.actorReviewCount??0} 条评价 · 用户 {item.stats?.totalUsers??'—'} · {pricingLabel(item)}</small></div><button onClick={()=>void selectActor(item)} disabled={schemaBusy}>{actor?.id===item.id?'已选择':'选择此 Actor'} <ArrowRight size={13}/></button><a href={item.url||'https://apify.com/'+item.username+'/'+item.name} target="_blank" rel="noreferrer" aria-label="打开 Actor 页面"><ExternalLink size={13}/></a></article>)}</div></>}
-   </>:<div className="ldw-provider-note">选择 Apify 时可以直接搜索 Actor Store 并读取 Schema。其他供应商将使用各自的模板 / 数据集 / Action 目录，不能把 Actor 机制混用。</div>}
-   {schemaBusy&&<div className="ldw-loading"><Loader2 size={16}/> 正在读取 Actor Schema…</div>}
-   {schema&&actor&&<div className="ldw-schema-panel">
-    <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个动态输入字段 · Schema 来自 Actor 最新构建 · {pricingLabel(actor)}</small><small>{Number(actor.currentPricingInfo?.pricePerUnitUsd)>0 ? `按 ${targetCount} 条估算约 $${(Number(actor.currentPricingInfo?.pricePerUnitUsd)*Number(targetCount)).toFixed(2)}` : '最终费用以 Actor 计费模型和实际使用量为准'}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
-    {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段；修正后错误会自动消失。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span><small>原始字段：{path}</small></li>)}</ol></div>}
-    <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div><div className="ldw-request-preview"><button type="button" onClick={()=>setShowRequestPreview(v=>!v)}><span><b>请求参数预览</b><small>{Object.keys(schemaValidation.payload).length} 个字段 · {Object.keys(schemaValidation.errors).length} 项校验问题</small></span><span>{showRequestPreview?'收起':'展开'} <ChevronDown size={13}/></span></button>{showRequestPreview&&<><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过，可以提交':`请修正 ${Object.keys(schemaValidation.errors).length} 个字段错误后再提交`}</div></>}</div>
-    
-   </div>}
-  </section> 
-  </div>}
-  <section className="ldw-card ldw-ai-step ldw-chat-card">
-   <div className="ldw-step-title"><span><MessageCircle size={16}/></span><div><h3>AI 需求助手</h3><p>先描述业务目标；识别平台后，由你手动选择 Actor，AI 再根据真实 Schema 逐项确认并实时完善参数。</p></div></div>
-   <label className="ldw-field"><span>AI 模型</span><select value={aiModel} onChange={e=>setAiModel(e.target.value)}><option value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">Cloudflare Workers AI · Llama 3.3 70B（默认）</option><option value="@cf/meta/llama-4-scout-17b-16e-instruct">Cloudflare Workers AI · Llama 4 Scout 17B</option></select></label>
-   {recognizedPlatform&&<div className="ldw-platform-detected"><Check size={14}/> AI 已识别平台：<b>{recognizedPlatform}</b>{!actor&&<span>请展开「手动配置」搜索并选择 Actor</span>}</div>}
-   <div className="ldw-chat-history" aria-live="polite">{chatMessages.map((message,index)=><div key={index} className={'ldw-chat-message '+message.role}><span>{message.role==='assistant'?'AI 助手':'你'}</span><p>{message.content}</p></div>)}{aiBusy&&<div className="ldw-chat-message assistant"><span>AI 助手</span><p className="ldw-chat-thinking"><Loader2 size={13}/> 正在结合当前需求和 Actor Schema 分析…</p></div>}</div>
-   <div className="ldw-chat-composer"><textarea rows={2} value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void submitChat()}}} placeholder={schema&&actor?'回答 AI 的问题，或补充你希望采集的细节…':'描述你想在哪个平台寻找什么类型的潜在客户…'} /><button type="button" onClick={()=>void submitChat()} disabled={!chatInput.trim()||aiBusy}><Send size={14}/> 发送</button></div>
+  <section className="ldw-card ldw-ai-step ldw-chat-card ldw-chat-first">
+   <div className="ldw-step-title"><span><MessageCircle size={16}/></span><div><h3>AI 采集助手</h3><p>描述业务目标，AI 将确认平台、推荐 Actor，并根据真实 Schema 自动填写采集参数。</p></div></div>
+   <div className="ldw-chat-history" aria-live="polite">{chatMessages.map((message,index)=><div key={index} className={'ldw-chat-message '+message.role}><span>{message.role==='assistant'?'AI 助手':'你'}</span><p>{message.content}</p></div>)}{aiBusy&&<div className="ldw-chat-message assistant"><span>AI 助手</span><p className="ldw-chat-thinking"><Loader2 size={13}/> 正在分析需求、筛选平台与 Actor…</p></div>}</div>
+   <div className="ldw-chat-composer"><textarea rows={3} value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void submitChat()}}} placeholder="例如：我销售手机数据线，想寻找美国亚马逊上相关品类的卖家…" /><button type="button" onClick={()=>void submitChat()} disabled={!chatInput.trim()||aiBusy}><Send size={14}/> 发送</button></div>
    {aiError&&<div className="ldw-error">{aiError}</div>}
+   {recognizedPlatform&&<div className="ldw-platform-detected"><Check size={14}/> 已识别平台：<b>{recognizedPlatform}</b>{actor&&<span> · 推荐 Actor：{actor.title}</span>}</div>}
+   {!actor&&actors.length>0&&<div className="ldw-ai-actor-options"><b>可选采集器</b><p>AI 正在评估这些候选项；你也可以直接指定一个。</p>{actors.slice(0,5).map(item=><button type="button" key={item.id} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description||item.username+'/'+item.name}</small></span><span>选择 <ArrowRight size={12}/></span></button>)}</div>}
    {schema&&actor&&<div className="ldw-ai-live-preview">
-    <div className="ldw-ai-result-heading"><b>实时参数预览</b><span>{actor.title}</span></div>
+    <div className="ldw-ai-result-heading"><b>实时参数预览</b><span>{actor.title} · {pricingLabel(actor)}</span></div>
     {aiSummary&&<div className="ldw-ai-summary"><b>需求理解</b><p>{aiSummary}</p></div>}
     {aiStrategy&&<div className="ldw-ai-summary"><b>采集策略</b><p>{aiStrategy}</p></div>}
-    <div className="ldw-ai-preview-status"><span>参数校验：{schemaValidation.valid?'通过':'待完善'}</span><span>已生成字段：{Object.keys(schemaValidation.payload).length} / {schemaKeys(schema).length}</span><span>待确认：{aiMissingInformation.length}</span></div>
+    <div className="ldw-ai-preview-status"><span>Schema 校验：{schemaValidation.valid?'通过':'待完善'}</span><span>已生成字段：{Object.keys(schemaValidation.payload).length} / {schemaKeys(schema).length}</span><span>待确认：{aiMissingInformation.length}</span></div>
     {aiMissingInformation.length>0&&<div className="ldw-ai-warnings"><b>还需要确认</b><ul>{aiMissingInformation.map((item,index)=><li key={index}>{item}</li>)}</ul></div>}
     {aiWarnings.length>0&&<div className="ldw-ai-warnings"><b>能力或参数提醒</b><ul>{aiWarnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul></div>}
     {Object.keys(aiFieldExplanations).length>0&&<div className="ldw-ai-explanations"><b>字段生成说明</b>{Object.entries(aiFieldExplanations).map(([key,explanation])=><div key={key}><span>{localizeTitle(key,schema.properties?.[key]||{})}</span><small>{String(explanation)}</small></div>)}</div>}
-    <button type="button" className="ldw-preview-json-toggle" onClick={()=>setShowRequestPreview(value=>!value)}><b>查看 Actor 原始 JSON 参数</b><span>{showRequestPreview?'收起':'展开'} <ChevronDown size={13}/></span></button>
-    {showRequestPreview&&<pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre>}
-    {aiApplied&&<div className="ldw-validation-ok">AI 参数已同步到手动配置。你可以展开手动配置修改任意字段，预览会同步更新。</div>}
+    <div className="ldw-request-preview"><div className="ldw-request-preview-heading"><b>最终提交数据</b><span>{Object.keys(schemaValidation.payload).length} 个字段</span></div><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过':'请修正 '+Object.keys(schemaValidation.errors).length+' 项字段问题'}</div></div>
+    {aiApplied&&<div className="ldw-validation-ok">AI 已将参数同步到 Actor Schema。你可以展开下方手动配置修改字段，提交预览会同步更新。</div>}
    </div>}
-   {!schema&&<div className="ldw-chat-hint">AI 识别平台后，请点击上方「手动配置」展开平台与 Actor 搜索。选择 Actor 后，AI 会自动读取 Schema 并开始参数确认。</div>}
-   <div className="ldw-submit-row"><span>只有 Actor 已选择、Schema 校验通过、所有必填信息完整且费用授权确认后，才能创建任务。</span><button disabled={!schema||!actor||!costConsent||busy||!schemaValidation.valid} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并创建任务'} <ArrowRight size={15}/></button></div>
+   {!schema&&<div className="ldw-chat-hint">无需先手动选择平台或 Actor。告诉 AI 你的业务目标，它会先确认关键条件，再自动推荐采集器并读取参数 Schema。</div>}
+   <div className="ldw-submit-row"><span>确认后将使用上方展示的同一份 Schema 参数提交并启动采集。</span><button disabled={!schema||!actor||busy||!schemaValidation.valid||aiMissingInformation.length>0||aiBusy} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认提交数据并启动采集'} <ArrowRight size={15}/></button></div>
   </section>
-
+  <button type="button" className="ldw-manual-toggle" aria-expanded={manualConfigOpen} onClick={()=>setManualConfigOpen(value=>!value)}><span><b>手动配置（Actor Schema）</b><small>{actor?'当前 Actor：'+actor.title+' · 仅显示该 Actor 定义的输入参数':'AI 推荐 Actor 后，这里将显示它的 Schema 参数'}</small></span><span>{manualConfigOpen?'收起参数':'展开参数'} <ChevronDown size={15}/></span></button>
+  {manualConfigOpen&&<div className="ldw-manual-config-body">
+   {schema&&actor?<section className="ldw-card">
+    <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个输入字段 · 来自 Actor 最新构建的真实 Schema</small><small>{pricingLabel(actor)}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
+    {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span></li>)}</ol></div>}
+    <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>
+    <div className="ldw-request-preview"><div className="ldw-request-preview-heading"><b>最终提交数据预览</b><span>{Object.keys(schemaValidation.payload).length} 个字段</span></div><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过':`请修正 ${Object.keys(schemaValidation.errors).length} 项字段问题`}</div></div>
+   </section>:<div className="ldw-chat-hint">尚未选择 Actor。请先在上方 AI 对话中描述需求，AI 会推荐合适的 Actor。</div>}
+  </div>}
+  {error&&<div className="ldw-error">{error}</div>}{notice&&<div className="ldw-notice">{notice}</div>}
  </div>
 }
