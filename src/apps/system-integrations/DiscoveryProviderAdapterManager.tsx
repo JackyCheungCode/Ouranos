@@ -23,6 +23,8 @@ export default function DiscoveryProviderAdapterManager({provider,canConfigure}:
  const [datasetId,setDatasetId]=useState('')
  const [datasetSchema,setDatasetSchema]=useState<JsonSchema|null>(null)
  const [query,setQuery]=useState('')
+ const [sampleInput,setSampleInput]=useState('{"query":"industrial equipment manufacturers Japan","limit":5,"sources":["web"]}')
+ const [testingKey,setTestingKey]=useState('')
  const [loading,setLoading]=useState(false)
  const [busy,setBusy]=useState(false)
  const [error,setError]=useState('')
@@ -38,7 +40,8 @@ export default function DiscoveryProviderAdapterManager({provider,canConfigure}:
   setLoading(true);setError('')
   try{const {data,error:e}=await supabase.functions.invoke('discovery-provider-catalog',{body:{workspace_id:workspace.id,action:'brightdata_datasets'}});if(e||data?.error)throw new Error(data?.error||e?.message||'无法读取 Bright Data Dataset');const rows=(data.items||[]) as Dataset[];setDatasets(rows);if(!datasetId&&rows[0]){setDatasetId(rows[0].id);setDatasetSchema(rows[0].input_schema||null)}}catch(e){setError(e instanceof Error?e.message:'Dataset 目录读取失败')}finally{setLoading(false)}
  }
- useEffect(()=>{setError('');setMessage('');void loadAdapters();if(provider.key==='brightdata'&&canConfigure)void loadDatasets()},[provider.key,workspace?.id,canConfigure])
+ useEffect(()=>{setError('');setMessage('');void loadAdapters();if(provider.key==='brightdata'&&canConfigure)void loadDatasets();setSampleInput(provider.key==='brightdata'?'{"input":[{"url":"https://example.com"}]}':'{"query":"industrial equipment manufacturers Japan","limit":5,"sources":["web"]}')},[provider.key,workspace?.id,canConfigure])
+ useEffect(()=>{if(provider.key==='firecrawl')setSampleInput(operation==='search'?'{"query":"industrial equipment manufacturers Japan","limit":5,"sources":["web"]}':operation==='scrape'?'{"url":"https://example.com","formats":["markdown"]}':'{"url":"https://example.com","limit":2,"maxDiscoveryDepth":1,"scrapeOptions":{"formats":["markdown"]}}')},[operation,provider.key])
  const selectedDataset=datasets.find(item=>item.id===datasetId)
  const filteredDatasets=useMemo(()=>datasets.filter(item=>(item.name+' '+item.id+' '+item.description).toLowerCase().includes(query.toLowerCase())),[datasets,query])
  const register=async()=>{
@@ -60,7 +63,14 @@ export default function DiscoveryProviderAdapterManager({provider,canConfigure}:
    setMessage('适配器已登记。完成样本测试与客户输出审核后，才可在发现任务中启用。');await loadAdapters()
   }catch(e){setError(e instanceof Error?e.message:'适配器登记失败')}finally{setBusy(false)}
  }
- const operationOptions=[['search','Search · 搜索网页'],['scrape','Scrape · 抓取单页'],['crawl','Crawl · 抓取整站']]
+ const testAndEnable=async(adapterKey:string)=>{
+  if(!supabase||!workspace||!canConfigure)return
+  let input:Record<string,unknown>;try{input=JSON.parse(sampleInput);if(!input||typeof input!=='object'||Array.isArray(input))throw new Error()}catch{setError('测试参数必须是有效的 JSON 对象');return}
+  if(!window.confirm('将使用真实 API 执行一次样本采集，服务商可能收取费用。样本通过企业 / 联系人识别后会自动审核并启用该采集器。是否继续？'))return
+  setTestingKey(adapterKey);setError('');setMessage('')
+  try{const {data,error:e}=await supabase.functions.invoke('review-provider-adapter',{body:{workspace_id:workspace.id,adapter_key:adapterKey,sample_input:input}});if(e||data?.error)throw new Error(data?.error||e?.message||'样本测试失败');setMessage('样本验证通过，采集器已审核并启用。');await loadAdapters()}catch(e){setError(e instanceof Error?e.message:'样本测试失败')}finally{setTestingKey('')}
+ }
+  const operationOptions=[['search','Search · 搜索网页'],['scrape','Scrape · 抓取单页'],['crawl','Crawl · 抓取整站']]
  return <section className="provider-adapter-manager">
   <header><div><span className="api-settings-eyebrow">DISCOVERY ADAPTERS</span><h3>{provider.name} 采集器</h3></div><button type="button" onClick={()=>{void loadAdapters();if(provider.key==='brightdata')void loadDatasets()}} disabled={loading}><RefreshCw size={13}/>刷新</button></header>
   {!canConfigure&&<div className="provider-adapter-note"><ShieldCheck size={14}/>请先在 API 集成设置中保存凭证并通过连接测试。</div>}
@@ -73,9 +83,10 @@ export default function DiscoveryProviderAdapterManager({provider,canConfigure}:
    <label>选择 Dataset<select value={datasetId} onChange={e=>{setDatasetId(e.target.value);setDatasetSchema(datasets.find(x=>x.id===e.target.value)?.input_schema||null)}}><option value="">请选择 Dataset</option>{filteredDatasets.map(item=><option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}</select></label>
    {selectedDataset&&<div className="provider-adapter-dataset"><b>{selectedDataset.name}</b><small>{selectedDataset.description||selectedDataset.id}</small><span>{datasetSchema?Object.keys(datasetSchema.properties||{}).length+' 个 Schema 字段':'平台未返回参数 Schema，将使用通用输入列表'}</span></div>}
   </div>}
+  <div className="provider-adapter-sample"><label>样本测试参数 <small>真实调用平台 API；用于检查是否返回企业或联系人档案。</small><textarea rows={5} value={sampleInput} onChange={e=>setSampleInput(e.target.value)}/></label></div>
   {error&&<div className="api-settings-error">{error}</div>}{message&&<div className="provider-adapter-success"><CheckCircle2 size={14}/>{message}</div>}
   <button className="provider-adapter-register" type="button" disabled={!canConfigure||busy||(provider.key==='brightdata'&&!selectedDataset)} onClick={()=>void register()}><Plus size={14}/>{busy?'正在登记…':'登记到线索发现'}</button>
-  <div className="provider-adapter-list"><b>已登记适配器</b>{adapters.length?adapters.map(item=><article key={item.id}><div><b>{item.catalog.adapter_name}</b><small>{item.channel_key} · {item.catalog.external_actor_id}</small></div><span className={item.catalog.verification_status==='verified'?'verified':'pending'}>{item.catalog.verification_status==='verified'?'已审核':'待审核'}</span></article>):<p>尚未登记采集器。</p>}</div>
+  <div className="provider-adapter-list"><b>已登记适配器</b>{adapters.length?adapters.map(item=><article key={item.id}><div><b>{item.catalog.adapter_name}</b><small>{item.channel_key} · {item.catalog.external_actor_id}</small></div><span className={item.catalog.verification_status==='verified'?'verified':'pending'}>{item.catalog.verification_status==='verified'?'已审核':'待审核'}</span>{item.catalog.verification_status!=='verified'&&<button type="button" disabled={!canConfigure||Boolean(testingKey)} onClick={()=>void testAndEnable(item.adapter_key)}>{testingKey===item.adapter_key?<Loader2 size={12}/>:<ShieldCheck size={12}/>}测试并启用</button>}</article>):<p>尚未登记采集器。</p>}</div>
   <small className="provider-adapter-footnote"><CircleHelp size={12}/> 登记不会自动启用；需要先检查真实样本，避免把网页文章误认成客户。</small>
  </section>
 }
