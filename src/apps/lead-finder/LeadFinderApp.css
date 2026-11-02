@@ -164,3 +164,11 @@
 @media(max-width:720px){.ouranos-platform .lead-workspace{padding:16px 12px 26px}.ouranos-platform .lead-tabs{gap:12px;overflow-x:auto}.ouranos-platform .lead-tabs button{white-space:nowrap}}
 
 .lead-page-head{justify-content:flex-start;align-items:center}.lead-page-title{display:flex;align-items:center;gap:11px;color:var(--lead-ink)}.lead-page-title>svg{color:#714b67;flex:0 0 auto}.lead-page-title h1{margin:0;font:700 22px Manrope,'Microsoft YaHei',sans-serif;letter-spacing:-.45px}
+
+/* Align the Odoo-style workspace title to the left edge. */
+.ouranos-platform .lead-page-head{width:100%;justify-content:flex-start!important;text-align:left;margin-left:0;margin-right:0}
+.ouranos-platform .lead-page-title{width:auto;justify-content:flex-start;margin:0 auto 0 0;text-align:left}
+.li-hero{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:5px 0 12px;background:transparent;border:0}
+.li-hero-copy{display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-width:0}
+.li-hero h2{font-size:22px;font-weight:650;line-height:1.3;color:#34313a;margin:5px 0 0}
+@media(max-width:680px){.li-hero h2{font-size:20px}}
