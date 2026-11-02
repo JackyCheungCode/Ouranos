@@ -346,6 +346,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      supported_platforms:supportedPlatforms,channel,actor_id:activeActor?activeActor.username+'~'+activeActor.name:'',actor_name:activeActor?.title||'',actor_description:activeActor?.description||'',
      actor_schema:activeSchema,
      previous_actor_input:activeSchema?normalizeValuesForAi(activeSchema,values):{},
+     required_fields:activeSchema?[...deriveSchemaRequirements(activeSchema).requiredFields]:[],
      market:{countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},
      task_limits:{task_name:taskName,product,industry,keywords,target_type:targetType,target_count:Number(targetCount),max_cost_usd:Number(maxCost)}
     })
