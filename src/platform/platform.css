@@ -97,3 +97,6 @@ button{font:inherit}
 .ouranos-platform .platform-search-pop input{min-height:0;padding:0;border:0!important;box-shadow:none!important;background:transparent!important}
 .ouranos-platform .int-credential-editor input{height:36px;min-height:36px;border-color:#aeb4bd!important;background:#fff!important}
 .ouranos-platform .int-credential-editor input:focus{border-color:#875b7c!important;box-shadow:0 0 0 2px #875b7c24!important}
+
+/* Font Awesome sizing for Odoo-style iconography */
+.platform-app-icon i{display:inline-block;font-size:inherit;line-height:1}.ldp-card-icon i{font-size:19px;line-height:1}.platform-sidebar-drawer>button>i{width:18px;text-align:center}
