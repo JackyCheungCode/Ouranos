@@ -66,7 +66,7 @@ export default function ApifyActorManager({canSync}:{canSync:boolean}){
  }
  useEffect(()=>{void load()},[workspace?.id])
  const selected=selections.find(row=>row.id===selectedId)||null
- const channelRows=useMemo(()=>channelOptions.map(([key,label])=>({key,label,count:selections.filter(row=>row.channel_key===key).length})).filter(row=>row.count>0||row.key===channel),[selections,channel])
+ const channelRows=useMemo(()=>channelOptions.map(([key,label])=>({key,label,count:selections.filter(row=>row.channel_key===key).length})),[selections,channel])
  const visibleRows=useMemo(()=>selections.filter(row=>(row.channel_key===channel)&&(row.discovery_adapter_catalog.adapter_name+' '+row.discovery_adapter_catalog.external_actor_id).toLowerCase().includes(listQuery.toLowerCase())),[selections,channel,listQuery])
  const stats=useMemo(()=>({all:selections.length,enabled:selections.filter(row=>row.is_enabled).length,verified:selections.filter(row=>row.discovery_adapter_catalog.verification_status==='verified').length,pending:selections.filter(row=>row.discovery_adapter_catalog.verification_status!=='verified').length}),[selections])
  const invoke=async(body:Record<string,unknown>)=>{
