@@ -14,6 +14,7 @@ export type DiscoveryPageDefinition = {
 }
 
 export const discoveryPages: DiscoveryPageDefinition[] = [
+  { id:'linkedin-candidates', title:'从 LinkedIn 发现', subtitle:'候选人搜索与公开联系方式补全', description:'按关键词、国家、职位、技能和资历发现公开职业主页；手动清洗后，再对保留对象补全公开可用的邮箱和电话。', group:'LinkedIn 专项发现', platformKeys:['linkedin'], platformNames:['LinkedIn','Apify'], filters:['关键词','国家 / 地区','职位','技能','资历 / 经验'], outputs:'LinkedIn 主页、职业信息、公开邮箱 / 电话', rule:'先发现、后人工筛选；只补全公开可用联系方式。' },
   { id:'map-discovery', title:'地图发现', subtitle:'本地企业与门店', description:'按国家、城市、商家类别和地理范围发现本地企业，重点获取企业名称、地址、电话、官网及公开商务资料。', group:'本地与企业发现', platformKeys:['google-maps','yelp'], platformNames:['Google Maps','Yelp'], filters:['国家 / 城市','行业类别','关键词','搜索半径','结果数量'], outputs:'企业档案、地址、电话、官网、公开邮箱', rule:'只接受商家 / 企业档案，不把地图评论当作客户。' },
   { id:'social-discovery', title:'社交媒体发现', subtitle:'品牌主页与商业账号', description:'发现具有商业属性的公开企业主页、品牌账号和创作者企业资料，按市场、行业和账号类别筛选。', group:'社交与联系人发现', platformKeys:['linkedin','facebook','instagram','tiktok','youtube','x'], platformNames:['LinkedIn','Facebook','Instagram','TikTok','YouTube','X'], filters:['国家 / 地区','行业 / 产品','账号类型','关键词','粉丝 / 规模范围'], outputs:'企业 / 商业账号档案、官网、公开商务联系方式', rule:'不采集帖子、评论、视频作为客户记录。' },
   { id:'search-engine-discovery', title:'搜索引擎发现', subtitle:'企业主体与目标官网', description:'利用搜索意图定位目标企业，再将可验证的企业名称、官网和商务资料提取为客户档案。', group:'本地与企业发现', platformKeys:['google-search','bing'], platformNames:['Google Search','Bing'], filters:['国家 / 语言','行业关键词','企业类型','域名限定','结果数量'], outputs:'经过结构化提取的企业档案', rule:'纯 SERP 链接和网页片段不进入客户库。' },
@@ -41,17 +42,18 @@ const iconMap: Record<string,string> = {
   'tender-opportunities': 'fas fa-clipboard-list',
   'exhibitors': 'fas fa-calendar-alt',
   'website-leads': 'fas fa-globe',
+  'linkedin-candidates': 'fab fa-linkedin-in',
 }
 
-const groups = ['本地与企业发现','社交与联系人发现','电商与贸易发现','商业机会发现']
+const groups = ['LinkedIn 专项发现','本地与企业发现','社交与联系人发现','电商与贸易发现','商业机会发现']
 
 export default function DiscoveryPageHub({ onSelect }: { onSelect: (page: DiscoveryPageDefinition) => void }) {
   return <div className="ldp-hub">
     <div className="ldp-intro">
-      <div><span className="ldp-eyebrow">CUSTOMER DISCOVERY</span><h2>选择客户发现方式</h2><p>按目标客户来源进入专属页面。每个页面使用对应的平台目录、服务商和 Actor；执行与结果统一进入线索审核流程。</p></div>
-      <div className="ldp-count"><b>12</b><span>个发现入口</span></div>
+      <div><span className="ldp-eyebrow">CUSTOMER DISCOVERY</span><h2>选择客户发现方式</h2><p>按目标客户来源进入专属页面。每个页面使用对应的平台目录、服务商和 Actor；LinkedIn 专项页面支持双 Actor 分阶段采集。</p></div>
+      <div className="ldp-count"><b>13</b><span>个发现入口</span></div>
     </div>
-    <div className="ldp-rule"><b>统一数据规则</b><span>只将可识别的企业或个人客户档案写入线索库。原始页面、帖子、评论、视频、商品和搜索结果仅可作为来源证据，不直接视为客户。</span></div>
+    <div className="ldp-rule"><b>统一数据规则</b><span>只处理可识别的公开企业或职业资料。原始页面、帖子、评论、视频、商品和搜索结果仅作为来源证据。</span></div>
     {groups.map(group => <section className="ldp-group" key={group}>
       <div className="ldp-group-head"><h3>{group}</h3><span>{discoveryPages.filter(page=>page.group===group).length} 个入口</span></div>
       <div className="ldp-grid">{discoveryPages.filter(page=>page.group===group).map(page => {
