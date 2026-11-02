@@ -54,6 +54,13 @@ async function testProvider(provider:string,secret:string,kind:string,baseUrl?:s
       const r=await fetch(endpoint,{headers:{Authorization:`Bearer ${apiKey}`},signal:timeout});
       return {success:r.ok,message:r.ok?`${provider} API Key 验证成功`:`${provider} 返回 HTTP ${r.status}`,statusCode:r.status};
     }
+    if(provider==="baidu-qianfan"){
+      const secretKey=String(credentials.secret_key||"");
+      if(!secretKey)return {success:false,manual:true,message:"百度千帆需要同时配置 API Key 和 Secret Key。"};
+      const r=await fetch("https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id="+encodeURIComponent(apiKey)+"&client_secret="+encodeURIComponent(secretKey),{method:"POST",signal:timeout});
+      const data=await r.json().catch(()=>({}));
+      return {success:r.ok&&Boolean(data.access_token),message:r.ok&&data.access_token?"百度千帆 API Key / Secret Key 验证成功":"百度千帆认证失败",statusCode:r.status};
+    }
     if(provider==="workers-ai"){
       const accountId=String(credentials.account_id||"");
       if(!/^[a-f0-9]{32}$/.test(accountId))return {success:false,manual:true,message:"缺少 Cloudflare Account ID，无法测试 Workers AI。"};
