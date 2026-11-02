@@ -294,27 +294,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   finally{setApprovedBusy(false)}
  }
  useEffect(()=>{void loadApprovedActors(0,false)},[workspaceId,channel,provider])
- const searchActors = async (queryOverride?:string,append=false,previous=false) => {
-  if(provider.toLowerCase()!=='apify'){setError('该服务商已进入目录，但尚未接入搜索与执行接口。当前不能将其请求转发给 Apify。');return}
-  setActorBusy(true);setError('');setNotice('')
-  if(!append){setActors([]);setCandidateOffset(0);setHasMoreCandidates(false)}
-  try {
-   const term=(queryOverride||actorQuery).trim() || directoryPlatforms.find(item=>item.platform_key===channel)?.search_terms || searchTerms[channel] || channel
-   const url=new URL('https://api.apify.com/v2/store')
-   url.searchParams.set('search',term);url.searchParams.set('limit','5');const pageOffset=append?candidateOffset:previous?Math.max(0,candidateOffset-10):0;url.searchParams.set('offset',String(pageOffset));url.searchParams.set('sortBy','popularity');url.searchParams.set('responseFormat','full')
-   const response=await fetch(url.toString(),{headers:{Accept:'application/json'}})
-   if(!response.ok)throw new Error('Apify Store 搜索失败，请稍后重试')
-   const body=await response.json();const items=(body.data?.items || []) as Actor[]
-   const approvedIds=new Set(approvedActors.map(item=>item.username+'~'+item.name))
-   if(supabase){
-    const {data:approvedRows,error:approvedError}=await supabase.from('discovery_adapter_catalog').select('external_actor_id').eq('provider_key','apify').eq('channel_key',channel).eq('verification_status','verified').eq('maintenance_status','maintained').eq('is_active',true).overlaps('supported_record_types',['company','contact'])
-    if(approvedError)throw approvedError
-    for(const row of approvedRows||[])if(row.external_actor_id)approvedIds.add(String(row.external_actor_id))
-   }
-   const candidates=items.filter(item=>!approvedIds.has(item.username+'~'+item.name))
-   setActors(candidates);setCandidateOffset(pageOffset+items.length);setHasMoreCandidates(items.length===5);if(!candidates.length&&!append)setNotice('没有找到新的待审核候选 Actor。可以调整关键词再搜索。')
-  }catch(e){setError(e instanceof Error?e.message:'无法搜索 Apify Store')}
-  finally{setActorBusy(false)}
+ const searchActors = async (_queryOverride?:string,_append=false,_previous=false) => {
+  setActors([]);setCandidateOffset(0);setHasMoreCandidates(false)
+  setNotice('搜索任务仅展示已审核、已启用且维护正常的 Actor。请管理员在 Actor 配置中心导入并审核新的 Actor。')
  }
  const selectActor = async (item: Actor) => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
@@ -437,21 +419,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      if(platform){
       setChannel(platform.id);setRecognizedPlatform(platform.name)
       if(providerByPlatform[platform.id]?.includes('Apify')){
-       const term=[searchTerms[platform.id]||platform.name,requestText.slice(0,160)].filter(Boolean).join(' ')
-       setActorQuery(term);setActorBusy(true)
-       try{
-        const storeUrl=new URL('https://api.apify.com/v2/store')
-        storeUrl.searchParams.set('search',term);storeUrl.searchParams.set('limit','5');storeUrl.searchParams.set('offset','0');storeUrl.searchParams.set('sortBy','popularity');storeUrl.searchParams.set('responseFormat','full')
-        const storeResponse=await fetch(storeUrl.toString(),{headers:{Accept:'application/json'}})
-        if(!storeResponse.ok)throw new Error('无法读取 Apify Store 候选 Actor，请稍后重试。')
-        const storeBody=await storeResponse.json()
-        const candidates=(storeBody.data?.items||[]) as Actor[]
-        const approvedIds=new Set(approvedActors.map(item=>item.username+'~'+item.name))
-        setActorQuery(term);setActors(candidates.filter(item=>!approvedIds.has(item.username+'~'+item.name)))
-        setCandidateOffset(candidates.length);setHasMoreCandidates(candidates.length===5)
-        setChatMessages(current=>[...current,{role:'assistant',content:candidates.length?'已识别平台：'+platform.name+'。已加载首批 '+candidates.length+' 个待审核候选 Actor；你可以继续加载下一批。请优先查看已审核数据源。':'已识别平台：'+platform.name+'，但暂时没有找到候选 Actor。你可以修改下面的搜索词再试一次。'}])
-       }finally{setActorBusy(false)}
-      }else{
+       setActors([]);setActorQuery('');setCandidateOffset(0);setHasMoreCandidates(false)
+       setChatMessages(current=>[...current,{role:'assistant',content:'已识别平台：'+platform.name+'。系统只会展示 Actor 配置中心中已审核、已启用且维护正常的数据源。'}])
+      
        setChatMessages(current=>[...current,{role:'assistant',content:'已识别平台：'+platform.name+'。当前暂未接入该平台的 Actor 搜索，请选择已支持 Apify 的平台，或稍后再试。'}])
       }
       setAiSummary(String(result.summary||''));return
