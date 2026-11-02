@@ -384,3 +384,15 @@
 
 /* Search task creation must never expose unreviewed Actor Store candidates. */
 .ldw-actor-search,.ldw-ai-actor-search,.ldw-ai-actor-options{display:none!important}
+
+/* Facebook dedicated, step-based discovery flow */
+.ldw-facebook-actor-card{display:grid;gap:10px;padding:14px;border:1px solid var(--odoo-line);border-radius:8px;background:var(--odoo-soft,#f8f7f9)}
+.ldw-facebook-actor-card .ldw-provider-note{margin:0;line-height:1.65}
+.ldw-facebook-actor-card button{display:inline-flex;align-items:center;justify-content:center;gap:7px;width:max-content;max-width:100%;padding:10px 14px;border:1px solid var(--odoo-primary);border-radius:6px;background:var(--odoo-primary);color:#fff;font-weight:650;cursor:pointer}
+.ldw-facebook-actor-card button:disabled{opacity:.6;cursor:wait}
+.ldw-facebook-actor-card a{font-size:12px;color:var(--odoo-primary);text-decoration:none}
+.ldw-facebook-task-card .ldw-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ldw-facebook-task-card .ldw-field{min-width:0}
+.ldw-facebook-task-card .ldw-field small{display:block;color:var(--odoo-muted);font-size:11px;line-height:1.5}
+.dark .ldw-facebook-actor-card{background:#20252e}
+@media(max-width:640px){.ldw-facebook-task-card .ldw-form-grid{grid-template-columns:1fr}.ldw-facebook-actor-card button{width:100%}}
