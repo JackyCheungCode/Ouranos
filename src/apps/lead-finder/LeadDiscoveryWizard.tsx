@@ -553,8 +553,17 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      {!directoryProviders.length&&<div className="ldw-provider-note">服务商目录暂不可用。</div>}
     </section>
     </>}
+    {page.id === "facebook-pages" && actor && <section className="ldw-card ldw-facebook-task-card">
+     <div className="ldw-step-title"><span>1</span><div><h3>填写本次发现任务需求</h3><p>先设定任务名称、目标数量与费用上限，再填写 Actor 搜索条件。</p></div></div>
+     <div className="ldw-form-grid">
+      <label className="ldw-field"><span className="ldw-field-label">任务名称</span><input value={taskName} onChange={event=>setTaskName(event.target.value)} placeholder="例如：美国户外用品经销商发现"/></label>
+      <label className="ldw-field"><span className="ldw-field-label">目标客户数量</span><input type="number" min="1" max="50000" value={targetCount} onChange={event=>{const value=event.target.value;setTargetCount(value);if(schema?.properties?.maxResults)setValues(current=>({...current,maxResults:value===""?"":Number(value)}))}} /><small>本次希望收集的企业主页数量，实际数量受搜索索引和地区覆盖影响。</small></label>
+      <label className="ldw-field"><span className="ldw-field-label">单次任务费用上限（USD） *</span><input type="number" min="0.01" step="0.01" value={maxCost} onChange={event=>setMaxCost(event.target.value)} /><small>Actor 页面当前标价约 $4 / 1,000 个返回主页；官网补全、主页透明度等可选功能可能产生额外费用。</small></label>
+      <label className="ldw-field"><span className="ldw-field-label">联系方式筛选</span><span><input type="checkbox" checked={facebookHasEmail} onChange={event=>setFacebookHasEmail(event.target.checked)}/> 仅保留公开邮箱</span><span><input type="checkbox" checked={facebookHasPhone} onChange={event=>setFacebookHasPhone(event.target.checked)}/> 仅保留公开电话</span><span><input type="checkbox" checked={facebookHasWebsite} onChange={event=>setFacebookHasWebsite(event.target.checked)}/> 仅保留公开官网</span><small>这些筛选由 Actor 的 API 支持，但未出现在其可视化 Schema 字段中；系统仅在用户主动勾选时提交。</small></label>
+     </div>
+    </section>}
     <section className="ldw-card">
-     <div className="ldw-step-title"><span>{page.id === "facebook-pages" ? "1" : "4"}</span><div><h3>{page.id === "facebook-pages" ? "确认 Facebook 发现引擎" : "选择采集器 / Actor"}</h3><p>{page.id === "facebook-pages" ? "本渠道固定使用一个按关键词和地区发现企业主页的 Apify Actor。" : "仅展示管理员在 Actor 配置中心绑定到当前渠道、审核通过并启用的 Actor。"}</p></div></div>
+     <div className="ldw-step-title"><span>{page.id === "facebook-pages" ? "2" : "4"}</span><div><h3>{page.id === "facebook-pages" ? "确认 Facebook 发现引擎" : "选择采集器 / Actor"}</h3><p>{page.id === "facebook-pages" ? "本渠道固定使用一个按关键词和地区发现企业主页的 Apify Actor。" : "仅展示管理员在 Actor 配置中心绑定到当前渠道、审核通过并启用的 Actor。"}</p></div></div>
      {actor && !actorPickerOpen ? (
       <div className="ldw-selected-actor-summary"><div><b>{actor.title || actor.name}</b><small>{actorVerificationStatus === "verified" && actorMaintenanceStatus === "maintained" ? "已通过审核" : "待审核 · 仅可预览 Schema"} · {pricingLabel(actor)}</small></div><button type="button" onClick={() => setActorPickerOpen(true)}><ChevronDown size={14}/> 更换 / 展开选择器</button></div>
      ) : canSearchSelectedProvider && selectedProviderKey !== "apify" ? (
@@ -588,15 +597,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
       page.id === "facebook-pages" ? <div className="ldw-provider-note">请先前往「系统设置 → 集成」连接并测试 Apify API Key，完成后返回本页读取固定 Actor 的真实 Schema。关键词发现还需要为该 Actor 配置搜索服务商 API Key。</div> : <div className="ldw-provider-note">当前服务商尚未接入搜索和执行接口。为避免错误调用，不会将此选择转发到其他服务商。</div>
      )}
     </section>
-    {page.id === "facebook-pages" && actor && <section className="ldw-card ldw-facebook-task-card">
-     <div className="ldw-step-title"><span>2</span><div><h3>填写本次发现任务需求</h3><p>先设定任务名称、目标数量与费用上限，再填写 Actor 搜索条件。</p></div></div>
-     <div className="ldw-form-grid">
-      <label className="ldw-field"><span className="ldw-field-label">任务名称</span><input value={taskName} onChange={event=>setTaskName(event.target.value)} placeholder="例如：美国户外用品经销商发现"/></label>
-      <label className="ldw-field"><span className="ldw-field-label">目标客户数量</span><input type="number" min="1" max="50000" value={targetCount} onChange={event=>{const value=event.target.value;setTargetCount(value);if(schema?.properties?.maxResults)setValues(current=>({...current,maxResults:value===""?"":Number(value)}))}} /><small>本次希望收集的企业主页数量，实际数量受搜索索引和地区覆盖影响。</small></label>
-      <label className="ldw-field"><span className="ldw-field-label">单次任务费用上限（USD） *</span><input type="number" min="0.01" step="0.01" value={maxCost} onChange={event=>setMaxCost(event.target.value)} /><small>Actor 页面当前标价约 $4 / 1,000 个返回主页；官网补全、主页透明度等可选功能可能产生额外费用。</small></label>
-      <label className="ldw-field"><span className="ldw-field-label">联系方式筛选</span><span><input type="checkbox" checked={facebookHasEmail} onChange={event=>setFacebookHasEmail(event.target.checked)}/> 仅保留公开邮箱</span><span><input type="checkbox" checked={facebookHasPhone} onChange={event=>setFacebookHasPhone(event.target.checked)}/> 仅保留公开电话</span><span><input type="checkbox" checked={facebookHasWebsite} onChange={event=>setFacebookHasWebsite(event.target.checked)}/> 仅保留公开官网</span><small>这些筛选由 Actor 的 API 支持，但未出现在其可视化 Schema 字段中；系统仅在用户主动勾选时提交。</small></label>
-     </div>
-    </section>}
     {schema&&actor?<section className="ldw-card ldw-manual-schema-card">
      <div className="ldw-step-title"><span>{page.id === "facebook-pages" ? "3" : "5"}</span><div><h3>按 Actor Schema 填写发现条件</h3><p>字段名称以中文展示；必填、类型、范围和 Actor 原始字段均保留。</p></div></div>
      <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个输入字段 · 来自 Actor 最新构建的真实 Schema</small><small>{pricingLabel(actor)}</small></div><span><ShieldCheck size={13}/> Schema 已读取 · {actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'客户输出已审核':'待客户输出审核'}</span></div>
