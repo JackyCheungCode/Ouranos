@@ -100,3 +100,5 @@ button{font:inherit}
 
 /* Font Awesome sizing for Odoo-style iconography */
 .platform-app-icon i{display:inline-block;font-size:inherit;line-height:1}.ldp-card-icon i{font-size:19px;line-height:1}.platform-sidebar-drawer>button>i{width:18px;text-align:center}
+
+.platform-placeholder-art>i{font-size:32px}
