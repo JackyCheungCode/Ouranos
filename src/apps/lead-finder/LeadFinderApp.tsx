@@ -143,6 +143,13 @@ export default function LeadFinderApp() {
  const [inboxError,setInboxError] = useState('')
  const [duplicateCandidates,setDuplicateCandidates] = useState<{id:string;record_id:string;candidate_record_id:string;match_type:string;confidence:number;resolution:string}[]>([])
  const [tab,setTab] = useState<Tab>('search')
+ const [apifyCanSync,setApifyCanSync] = useState(false)
+ useEffect(()=>{
+  if(!supabase||!workspace){setApifyCanSync(false);return}
+  let alive=true
+  supabase.from('integration_connections').select('status,is_enabled').eq('workspace_id',workspace.id).eq('provider_key','apify').maybeSingle().then(({data})=>{if(alive)setApifyCanSync(data?.status==='connected'&&data?.is_enabled===true)})
+  return()=>{alive=false}
+ },[workspace?.id])
  const [selectedDiscoveryPage,setSelectedDiscoveryPage] = useState<DiscoveryPageDefinition|null>(null)
  const [product,setProduct] = useState('')
  const [industry,setIndustry] = useState('')
