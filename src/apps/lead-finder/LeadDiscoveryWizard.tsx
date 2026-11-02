@@ -652,7 +652,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个输入字段 · 来自 Actor 最新构建的真实 Schema</small><small>{pricingLabel(actor)}</small></div><span><ShieldCheck size={13}/> Schema 已读取 · {actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'客户输出已审核':'待客户输出审核'}</span></div>
      <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>
      <div className="ldw-submit-row"><span>Schema 校验通过并确认费用上限后，才会创建任务。</span><button disabled={!schema||!actor||busy||!schemaValidation.valid||!canSearchSelectedProvider||actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
-    </section> : <div className="ldw-chat-hint">完成前四步后，选择 Actor 即可读取 Schema 并显示手动参数表单。</div>
+    </section> : <div className="ldw-chat-hint">完成前四步后，选择 Actor 即可读取 Schema 并显示手动参数表单。</div>}
    </main>
    {aiSidebarOpen&&page.id!=='facebook-pages'&&<aside className="ldw-ai-sidebar">
   <section className="ldw-card ldw-ai-step ldw-chat-card ldw-chat-first">
