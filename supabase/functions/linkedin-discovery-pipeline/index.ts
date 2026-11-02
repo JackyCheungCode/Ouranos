@@ -87,9 +87,26 @@ async function handle(req:Request){
     const emails=Array.isArray(item.emails)?item.emails:Array.isArray(item.emailAddresses)?item.emailAddresses:[];
     const phones=Array.isArray(item.phones)?item.phones:Array.isArray(item.phoneNumbers)?item.phoneNumbers:[];
     const firstValue=(values:any[],field:string)=>values.map(x=>typeof x==="string"?x:String(asObject(x)[field]||asObject(x).value||"")).find(Boolean)||"";
-    const email=String(item.publicEmail||item.public_email||item.email||item.emailAddress||item.workEmail||item.contactEmail||item.verifiedEmail||contact.publicEmail||contact.email||contact.workEmail||firstValue(emails,"email")||nested.email||"").trim();
-    const phone=String(item.publicPhone||item.public_phone||item.phone||item.phoneNumber||item.mobile||item.contactPhone||contact.publicPhone||contact.phone||contact.mobile||firstValue(phones,"phone")||nested.phone||"").trim();
+    const email=String(item.publicEmail||item.public_email||item.email||item.emailAddress||item.workEmail||item.contactEmail||item.verifiedEmail||item.personalEmail||item.personal_email||contact.publicEmail||contact.email||contact.workEmail||firstValue(emails,"email")||nested.email||"").trim();
+    const phone=String(item.publicPhone||item.public_phone||item.phone||item.phoneNumber||item.mobile||item.contactPhone||item.personalPhone||contact.publicPhone||contact.phone||contact.mobile||firstValue(phones,"phone")||nested.phone||"").trim();
+    const locationValue=item.location??nested.location;
+    const locationObj=asObject(locationValue);
+    const experience=Array.isArray(item.experience)?item.experience:Array.isArray(nested.experience)?nested.experience:[];
+    const currentExperience=experience.find((entry:unknown)=>asObject(entry).is_current===true)||experience[0]||{};
+    const experienceRow=asObject(currentExperience);
+    const fullName=String(item.fullName||item.fullname||item.full_name||item.name||nested.fullName||nested.fullname||"").trim();
+    const headline=String(item.headline||nested.headline||"").trim();
+    const jobTitle=String(item.jobTitle||item.job_title||item.title||experienceRow.title||headline||"").trim();
+    const company=String(item.currentCompany||item.current_company||item.company||nested.current_company||nested.currentCompany||experienceRow.company||"").trim();
+    const location=String(typeof locationValue==="string"?locationValue:locationObj.full||locationObj.city||locationObj.name||"").trim();
+    const country=String(item.country||locationObj.country||nested.country||"").trim();
     const patch:Record<string,unknown>={profile_data:item,enriched_at:new Date().toISOString(),last_error:null,updated_at:new Date().toISOString()};
+    if(fullName)patch.full_name=fullName;
+    if(headline)patch.headline=headline;
+    if(jobTitle)patch.job_title=jobTitle;
+    if(company)patch.company_name=company;
+    if(location)patch.location=location;
+    if(country)patch.country=country;
     if(email){patch.contact_email=email;patch.email_source="datadoping/linkedin-profile-scraper";}
     if(phone){patch.contact_phone=phone;patch.phone_source="datadoping/linkedin-profile-scraper";}
     if(!email&&!phone)withoutContact++;
@@ -101,7 +118,7 @@ async function handle(req:Request){
    await updateRun(admin,workspaceId,runId,{status:failed?"failed":complete?"completed":"enriching",actor_b_status:actorStatus,actor_b_offset:nextOffset,enriched_count:countRows.length,actual_cost:Number(state.usageTotalUsd)||run.actual_cost||null,completed_at:complete?new Date().toISOString():null,error_message:failed?String(state.statusMessage||actorStatus):null});
    if(items.length)await log(admin,workspaceId,runId,"enrichment_collect",`Actor B 返回 ${items.length} 条资料，数据库实际更新 ${updated} 条候选人`,updated===items.length?"success":"warning",{offset,next_offset:nextOffset,returned:items.length,updated,unmatched,without_contact:withoutContact});
    if(failed)await log(admin,workspaceId,runId,"enrichment_failed","Actor B 执行失败："+String(state.statusMessage||actorStatus),"error",{status:actorStatus});
-   else if(complete)await log(admin,workspaceId,runId,"completed",`联系方式补全完成，已处理 ${countRows.length} 条候选人`,"success",{enriched:countRows.length});
+   else if(complete)await log(admin,workspaceId,runId,"completed",`候选人档案补充完成：已更新 ${countRows.length} 条；本批新增公开联系方式 ${Math.max(0,items.length-withoutContact-unmatched)} 条匹配结果，无联系方式 ${withoutContact} 条，未匹配 ${unmatched} 条`,withoutContact===0&&unmatched===0?"success":"warning",{enriched:countRows.length,returned:items.length,updated,unmatched,without_contact:withoutContact});
    return json({ok:true,status:failed?"failed":complete?"completed":"enriching",enriched:updated,count:countRows.length,returned:items.length,unmatched,without_contact:withoutContact,actor_status:actorStatus},200,origin);
   }
   return json({error:"Unsupported action"},400,origin);
