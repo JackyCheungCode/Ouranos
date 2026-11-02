@@ -88,3 +88,5 @@ export const AlertCircle = icon('circle-exclamation')
 export const Circle = icon('circle')
 export const ContactRound = icon('address-card')
 export type LucideIcon = React.ComponentType<IconProps>
+
+export const Pencil = icon('pencil-alt')
