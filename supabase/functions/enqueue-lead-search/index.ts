@@ -5,8 +5,6 @@ function json(data:unknown,status=200,origin:string|null=null){return new Respon
 function serviceKey(){const legacy=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");if(legacy)return legacy;const keys=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")??"{}");return keys.default as string|undefined;}
 function publishableKey(){const legacy=Deno.env.get("SUPABASE_ANON_KEY");if(legacy)return legacy;const keys=JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS")??"{}");return keys.default as string|undefined;}
 async function rest(path:string,key:string,init:RequestInit={}){const url=Deno.env.get("SUPABASE_URL");if(!url)throw new Error("Supabase URL missing");const headers=new Headers(init.headers);headers.set("apikey",key);headers.set("Authorization",`Bearer ${key}`);headers.set("Content-Type","application/json");return fetch(`${url}/rest/v1/${path}`,{...init,headers});}
-function getPath(source:Record<string,unknown>,path:string){return path.split(".").reduce<unknown>((value,key)=>value&&typeof value==="object"?(value as Record<string,unknown>)[key]:undefined,source);}
-function setPath(target:Record<string,unknown>,path:string,value:unknown){const parts=path.split(".");let current=target;for(const part of parts.slice(0,-1)){const existing=current[part];if(!existing||typeof existing!=="object"||Array.isArray(existing))current[part]={};current=current[part] as Record<string,unknown>;}current[parts[parts.length-1]]=value;}
 async function hash(value:string){const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("");}
 Deno.serve(async(req:Request)=>{
  const origin=req.headers.get("origin");if(req.method==="OPTIONS")return new Response("ok",{headers:cors(origin)});if(req.method!=="POST")return json({error:"Method not allowed"},405,origin);
@@ -32,8 +30,6 @@ Deno.serve(async(req:Request)=>{
   const connectionResponse=await rest(`integration_connections?select=provider_key,status,is_enabled&workspace_id=eq.${encodeURIComponent(workspaceId)}`,admin);if(!connectionResponse.ok)return json({error:"Unable to read provider connections"},500,origin);
   const connections=await connectionResponse.json();const connectionMap=new Map(connections.map((x:Record<string,unknown>)=>[String(x.provider_key),x]));
   const profile=(task.target_profile||{}) as Record<string,unknown>;
-  const countries=Array.isArray(profile.countries)?profile.countries as Record<string,unknown>[]:[];
-  const searchProfile:Record<string,unknown>={...profile,country_names:countries.map(x=>String(x.name||"")).filter(Boolean),country_codes:countries.map(x=>String(x.code||"")).filter(Boolean),countries_text:countries.map(x=>String(x.name||"")).filter(Boolean).join(", "),target_count:task.target_count};
   const runPayloads:Record<string,unknown>[]=[];
   for(const selection of selections){
     const adapterResponse=await rest(`discovery_adapter_catalog?select=provider_key,channel_key,adapter_key,adapter_name,adapter_version,provider_product_type,external_actor_id,supported_record_types,execution_mode,input_schema,output_schema,field_mapping,capabilities,pricing_model,max_concurrency,is_active,verification_status,maintenance_status,supported_record_types&adapter_key=eq.${encodeURIComponent(String(selection.adapter_key))}&limit=1`,admin);
@@ -43,17 +39,33 @@ Deno.serve(async(req:Request)=>{
     if(!connection||connection.status!=="connected"||connection.is_enabled!==true)return json({error:`请先连接并启用服务商：${catalog.provider_key}`},409,origin);
     const config=(selection.config||{}) as Record<string,unknown>;const outputMapping={} as Record<string,unknown>;
     const submittedActorId=String(profile.actor_id||"");
-    if(submittedActorId&&submittedActorId!==String(catalog.external_actor_id||""))return json({error:`任务中的 Actor 与已选适配器不一致：${selection.adapter_key}`,expected_actor_id:catalog.external_actor_id,submitted_actor_id:submittedActorId},409,origin);
-    const submittedInput=profile.actor_input;
-    if(!submittedInput||typeof submittedInput!=="object"||Array.isArray(submittedInput))return json({error:`任务缺少 Actor Schema 参数对象：${selection.adapter_key}`},422,origin);
-    const input={...(submittedInput as Record<string,unknown>)};
+    if(submittedActorId&&submittedActorId!==String(catalog.external_actor_id||""))return json({error:"任务中保存的 Actor 与当前数据源不一致，请重新创建搜索任务。",adapter_key:selection.adapter_key},409,origin);
+    const submittedActorInput=profile.actor_input;
+    if(!submittedActorInput||typeof submittedActorInput!=="object"||Array.isArray(submittedActorInput))return json({error:`任务缺少 Actor Schema 参数对象：${selection.adapter_key}`},422,origin);
+    const input={...(submittedActorInput as Record<string,unknown>)};
     const schema=(catalog.input_schema||{}) as Record<string,unknown>;
-    const properties=(schema.properties&&typeof schema.properties==="object"?schema.properties:{}) as Record<string,unknown>;
+    const properties=schema.properties&&typeof schema.properties==="object"&&!Array.isArray(schema.properties)?schema.properties as Record<string,unknown>:{};
     const unknownFields=Object.keys(input).filter(field=>!(field in properties));
     if(unknownFields.length)return json({error:`Actor 参数包含当前 Schema 不存在的字段：${selection.adapter_key}`,unknown_input_fields:unknownFields},422,origin);
-    const required=Array.isArray(schema.required)?schema.required as string[]:[];
-    const missingFields=required.filter(field=>input[field]===undefined||input[field]===null||input[field]===""||(Array.isArray(input[field])&&!(input[field] as unknown[]).length));
-    if(missingFields.length)return json({error:`渠道 ${selection.channel_key} 的 Actor 缺少必填参数`,adapter_key:selection.adapter_key,missing_input_fields:missingFields},422,origin);
+    const missingRequired=(node:Record<string,unknown>,value:unknown,path=""):string[]=>{
+      const nodeProperties=node.properties&&typeof node.properties==="object"&&!Array.isArray(node.properties)?node.properties as Record<string,Record<string,unknown>>:{};
+      const required=Array.isArray(node.required)?node.required as string[]:[];
+      const missing:string[]=[];
+      for(const field of required){
+        const fieldValue=value&&typeof value==="object"&&!Array.isArray(value)?(value as Record<string,unknown>)[field]:undefined;
+        const empty=fieldValue===undefined||fieldValue===null||fieldValue===""||(Array.isArray(fieldValue)&&fieldValue.length===0)||(fieldValue&&typeof fieldValue==="object"&&!Array.isArray(fieldValue)&&Object.keys(fieldValue as Record<string,unknown>).length===0);
+        const fieldPath=path?path+"."+field:field;
+        if(empty){missing.push(fieldPath);continue;}
+        const child=nodeProperties[field];
+        if(child&&fieldValue&&typeof fieldValue==="object"&&!Array.isArray(fieldValue))missing.push(...missingRequired(child,fieldValue,fieldPath));
+        if(child&&Array.isArray(fieldValue)&&child.items&&typeof child.items==="object"){
+          fieldValue.forEach((item,index)=>{if(item&&typeof item==="object"&&!Array.isArray(item))missing.push(...missingRequired(child.items as Record<string,unknown>,item,fieldPath+"["+index+"]"));});
+        }
+      }
+      return missing;
+    };
+    const missingFields=missingRequired(schema,input);
+    if(missingFields.length)return json({error:"渠道 "+selection.channel_key+" 的 Actor 缺少必填参数",adapter_key:selection.adapter_key,missing_input_fields:missingFields},422,origin);
     const pricing=(catalog.pricing_model||{}) as Record<string,unknown>;const maxCost=Number(config.max_cost||0);
     if(catalog.provider_key==="kuajingmofang"&&maxCost<=0)return json({error:"跨境魔方按接口计费，请先为该适配器设置单次费用上限（人民币）"},409,origin);
     const estimated=typeof pricing.estimated_cost==="number"?pricing.estimated_cost:typeof pricing.price_per_call==="number"?pricing.price_per_call:null;
