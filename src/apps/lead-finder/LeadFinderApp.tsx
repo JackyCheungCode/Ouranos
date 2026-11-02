@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, Bot, Building2, Check, CheckCircle2, ChevronDown, CircleHelp, Clock3, Database, Globe2, Plus, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Target, Users, Workflow, Inbox, UserRoundCheck, Pencil, Trash2, Ban, Save, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bot, Building2, Check, CheckCircle2, ChevronDown, CircleHelp, Clock3, Database, Globe2, Plus, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Target, Users, Workflow, Inbox, UserRoundCheck, Pencil, Trash2, Ban, Save, X, ExternalLink } from 'lucide-react'
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import type { Layer, PathOptions } from 'leaflet'
@@ -180,6 +180,12 @@ export default function LeadFinderApp() {
  const [taskActionBusy,setTaskActionBusy] = useState(false)
  const [taskLogs,setTaskLogs] = useState<TaskLog[]>([])
  const [taskLogsLoading,setTaskLogsLoading] = useState(false)
+ const [rawResults,setRawResults] = useState<RawSourceRecord[]>([])
+ const [rawResultsLoading,setRawResultsLoading] = useState(false)
+ const [rawResultsError,setRawResultsError] = useState('')
+ const [rawResultsPage,setRawResultsPage] = useState(0)
+ const [rawResultsHasMore,setRawResultsHasMore] = useState(false)
+ const [expandedRawResult,setExpandedRawResult] = useState<string|null>(null)
  const [reviewFilter,setReviewFilter] = useState('all')
  const refreshTasks=async()=>{
   if(!supabase||!workspace){setTasks([]);return}
