@@ -231,7 +231,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
 
  const searchActors = async (queryOverride?:string) => {
-  if(provider!=='Apify')return
   setActorBusy(true);setError('');setNotice('')
   try {
    const term=(queryOverride||actorQuery).trim() || searchTerms[channel] || channel
