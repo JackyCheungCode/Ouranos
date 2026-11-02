@@ -30,6 +30,7 @@ export default function LinkedInDiscoveryApp({workspaceId,userId}:{workspaceId:s
  const [filter,setFilter]=useState('all')
  const [tableQuery,setTableQuery]=useState('')
  const [costConsent,setCostConsent]=useState(false)
+ const [searchCostConsent,setSearchCostConsent]=useState(false)
  const pollBusy=useRef(false)
  const activeRun=runs.find(x=>x.id===activeRunId)||null
  const invoke=useCallback(async(action:string,payload:Record<string,unknown>={})=>{
@@ -78,10 +79,10 @@ export default function LinkedInDiscoveryApp({workspaceId,userId}:{workspaceId:s
   if(error||!data){setError(error?.message||'创建任务失败');setBusy(false);return}
   setActiveRunId(data.id)
   try{
-   const {data:result,error:fnError}=await supabase.functions.invoke('linkedin-discovery-pipeline',{body:{action:'start_search',workspace_id:workspaceId,run_id:data.id,criteria}})
+   const {data:result,error:fnError}=await supabase.functions.invoke('linkedin-discovery-pipeline',{body:{action:'start_search',workspace_id:workspaceId,run_id:data.id,criteria,confirm_cost:true}})
    if(fnError||result?.error)throw new Error(result?.error||fnError?.message||'Actor A 启动失败')
    setNotice('Actor A 已启动。候选人会持续增量写入下方表格，刷新页面后仍可继续查看。')
-   setCostConsent(false);await refreshRuns();await refreshRunData(data.id)
+   setCostConsent(false);setSearchCostConsent(false);await refreshRuns();await refreshRunData(data.id)
   }catch(e){setError(e instanceof Error?e.message:'启动失败')}
   setBusy(false)
  }
@@ -97,7 +98,7 @@ export default function LinkedInDiscoveryApp({workspaceId,userId}:{workspaceId:s
  const startEnrichment=async()=>{
   if(!costConsent){setError('请先确认已了解本次 Actor B 可能产生的第三方费用');return}
   setBusy(true);setError('');setNotice('')
-  try{const result=await invoke('start_enrichment',{max_cost:Number(maxCost)});setNotice(`Actor B 已启动，正在补全 ${result.profiles} 条候选人的公开联系资料`);await refreshRuns();await refreshRunData(activeRunId)}catch(e){setError(e instanceof Error?e.message:'联系方式补全启动失败')}finally{setBusy(false)}
+  try{const result=await invoke('start_enrichment',{max_cost:Number(maxCost),confirm_cost:true});setNotice(`Actor B 已启动，正在补全 ${result.profiles} 条候选人的公开联系资料`);await refreshRuns();await refreshRunData(activeRunId)}catch(e){setError(e instanceof Error?e.message:'联系方式补全启动失败')}finally{setBusy(false)}
  }
  const retryPoll=async()=>{if(!activeRun)return;setBusy(true);try{await invoke(activeRun.status==='enriching'?'poll_enrichment':'poll_search');await refreshRunData(activeRunId);await refreshRuns()}catch(e){setError(e instanceof Error?e.message:'刷新失败')}finally{setBusy(false)}}
  return <div className="linkedin-discovery">
@@ -116,7 +117,7 @@ export default function LinkedInDiscoveryApp({workspaceId,userId}:{workspaceId:s
     <label className="li-field"><span>本次费用上限（USD）</span><input type="number" min="0.1" max="100" step="0.5" value={maxCost} onChange={e=>setMaxCost(e.target.value)}/></label>
    </div>
    <div className="li-policy-note"><i className="fas fa-shield-alt"/> 仅处理 Actor 返回的公开职业资料；Actor B 仅对你勾选保留的主页执行补全。邮箱和电话仅在数据源公开提供时展示，不保证每条都有。</div>
-   <div className="li-form-actions"><button className="li-primary" disabled={busy||!workspaceId||!userId} onClick={()=>void createSearch()}><i className="fas fa-search"/> {busy?'正在提交…':'开始发现候选人'}</button><span>Actor A：thirdwatch/linkedin-candidate-finder-scraper</span></div>
+   <div className="li-form-actions"><label className="li-cost-consent"><input type="checkbox" checked={searchCostConsent} onChange={e=>setSearchCostConsent(e.target.checked)}/> 我已了解 Actor A 可能按结果数量收费，并同意本次费用上限。</label><button className="li-primary" disabled={busy||!workspaceId||!userId||!searchCostConsent} onClick={()=>void createSearch()}><i className="fas fa-search"/> {busy?'正在提交…':'开始发现候选人'}</button><span>Actor A：thirdwatch/linkedin-candidate-finder-scraper</span></div>
   </section>
   <section className="li-panel li-run-panel">
    <div className="li-panel-title"><div><span className="li-step">02 / LIVE COLLECTION</span><h3>采集任务与实时进度</h3></div><button className="li-secondary" onClick={()=>{void refreshRuns();if(activeRunId)void refreshRunData(activeRunId)}}><i className="fas fa-sync-alt"/> 刷新</button></div>
