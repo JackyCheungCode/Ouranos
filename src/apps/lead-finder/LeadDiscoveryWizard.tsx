@@ -17,6 +17,7 @@ type MapLocation = { lat:number; lon:number; label:string }
 type ChatMessage = { role:'user'|'assistant'; content:string }
 type DirectoryPlatform = { platform_key:string; platform_name:string; category_key:string; search_terms:string; description:string; sort_order:number }
 type DirectoryProvider = { provider_key:string; provider_name:string; provider_type:string; description:string; is_active:boolean; sort_order:number }
+type ProviderAdapterRow={adapter_key:string;config:Record<string,unknown>;discovery_adapter_catalog:{adapter_name:string;external_actor_id:string;input_schema:JsonSchema;verification_status:string;maintenance_status:string;is_active:boolean;provider_key:string;pricing_model?:Record<string,unknown>}}
 const marketMarkerIcon=divIcon({className:'ldw-map-marker',html:'<span></span>',iconSize:[22,22],iconAnchor:[11,11]})
 const platformGroups = [
  { label: '搜索引擎与地图', items: [['google-maps','Google Maps','google maps business places'],['google-search','Google Search','google search results'],['bing','Bing','bing search results'],['yelp','Yelp','yelp business'] ] },
