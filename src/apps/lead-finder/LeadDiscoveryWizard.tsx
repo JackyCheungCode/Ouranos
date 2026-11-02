@@ -234,7 +234,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   setProviderAdapters(rows.filter(row=>row.discovery_adapter_catalog.verification_status==='verified'&&row.discovery_adapter_catalog.maintenance_status==='maintained'&&row.discovery_adapter_catalog.is_active===true))
  }
  useEffect(()=>{void loadProviderAdapters()},[workspaceId,channel,selectedProviderKey])
-\n const selectedCountry = countries.find(c=>c.code===countryCode)
+
+ const selectedCountry = countries.find(c=>c.code===countryCode)
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
  const toggleCountry = (code:string) => {
   const next=selectedCountries.includes(code)?selectedCountries.filter(x=>x!==code):[...selectedCountries,code]
