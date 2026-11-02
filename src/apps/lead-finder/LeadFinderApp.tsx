@@ -289,7 +289,7 @@ export default function LeadFinderApp() {
   </div>
 
   {tab==='search'&&(selectedDiscoveryPage ? <div className="ldp-selected-page">
-   <div className="ldp-selected-head"><button type="button" onClick={()=>setSelectedDiscoveryPage(null)}>← 返回 12 类发现入口</button>{selectedDiscoveryPage.id!=='linkedin-candidates'&&<div><h2>{selectedDiscoveryPage.title}</h2><p>{selectedDiscoveryPage.description}</p></div>}</div>
+   <div className="ldp-selected-head"><button type="button" onClick={()=>setSelectedDiscoveryPage(null)}>← 返回发现平台</button>{selectedDiscoveryPage.id!=='linkedin-candidates'&&<div><h2>{selectedDiscoveryPage.title}</h2><p>{selectedDiscoveryPage.description}</p></div>}</div>
    {selectedDiscoveryPage.id==='linkedin-candidates' ? <LinkedInDiscoveryApp workspaceId={workspace?.id||''} userId={user?.id||''}/> : <LeadDiscoveryWizard key={selectedDiscoveryPage.id} page={selectedDiscoveryPage} workspaceId={workspace?.id||''} userId={user?.id||''} onTaskCreated={()=>{void refreshTasks();setTab('tasks');setSelectedDiscoveryPage(null)}}/>}
   </div> : <DiscoveryPageHub onSelect={setSelectedDiscoveryPage}/>)}
 
