@@ -162,3 +162,5 @@
 .ouranos-platform .ldw-provider-note{font-size:9px}
 .ouranos-platform .lead-empty-state{border-radius:4px}
 @media(max-width:720px){.ouranos-platform .lead-workspace{padding:16px 12px 26px}.ouranos-platform .lead-tabs{gap:12px;overflow-x:auto}.ouranos-platform .lead-tabs button{white-space:nowrap}}
+
+.lead-page-head{justify-content:flex-start;align-items:center}.lead-page-title{display:flex;align-items:center;gap:11px;color:var(--lead-ink)}.lead-page-title>svg{color:#714b67;flex:0 0 auto}.lead-page-title h1{margin:0;font:700 22px Manrope,'Microsoft YaHei',sans-serif;letter-spacing:-.45px}
