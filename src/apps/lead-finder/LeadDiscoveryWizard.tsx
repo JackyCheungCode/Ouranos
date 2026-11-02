@@ -482,10 +482,13 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel,ai_analysis:aiGenerated?{model:aiModel,user_request:aiRequest,conversation:chatMessages,summary:aiSummary,strategy:aiStrategy,actor_input:actorInput,field_explanations:aiFieldExplanations,missing_information:aiMissingInformation,warnings:aiWarnings,analyzed_at:new Date().toISOString()}:null}
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspaceId,created_by:userId,name:taskTitle,status:'draft',target_profile:profile,selected_channels:[channel],target_count:Number(targetCount)}).select('id').single()
    if(taskError)throw new Error(taskError.message)
-   const adapterKey='apify-'+channel+'-'+(actor.username+'-'+actor.name).toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,110)
-   const config={field_mapping:{},max_cost:Number(maxCost),max_items:Number(targetCount)}
-   const {error:selectionError}=await supabase.from('workspace_adapter_selections').upsert({workspace_id:workspaceId,adapter_key:adapterKey,channel_key:channel,is_enabled:true,priority:10,config,created_by:userId,updated_at:new Date().toISOString()},{onConflict:'workspace_id,adapter_key'})
-   if(selectionError)throw new Error('搜索任务已保存，但适配器配置失败：'+selectionError.message)
+   const {data:selections,error:selectionQueryError}=await supabase.from('workspace_adapter_selections').select('id,config,discovery_adapter_catalog!inner(external_actor_id,verification_status,maintenance_status,is_active)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true)
+   if(selectionQueryError)throw selectionQueryError
+   const selection=(selections||[]).find((row:any)=>row.discovery_adapter_catalog?.external_actor_id===actorId&&row.discovery_adapter_catalog?.verification_status==='verified'&&row.discovery_adapter_catalog?.maintenance_status==='maintained'&&row.discovery_adapter_catalog?.is_active===true)
+   if(!selection)throw new Error('当前 Actor 已不在可用目录中，请刷新页面并联系管理员检查配置。')
+   const config={...(selection.config||{}),max_cost:Number(maxCost),max_items:Number(targetCount)}
+   const {error:selectionError}=await supabase.from('workspace_adapter_selections').update({config,updated_at:new Date().toISOString()}).eq('id',selection.id).eq('workspace_id',workspaceId)
+   if(selectionError)throw new Error('搜索任务已保存，但适配器参数配置失败：'+selectionError.message)
    const {data:queued,error:queueError}=await supabase.functions.invoke('enqueue-lead-search',{body:{workspace_id:workspaceId,task_id:task.id,confirm_cost:true}})
    if(queueError||queued?.error)throw new Error(queued?.error||queueError?.message||'启动搜索失败')
    setNotice('搜索任务已成功进入队列。')
