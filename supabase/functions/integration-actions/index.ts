@@ -36,7 +36,7 @@ async function recordEvent(adminKey:string, event:Record<string,unknown>) {
   await rest("integration_events",adminKey,{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(event)});
 }
 type TestResult={success:boolean;message:string;statusCode?:number;usage?:unknown;manual?:boolean};
-async function testProvider(provider:string,secret:string,kind:string):Promise<TestResult>{
+async function testProvider(provider:string,secret:string,kind:string,baseUrl?:string,modelName?:string):Promise<TestResult>{
   let credentials:Record<string,unknown>={api_key:secret};
   try { const parsed=JSON.parse(secret); if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))credentials=parsed; } catch { /* legacy plain API key */ }
   const apiKey=String(credentials.api_key||"");
@@ -47,6 +47,19 @@ async function testProvider(provider:string,secret:string,kind:string):Promise<T
     if(provider==="google-ai"){const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models",{headers:{"x-goog-api-key":apiKey},signal:timeout});return {success:r.ok,message:r.ok?"Google AI API Key 验证成功":`Google AI 返回 HTTP ${r.status}`,statusCode:r.status};}
     if(provider==="deepseek"){const r=await fetch("https://api.deepseek.com/models",{headers:{Authorization:`Bearer ${apiKey}`},signal:timeout});return {success:r.ok,message:r.ok?"DeepSeek API Key 验证成功":`DeepSeek 返回 HTTP ${r.status}`,statusCode:r.status};}
     if(provider==="openrouter"){const r=await fetch("https://openrouter.ai/api/v1/models",{headers:{Authorization:`Bearer ${apiKey}`},signal:timeout});return {success:r.ok,message:r.ok?"OpenRouter API Key 验证成功":`OpenRouter 返回 HTTP ${r.status}`,statusCode:r.status};}
+    if(provider==="qwen"||provider==="zhipu"||provider==="moonshot"||provider==="siliconflow"||provider==="groq"||provider==="cerebras"||provider==="mistral"||provider==="xai"||provider==="custom-openai"){
+      const endpoints:Record<string,string>={qwen:"https://dashscope.aliyuncs.com/compatible-mode/v1/models",zhipu:"https://open.bigmodel.cn/api/paas/v4/models",moonshot:"https://api.moonshot.cn/v1/models",siliconflow:"https://api.siliconflow.cn/v1/models",groq:"https://api.groq.com/openai/v1/models",cerebras:"https://api.cerebras.ai/v1/models",mistral:"https://api.mistral.ai/v1/models",xai:"https://api.x.ai/v1/models"};
+      const endpoint=provider==="custom-openai"&&baseUrl?baseUrl.replace(/\\/$/,"")+"/models":endpoints[provider];
+      if(!endpoint)return {success:false,manual:true,message:"该 AI 服务暂未配置自动连接测试。"};
+      const r=await fetch(endpoint,{headers:{Authorization:`Bearer ${apiKey}`},signal:timeout});
+      return {success:r.ok,message:r.ok?`${provider} API Key 验证成功`:`${provider} 返回 HTTP ${r.status}`,statusCode:r.status};
+    }
+    if(provider==="workers-ai"){
+      const accountId=String(credentials.account_id||"");
+      if(!/^[a-f0-9]{32}$/.test(accountId))return {success:false,manual:true,message:"缺少 Cloudflare Account ID，无法测试 Workers AI。"};
+      const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models/search?per_page=1`,{headers:{Authorization:`Bearer ${apiKey}`},signal:timeout});
+      return {success:r.ok,message:r.ok?"Cloudflare Workers AI Token 验证成功":`Cloudflare 返回 HTTP ${r.status}`,statusCode:r.status};
+    }
     return {success:false,manual:true,message:"该 AI 服务商暂未配置无计费连接测试适配器。"};
   }
   if(provider==="apify"){
@@ -103,7 +116,7 @@ Deno.serve(async(req:Request)=>{
     if(!members.length&&!isOwner)return json({error:"Workspace access denied"},403,origin);
     const table=kind==="data_source"?"integration_connections":"ai_model_configs";
     const filter=`workspace_id=eq.${encodeURIComponent(workspaceId)}&provider_key=eq.${encodeURIComponent(providerKey)}`+(kind==="ai_model"?`&model_name=eq.${encodeURIComponent(modelName)}`:"");
-    const existingResponse=await rest(`${table}?select=id,secret_ref,provider_name&${filter}&limit=1`,adminKey);
+    const existingResponse=await rest(`${table}?select=id,secret_ref,provider_name,base_url&${filter}&limit=1`,adminKey);
     if(!existingResponse.ok)return json({error:"Unable to read current integration"},500,origin);
     const existingRows=await existingResponse.json();const existing=existingRows[0];
     if(!existing)return json({error:"Integration configuration not found"},404,origin);
@@ -128,7 +141,7 @@ Deno.serve(async(req:Request)=>{
     if(!secretResponse.ok)return json({error:"Unable to retrieve credential from Vault"},500,origin);
     const secret=await secretResponse.json();
     if(typeof secret!=="string"||!secret)return json({error:"Stored credential is empty"},500,origin);
-    const result=await testProvider(providerKey,secret,kind);
+    const result=await testProvider(providerKey,secret,kind,existing.base_url,modelName);
     const status=result.success?"connected":result.manual?"configured":"error";
     const update=await rest(`${table}?${filter}`,adminKey,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status,is_enabled:result.success,verification_method:result.success?"api_test":result.manual?"manual_pending":"failed",last_tested_at:new Date().toISOString(),last_error:result.success?null:result.message,updated_at:new Date().toISOString()})});
     if(!update.ok)return json({error:"Test completed but status could not be saved"},500,origin);
