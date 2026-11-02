@@ -262,12 +262,19 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
 
  const loadApprovedActors = async (offset=0,append=false) => {
-  if(!supabase)return
+  if(!supabase||!workspaceId){setApprovedActors([]);setApprovedOffset(0);setHasMoreApproved(false);return}
   setApprovedBusy(true)
   try {
+   const connection=await supabase.from('integration_connections').select('status,is_enabled').eq('workspace_id',workspaceId).eq('provider_key','apify').maybeSingle()
+   if(connection.error)throw connection.error
+   if(!connection.data||connection.data.status!=='connected'||connection.data.is_enabled!==true){setApprovedActors([]);setApprovedOffset(0);setHasMoreApproved(false);return}
+   const selections=await supabase.from('workspace_adapter_selections').select('adapter_key').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true)
+   if(selections.error)throw selections.error
+   const enabledKeys=(selections.data||[]).map(row=>String(row.adapter_key)).filter(Boolean)
+   if(!enabledKeys.length){setApprovedActors([]);setApprovedOffset(0);setHasMoreApproved(false);return}
    const {data,error:queryError}=await supabase.from('discovery_adapter_catalog')
     .select('adapter_key,adapter_name,external_actor_id,adapter_version,capabilities,pricing_model,supported_record_types')
-    .eq('provider_key','apify').eq('channel_key',channel).eq('verification_status','verified').eq('maintenance_status','maintained').eq('is_active',true)
+    .in('adapter_key',enabledKeys).eq('provider_key','apify').eq('channel_key',channel).eq('verification_status','verified').eq('maintenance_status','maintained').eq('is_active',true)
     .overlaps('supported_record_types',['company','contact']).order('updated_at',{ascending:false}).range(offset,offset+4)
    if(queryError)throw queryError
    const rows=(data||[]) as Array<Record<string,unknown>>
@@ -275,14 +282,14 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     const id=String(row.external_actor_id||'');const [username,name]=id.split('~')
     const caps=(row.capabilities||{}) as Record<string,unknown>
     const types=Array.isArray(row.supported_record_types)?(row.supported_record_types as string[]).map(x=>x==='company'?'企业':'联系人').join(' / '):'客户资料'
-    return {id,title:String(row.adapter_name||name||id),name:name||id,username:username||'',description:'已审核 · 支持'+types+' · Build '+String(row.adapter_version||''),url:String(caps.actor_url||''),currentPricingInfo:(row.pricing_model||{}) as Record<string,unknown>}
+    return {id,title:String(row.adapter_name||name||id),name:name||id,username:username||'',description:'已审核 · 已在当前工作空间启用 · 支持'+types+' · Build '+String(row.adapter_version||''),url:String(caps.actor_url||''),currentPricingInfo:(row.pricing_model||{}) as Record<string,unknown>}
    }).filter(item=>item.username&&item.name)
    setApprovedActors(mapped)
    setApprovedOffset(offset+rows.length);setHasMoreApproved(rows.length===5)
   }catch(e){setError(e instanceof Error?e.message:'读取已审核 Actor 目录失败')}
   finally{setApprovedBusy(false)}
  }
- useEffect(()=>{void loadApprovedActors(0,false)},[channel,provider])
+ useEffect(()=>{void loadApprovedActors(0,false)},[workspaceId,channel,provider])
  const searchActors = async (queryOverride?:string,append=false,previous=false) => {
   if(provider.toLowerCase()!=='apify'){setError('该服务商已进入目录，但尚未接入搜索与执行接口。当前不能将其请求转发给 Apify。');return}
   setActorBusy(true);setError('');setNotice('')
@@ -295,6 +302,11 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    if(!response.ok)throw new Error('Apify Store 搜索失败，请稍后重试')
    const body=await response.json();const items=(body.data?.items || []) as Actor[]
    const approvedIds=new Set(approvedActors.map(item=>item.username+'~'+item.name))
+   if(supabase){
+    const {data:approvedRows,error:approvedError}=await supabase.from('discovery_adapter_catalog').select('external_actor_id').eq('provider_key','apify').eq('channel_key',channel).eq('verification_status','verified').eq('maintenance_status','maintained').eq('is_active',true).overlaps('supported_record_types',['company','contact'])
+    if(approvedError)throw approvedError
+    for(const row of approvedRows||[])if(row.external_actor_id)approvedIds.add(String(row.external_actor_id))
+   }
    const candidates=items.filter(item=>!approvedIds.has(item.username+'~'+item.name))
    setActors(candidates);setCandidateOffset(pageOffset+items.length);setHasMoreCandidates(items.length===5);if(!candidates.length&&!append)setNotice('没有找到新的待审核候选 Actor。可以调整关键词再搜索。')
   }catch(e){setError(e instanceof Error?e.message:'无法搜索 Apify Store')}
@@ -532,7 +544,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     </section>
     <section className="ldw-card">
      <div className="ldw-step-title"><span>4</span><div><h3>选择采集器 / Actor</h3><p>搜索当前服务商的真实产品目录，你可以自行决定使用哪一个。</p></div></div>
-     {canSearchSelectedProvider?<><div className="ldw-approved-actor-list"><div className="ldw-actor-list-heading"><b>已审核 · 可直接执行</b><span>每次最多显示 5 个</span></div>{approvedActors.length>0?approvedActors.map(item=><button type="button" key={item.id} className={actor?.id===item.id?'selected':''} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description}</small><small>{pricingLabel(item)}</small></span><span>{actor?.id===item.id?'已选择':'选择'} <ArrowRight size={12}/></span></button>):<p className="ldw-provider-note">当前平台暂无通过客户资料审核的 Actor。你可以在下方发现候选项，但候选项不能直接执行。</p>}{approvedOffset>5&&<button type="button" className="ldw-load-more-actors" onClick={()=>void loadApprovedActors(Math.max(0,approvedOffset-10),false)} disabled={approvedBusy}>上一批已审核 Actor</button>}{hasMoreApproved&&<button type="button" className="ldw-load-more-actors" onClick={()=>void loadApprovedActors(approvedOffset,false)} disabled={approvedBusy}>{approvedBusy?'正在加载…':'下一批已审核 Actor（5 个）'}</button>}</div><div className="ldw-actor-search"><input value={actorQuery} onChange={event=>setActorQuery(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();void searchActors()}}} placeholder="输入 Actor 名称或采集关键词"/><button type="button" onClick={()=>void searchActors()} disabled={actorBusy||!actorQuery.trim()}>{actorBusy?<Loader2 size={13}/>:<Search size={13}/>} 搜索 Apify Store</button></div>{actorBusy&&<div className="ldw-loading"><Loader2 size={14}/> 正在搜索 Actor…</div>}{actors.length>0&&<div className="ldw-ai-actor-options"><b>待审核候选（{actors.length}）</b><p>Apify Store 搜索结果尚未经过真实客户资料审核；选择后仅读取 Schema，不代表可以执行。</p>{actors.map(item=><button type="button" key={item.id} className={actor?.id===item.id?'selected':''} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description||item.username+'/'+item.name}</small><small>{pricingLabel(item)}</small></span><span>{actor?.id===item.id?'已选择':'选择'} <ArrowRight size={12}/></span></button>)}</div>}{candidateOffset>5&&<button type="button" className="ldw-load-more-actors" onClick={()=>void searchActors(undefined,false,true)} disabled={actorBusy}>上一批候选</button>}{hasMoreCandidates&&<button type="button" className="ldw-load-more-actors" onClick={()=>void searchActors(undefined,true)} disabled={actorBusy}>{actorBusy?'正在加载…':'下一批候选（5 个）'}</button>}</>:<div className="ldw-provider-note">当前服务商尚未接入搜索和执行接口。为避免错误调用，不会将此选择转发到其他服务商。</div>}
+     {canSearchSelectedProvider?<><div className="ldw-approved-actor-list"><div className="ldw-actor-list-heading"><b>已审核 · 可直接执行</b><span>每次最多显示 5 个</span></div>{approvedActors.length>0?approvedActors.map(item=><button type="button" key={item.id} className={actor?.id===item.id?'selected':''} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description}</small><small>{pricingLabel(item)}</small></span><span>{actor?.id===item.id?'已选择':'选择'} <ArrowRight size={12}/></span></button>):<p className="ldw-provider-note">当前没有同时满足审核通过、维护正常、客户资料输出、工作空间启用和 Apify 连接正常的可执行 Actor。你可以在下方发现待审核候选。</p>}{approvedOffset>5&&<button type="button" className="ldw-load-more-actors" onClick={()=>void loadApprovedActors(Math.max(0,approvedOffset-10),false)} disabled={approvedBusy}>上一批已审核 Actor</button>}{hasMoreApproved&&<button type="button" className="ldw-load-more-actors" onClick={()=>void loadApprovedActors(approvedOffset,false)} disabled={approvedBusy}>{approvedBusy?'正在加载…':'下一批已审核 Actor（5 个）'}</button>}</div><div className="ldw-actor-search"><input value={actorQuery} onChange={event=>setActorQuery(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();void searchActors()}}} placeholder="输入 Actor 名称或采集关键词"/><button type="button" onClick={()=>void searchActors()} disabled={actorBusy||!actorQuery.trim()}>{actorBusy?<Loader2 size={13}/>:<Search size={13}/>} 搜索 Apify Store</button></div>{actorBusy&&<div className="ldw-loading"><Loader2 size={14}/> 正在搜索 Actor…</div>}{actors.length>0&&<div className="ldw-ai-actor-options"><b>待审核候选（{actors.length}）</b><p>Apify Store 搜索结果尚未经过真实客户资料审核；选择后仅读取 Schema，不代表可以执行。</p>{actors.map(item=><button type="button" key={item.id} className={actor?.id===item.id?'selected':''} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description||item.username+'/'+item.name}</small><small>{pricingLabel(item)}</small></span><span>{actor?.id===item.id?'已选择':'选择'} <ArrowRight size={12}/></span></button>)}</div>}{candidateOffset>5&&<button type="button" className="ldw-load-more-actors" onClick={()=>void searchActors(undefined,false,true)} disabled={actorBusy}>上一批候选</button>}{hasMoreCandidates&&<button type="button" className="ldw-load-more-actors" onClick={()=>void searchActors(undefined,true)} disabled={actorBusy}>{actorBusy?'正在加载…':'下一批候选（5 个）'}</button>}</>:<div className="ldw-provider-note">当前服务商尚未接入搜索和执行接口。为避免错误调用，不会将此选择转发到其他服务商。</div>}
     </section>
     {schema&&actor?<section className="ldw-card ldw-manual-schema-card">
      <div className="ldw-step-title"><span>5</span><div><h3>按 Schema 填写参数</h3><p>字段名称以中文展示；必填、类型、范围和 Actor 原始字段均保留。</p></div></div>
