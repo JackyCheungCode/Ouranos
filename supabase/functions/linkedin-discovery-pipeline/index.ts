@@ -72,9 +72,9 @@ async function handle(req:Request){
   }
   if(action==="poll_enrichment"){
    const key=await getApifyKey(admin,workspaceId);
-   if(!run.actor_b_run_id||!run.actor_b_dataset_id)return json({error:"Actor B 尚未启动"},409,origin);const stateBody=await apify(key,`actor-runs/${enc(String(run.actor_b_run_id))}`);const state=asObject(stateBody.data||stateBody);const offset=Number(run.actor_b_offset||0);const items=await fetchBatch(key,String(run.actor_b_dataset_id),offset);let enriched=0;
+   if(!run.actor_b_run_id||!run.actor_b_dataset_id)return json({error:"Actor B 尚未启动"},409,origin);const stateBody=await apify(key,`actor-runs/${enc(String(run.actor_b_run_id))}`);const state=asObject(stateBody.data||stateBody);const offset=Number(run.actor_b_offset||0);const items=await fetchBatch(key,String(run.actor_b_dataset_id),offset);
    const selectedRows=await readJson(await rest(`linkedin_candidates?select=id,profile_url,profile_slug,contact_email,contact_phone&run_id=eq.${enc(runId)}&workspace_id=eq.${enc(workspaceId)}&clean_status=eq.keep&selected_for_enrichment=eq.true&limit=250`,admin));
-   const keyOf=(value:string)=>{const slug=slugOf(value);return slug?slug.toLowerCase():value.toLowerCase().replace(/^https?:\\/\\//,"").replace(/[?#].*$/,"").replace(/\\/$/,"");};
+   const keyOf=(value:string)=>{const slug=slugOf(value);return slug?slug.toLowerCase():value.toLowerCase().split("?")[0].split("#")[0].replace(new RegExp("/+$"),"");};
    const byProfile=new Map<string,any>();for(const row of selectedRows){byProfile.set(keyOf(String(row.profile_url||"")),row);if(row.profile_slug)byProfile.set(String(row.profile_slug).toLowerCase(),row);}
    let updated=0,unmatched=0,withoutContact=0;
    for(const raw of items){
@@ -99,7 +99,7 @@ async function handle(req:Request){
    }
    const nextOffset=offset+items.length;const actorStatus=String(state.status||"");const done=["SUCCEEDED","FAILED","ABORTED","TIMED-OUT"].includes(actorStatus);const failed=["FAILED","ABORTED","TIMED-OUT"].includes(actorStatus);const complete=done&&items.length<100;const countRows=await readJson(await rest(`linkedin_candidates?select=id&run_id=eq.${enc(runId)}&workspace_id=eq.${enc(workspaceId)}&enriched_at=not.is.null`,admin));
    await updateRun(admin,workspaceId,runId,{status:failed?"failed":complete?"completed":"enriching",actor_b_status:actorStatus,actor_b_offset:nextOffset,enriched_count:countRows.length,actual_cost:Number(state.usageTotalUsd)||run.actual_cost||null,completed_at:complete?new Date().toISOString():null,error_message:failed?String(state.statusMessage||actorStatus):null});
-   if(items.length)await log(admin,workspaceId,runId,"enrichment_collect",`Actor B 返回 ${items.length} 条资料，已更新 ${enriched} 条候选人`,"success",{offset,next_offset:nextOffset,enriched});
+   if(items.length)await log(admin,workspaceId,runId,"enrichment_collect",`Actor B 返回 ${items.length} 条资料，数据库实际更新 ${updated} 条候选人`,updated===items.length?"success":"warning",{offset,next_offset:nextOffset,returned:items.length,updated,unmatched,without_contact:withoutContact});
    if(failed)await log(admin,workspaceId,runId,"enrichment_failed","Actor B 执行失败："+String(state.statusMessage||actorStatus),"error",{status:actorStatus});
    else if(complete)await log(admin,workspaceId,runId,"completed",`联系方式补全完成，已处理 ${countRows.length} 条候选人`,"success",{enriched:countRows.length});
    return json({ok:true,status:failed?"failed":complete?"completed":"enriching",enriched:updated,count:countRows.length,returned:items.length,unmatched,without_contact:withoutContact,actor_status:actorStatus},200,origin);
