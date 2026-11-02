@@ -300,10 +300,12 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    if(selections.error)throw selections.error
    const enabledKeys=(selections.data||[]).map(row=>String(row.adapter_key)).filter(Boolean)
    if(!enabledKeys.length){setApprovedActors([]);setApprovedOffset(0);setHasMoreApproved(false);return}
-   const {data,error:queryError}=await supabase.from('discovery_adapter_catalog')
+   let catalogQuery=supabase.from('discovery_adapter_catalog')
     .select('adapter_key,adapter_name,external_actor_id,adapter_version,capabilities,pricing_model,supported_record_types')
     .in('adapter_key',enabledKeys).eq('provider_key','apify').eq('channel_key',channel).eq('verification_status','verified').eq('maintenance_status','maintained').eq('is_active',true)
-    .overlaps('supported_record_types',['company','contact']).order('updated_at',{ascending:false}).range(offset,offset+4)
+    .overlaps('supported_record_types',['company','contact'])
+   if(channel==='facebook')catalogQuery=catalogQuery.in('external_actor_id',facebookProfileActors.map(item=>item.username+'~'+item.name))
+   const {data,error:queryError}=await catalogQuery.order('updated_at',{ascending:false}).range(offset,offset+4)
    if(queryError)throw queryError
    const rows=(data||[]) as Array<Record<string,unknown>>
    const mapped:Actor[]=rows.map(row=>{
