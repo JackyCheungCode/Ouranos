@@ -230,11 +230,11 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   finally{setCitySearchBusy(false)}
  }
 
- const searchActors = async () => {
+ const searchActors = async (queryOverride?:string) => {
   if(provider!=='Apify')return
   setActorBusy(true);setError('');setNotice('')
   try {
-   const term=actorQuery.trim() || searchTerms[channel] || channel
+   const term=(queryOverride||actorQuery).trim() || searchTerms[channel] || channel
    const url=new URL('https://api.apify.com/v2/store')
    url.searchParams.set('search',term);url.searchParams.set('limit','20');url.searchParams.set('sortBy','popularity');url.searchParams.set('responseFormat','full')
    const response=await fetch(url.toString(),{headers:{Accept:'application/json'}})
@@ -356,33 +356,27 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      const platform=supportedPlatforms.find(item=>item.id===result.platform_id)
      if(platform){
       setChannel(platform.id);setRecognizedPlatform(platform.name)
-      if(platform.id==='amazon' || providerByPlatform[platform.id]?.includes('Apify')){
-       const term=[searchTerms[platform.id]||platform.name,requestText.slice(0,120)].filter(Boolean).join(' ')
-       const storeUrl=new URL('https://api.apify.com/v2/store')
-       storeUrl.searchParams.set('search',term);storeUrl.searchParams.set('limit','20');storeUrl.searchParams.set('sortBy','popularity');storeUrl.searchParams.set('responseFormat','full')
-       const storeResponse=await fetch(storeUrl.toString(),{headers:{Accept:'application/json'}})
-       if(!storeResponse.ok)throw new Error('无法读取平台可用的 Actor，请稍后重试。')
-       const storeBody=await storeResponse.json()
-       const candidates=(storeBody.data?.items||[]) as Actor[]
-       setActors(candidates)
-       if(candidates.length){
-        const recommendationResponse=await fetch('https://ouranos-ai-assistant.xg-y.workers.dev',{
-         method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+sessionData.session.access_token},
-         body:JSON.stringify({mode:'intent',model:aiModel,user_request:requestText,conversation:messages.slice(-20),supported_platforms:supportedPlatforms,actor_candidates:candidates.slice(0,16).map(item=>({id:item.id,actor_id:item.username+'~'+item.name,name:item.title||item.name,description:item.description||'',pricing:pricingLabel(item)})),channel:platform.id})
-        })
-        const recommendation=await recommendationResponse.json()
-        const recommended=candidates.find(item=>item.id===recommendation?.recommended_actor_id||item.username+'~'+item.name===recommendation?.recommended_actor_id)
-        if(recommendationResponse.ok&&recommended){
-         setChatMessages(current=>[...current,{role:'assistant',content:String(recommendation.assistant_message||('我已为你推荐 '+recommended.title+'，正在读取它的真实参数 Schema。'))}])
-         await selectActor(recommended)
-         return
-        }
-       }
+      if(providerByPlatform[platform.id]?.includes('Apify')){
+       const term=[searchTerms[platform.id]||platform.name,requestText.slice(0,160)].filter(Boolean).join(' ')
+       setActorQuery(term);setActorBusy(true)
+       try{
+        const storeUrl=new URL('https://api.apify.com/v2/store')
+        storeUrl.searchParams.set('search',term);storeUrl.searchParams.set('limit','20');storeUrl.searchParams.set('sortBy','popularity');storeUrl.searchParams.set('responseFormat','full')
+        const storeResponse=await fetch(storeUrl.toString(),{headers:{Accept:'application/json'}})
+        if(!storeResponse.ok)throw new Error('无法读取 Apify Store 候选 Actor，请稍后重试。')
+        const storeBody=await storeResponse.json()
+        const candidates=(storeBody.data?.items||[]) as Actor[]
+        setActors(candidates)
+        setChatMessages(current=>[...current,{role:'assistant',content:candidates.length?'已识别平台：'+platform.name+'。我找到了 '+candidates.length+' 个候选 Actor。请直接在下面选择一个；也可以修改搜索词重新查找。选择后我会读取它的 Schema，并继续帮你配置。':'已识别平台：'+platform.name+'，但暂时没有找到候选 Actor。你可以修改下面的搜索词再试一次。'}])
+       }finally{setActorBusy(false)}
+      }else{
+       setChatMessages(current=>[...current,{role:'assistant',content:'已识别平台：'+platform.name+'。当前暂未接入该平台的 Actor 搜索，请选择已支持 Apify 的平台，或稍后再试。'}])
       }
+      setAiSummary(String(result.summary||''));return
      }
     }
     setAiSummary(String(result.summary||''))
-    setChatMessages(current=>[...current,{role:'assistant',content:String(result.assistant_message||'我已理解你的需求。请继续补充目标范围，我会据此推荐平台和采集器。')}])
+    setChatMessages(current=>[...current,{role:'assistant',content:String(result.assistant_message||'我已理解你的需求。请继续补充目标平台或采集范围。')}])
     return
    }
    const generated=(result.actor_input||{}) as Record<string,unknown>
@@ -455,7 +449,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  return <div className="ldw-shell">
   <section className="ldw-card ldw-ai-step ldw-chat-card ldw-chat-first">
-   <div className="ldw-step-title"><span><MessageCircle size={16}/></span><div><h3>AI 采集助手</h3><p>描述业务目标，AI 将确认平台、推荐 Actor，并根据真实 Schema 自动填写采集参数。</p></div></div>
+   <div className="ldw-step-title"><span><MessageCircle size={16}/></span><div><h3>AI 采集助手</h3><p>描述业务目标，AI 将识别平台并搜索候选 Actor；你在对话中选择后，AI 再读取 Schema 并填写参数。</p></div></div>
    <div className="ldw-chat-history" aria-live="polite">{chatMessages.map((message,index)=><div key={index} className={'ldw-chat-message '+message.role}><span>{message.role==='assistant'?'AI 助手':'你'}</span><p>{message.content}</p></div>)}{aiBusy&&<div className="ldw-chat-message assistant"><span>AI 助手</span><p className="ldw-chat-thinking"><Loader2 size={13}/> 正在理解需求并搜索可用 Actor…</p></div>}</div>
    {!actor&&recognizedPlatform&&<div className="ldw-ai-actor-picker"><div className="ldw-ai-actor-search"><input value={actorQuery} onChange={e=>setActorQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();void searchActors()}}} placeholder="搜索 Actor，例如 amazon seller scraper"/><button type="button" onClick={()=>void searchActors()} disabled={actorBusy||!actorQuery.trim()}>{actorBusy?<Loader2 size={13}/>:<Search size={13}/>} 搜索 Actor</button></div>{actorBusy&&<p>正在搜索 Apify Store…</p>}{actors.length>0&&<div className="ldw-ai-actor-options"><b>选择一个 Actor（{actors.length}）</b><p>由你决定使用哪个采集器。AI 会在你选择后读取真实 Schema 并继续对话。</p>{actors.slice(0,8).map(item=><button type="button" key={item.id} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description||item.username+\'/\'+item.name}</small><small>{pricingLabel(item)}</small></span><span>选择 <ArrowRight size={12}/></span></button>)}</div>}</div>}
    <div className="ldw-chat-composer"><textarea rows={3} value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void submitChat()}}} placeholder="例如：我销售手机数据线，想寻找美国亚马逊上相关品类的卖家…" /><button type="button" onClick={()=>void submitChat()} disabled={!chatInput.trim()||aiBusy}><Send size={14}/> 发送</button></div>
