@@ -37,11 +37,15 @@ Deno.serve(async(req:Request)=>{
   }else{
    const datasetId=String(config.dataset_id||"");if(!datasetId)throw new Error("Bright Data Dataset ID missing");
    const params=new URLSearchParams({dataset_id:datasetId,format:"json"});
-   const trigger=await responseJson(await fetch(`https://api.brightdata.com/datasets/v3/trigger?${params}`,{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify(sampleInput),signal:AbortSignal.timeout(30000)}));
-   const snapshotId=String(trigger.snapshot_id||trigger.id||"");if(!snapshotId)throw new Error("Bright Data 未返回 Snapshot ID");
-   let ready=false;for(let attempt=0;attempt<12;attempt++){await new Promise(resolve=>setTimeout(resolve,4000));const progress=await responseJson(await fetch(`https://api.brightdata.com/datasets/v3/progress/${encodeURIComponent(snapshotId)}`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(20000)}));if(String(progress.status)==="ready"){ready=true;break;}if(String(progress.status)==="failed")throw new Error("Bright Data Dataset 测试失败");}
-   if(!ready)throw new Error("Bright Data Snapshot 仍在执行，请稍后重新测试；Snapshot ID "+snapshotId);
-   const snapshot=await fetch(`https://api.brightdata.com/datasets/v3/snapshot/${encodeURIComponent(snapshotId)}?format=json`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30000)});const text=await snapshot.text();let parsed:unknown;try{parsed=text?JSON.parse(text):[]}catch{parsed=[];}if(!snapshot.ok)throw new Error(`Bright Data Snapshot 下载失败（HTTP ${snapshot.status}）`);sample=records(parsed);
+   const scrape=await fetch(`https://api.brightdata.com/datasets/v3/scrape?${params}`,{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify(sampleInput),signal:AbortSignal.timeout(65000)});
+   const scrapeText=await scrape.text();let scrapeData:unknown;try{scrapeData=scrapeText?JSON.parse(scrapeText):[]}catch{scrapeData=[];}
+   if(!scrape.ok)throw new Error(`Bright Data Dataset 测试失败（HTTP ${scrape.status}）：${scrapeText.slice(0,500)}`);
+   if(scrape.status===200){sample=records(scrapeData);}else if(scrape.status===202){
+    const snapshotId=String(obj(scrapeData).snapshot_id||"");if(!snapshotId)throw new Error("Bright Data 未返回 Snapshot ID");
+    let ready=false;for(let attempt=0;attempt<12;attempt++){await new Promise(resolve=>setTimeout(resolve,4000));const progress=await responseJson(await fetch(`https://api.brightdata.com/datasets/v3/progress/${encodeURIComponent(snapshotId)}`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(20000)}));if(String(progress.status)==="ready"){ready=true;break;}if(String(progress.status)==="failed")throw new Error("Bright Data Dataset 测试失败");}
+    if(!ready)throw new Error("Bright Data Snapshot 仍在执行，请稍后重新测试；Snapshot ID "+snapshotId);
+    const snapshot=await fetch(`https://api.brightdata.com/datasets/v3/snapshot/${encodeURIComponent(snapshotId)}?format=json`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30000)});const snapshotText=await snapshot.text();let snapshotData:unknown;try{snapshotData=snapshotText?JSON.parse(snapshotText):[]}catch{snapshotData=[];}if(!snapshot.ok)throw new Error(`Bright Data Snapshot 下载失败（HTTP ${snapshot.status}）`);sample=records(snapshotData);
+   }else throw new Error(`Bright Data 返回了未预期状态：${scrape.status}`);
   }
   if(!sample.length)return json({error:"测试已执行，但没有返回样本数据；请检查测试参数。"},422,origin);
   const details=inspectSample(sample);const types:string[]=[];if(details.company_count>0)types.push("company");if(details.contact_count>0)types.push("contact");if(!types.length)return json({error:"返回样本中未识别到企业或联系人档案。请检查 Dataset / 操作是否返回客户资料，而不是文章、帖子或普通网页。",sample:details},422,origin);
