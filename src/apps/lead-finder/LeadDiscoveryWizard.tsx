@@ -335,7 +335,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    const configuredConfig=(configured?.config||{}) as Record<string,unknown>
    const defaults=(configuredConfig.input_defaults||{}) as Record<string,unknown>
    initial={...initial,...Object.fromEntries(Object.entries(defaults).filter(([key])=>Object.prototype.hasOwnProperty.call(nextSchema.properties||{},key)))}
-  setSchema(nextSchema);setValues(initial);
+  setSchema(nextSchema);setValues(initial);if(page.id==='facebook-pages'){const countKey=Object.keys(nextSchema.properties||{}).find(key=>/^(maxResults|maxItems|maxResultsPerQuery)$/i.test(key));if(countKey&&initial[countKey]!==undefined)setTargetCount(String(initial[countKey]))}
   setNotice(data.verification_status==='verified'&&data.maintenance_status==='maintained'?'已读取 Actor 最新输入 Schema。该数据源已通过客户输出审核。':'已读取 Actor 最新输入 Schema。该 Actor 尚未通过直接客户资料审核，当前只能预览参数，不能启动正式采集。')
   setSchemaBusy(false)
  }
@@ -352,7 +352,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const required=requirements.requiredFields.has(key)
   const groupRequired=requirements.atLeastOneGroups.some(group=>group.includes(key))
   const value=values[key] ?? getDefaultValue(field,required)
-  const set=(v:unknown)=>{setValues(current=>({...current,[key]:v}));if(page.id==='facebook-pages'&&key==='maxResults')setTargetCount(String(v??''))}
+  const set=(v:unknown)=>{setValues(current=>({...current,[key]:v}));if(page.id==='facebook-pages'&&/^(maxResults|maxItems|maxResultsPerQuery)$/i.test(key))setTargetCount(String(v??''))}
   const enumValues=field.enum || []
   const semantic=key.toLowerCase()
   const countryField=/country|countrycode|country_code/.test(semantic)
