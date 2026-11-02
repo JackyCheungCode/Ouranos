@@ -21,15 +21,16 @@ Deno.serve(async(req:Request)=>{
   if(task.status!=="draft")return json({error:`任务状态为 ${task.status}，只有草稿任务可以启动`},409,origin);
   const selectedChannels=Array.isArray(task.selected_channels)?task.selected_channels as string[]:[];
   if(!selectedChannels.length)return json({error:"该任务没有选择搜索渠道"},400,origin);
+  const profile=(task.target_profile||{}) as Record<string,unknown>;
+  const requestedAdapterKey=String(profile.adapter_key||"");
   const selectionsResponse=await rest(`workspace_adapter_selections?select=id,adapter_key,channel_key,config,is_enabled,priority&workspace_id=eq.${encodeURIComponent(workspaceId)}&is_enabled=eq.true&order=priority.asc`,admin);
   if(!selectionsResponse.ok)return json({error:"Unable to read enabled channel adapters"},500,origin);
-  const allSelections=await selectionsResponse.json();const selections=allSelections.filter((s:Record<string,unknown>)=>selectedChannels.includes(String(s.channel_key)));
+  const allSelections=await selectionsResponse.json();const selections=allSelections.filter((s:Record<string,unknown>)=>selectedChannels.includes(String(s.channel_key))&&(!requestedAdapterKey||String(s.adapter_key)===requestedAdapterKey));
   const missing=selectedChannels.filter(channel=>!selections.some((s:Record<string,unknown>)=>s.channel_key===channel));
   if(missing.length)return json({error:"以下渠道尚未配置并启用可执行适配器",missing_channels:missing},409,origin);
   if(!selections.length)return json({error:"没有已启用的渠道适配器"},409,origin);
   const connectionResponse=await rest(`integration_connections?select=provider_key,status,is_enabled&workspace_id=eq.${encodeURIComponent(workspaceId)}`,admin);if(!connectionResponse.ok)return json({error:"Unable to read provider connections"},500,origin);
   const connections=await connectionResponse.json();const connectionMap=new Map(connections.map((x:Record<string,unknown>)=>[String(x.provider_key),x]));
-  const profile=(task.target_profile||{}) as Record<string,unknown>;
   const runPayloads:Record<string,unknown>[]=[];
   for(const selection of selections){
     const adapterResponse=await rest(`discovery_adapter_catalog?select=provider_key,channel_key,adapter_key,adapter_name,adapter_version,provider_product_type,external_actor_id,supported_record_types,execution_mode,input_schema,output_schema,field_mapping,capabilities,pricing_model,max_concurrency,is_active,verification_status,maintenance_status,supported_record_types&adapter_key=eq.${encodeURIComponent(String(selection.adapter_key))}&limit=1`,admin);
@@ -37,7 +38,7 @@ Deno.serve(async(req:Request)=>{
     const catalog=(await adapterResponse.json())[0];if(!catalog||!catalog.is_active)return json({error:`适配器 ${selection.adapter_key} 尚未启用`},409,origin);if(catalog.channel_key!==selection.channel_key)return json({error:`适配器 ${selection.adapter_key} 与工作空间渠道绑定不一致，不能执行`},409,origin);if(catalog.verification_status!=="verified"||catalog.maintenance_status!=="maintained")return json({error:`适配器 ${selection.adapter_key} 尚未通过客户资料输出审核或维护状态检查，不能执行`,verification_status:catalog.verification_status,maintenance_status:catalog.maintenance_status},409,origin);if(!Array.isArray(catalog.supported_record_types)||!catalog.supported_record_types.some((type:unknown)=>type==="company"||type==="contact"))return json({error:`适配器 ${selection.adapter_key} 尚未确认能够输出企业或联系人档案`},422,origin);
     const connection=connectionMap.get(String(catalog.provider_key)) as Record<string,unknown>|undefined;
     if(!connection||connection.status!=="connected"||connection.is_enabled!==true)return json({error:`请先连接并启用服务商：${catalog.provider_key}`},409,origin);
-    const config=(selection.config||{}) as Record<string,unknown>;const outputMapping={} as Record<string,unknown>;
+    const config=(selection.config||{}) as Record<string,unknown>;const outputMapping=(config.field_mapping&&typeof config.field_mapping==='object'&&!Array.isArray(config.field_mapping)?config.field_mapping:{}) as Record<string,unknown>;
     const submittedActorId=String(profile.actor_id||"");
     if(submittedActorId&&submittedActorId!==String(catalog.external_actor_id||""))return json({error:"任务中保存的 Actor 与当前数据源不一致，请重新创建搜索任务。",adapter_key:selection.adapter_key},409,origin);
     const submittedActorInput=profile.actor_input;
