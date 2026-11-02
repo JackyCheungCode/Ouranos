@@ -23,7 +23,7 @@ Deno.serve(async(req:Request)=>{
   if(action==="search"){
    const storeUrl=new URL("https://api.apify.com/v2/store");storeUrl.searchParams.set("search",searchQuery);storeUrl.searchParams.set("limit","20");storeUrl.searchParams.set("sortBy","popularity");storeUrl.searchParams.set("responseFormat","full");
    const storeResponse=await fetch(storeUrl.toString(),{headers,signal});if(!storeResponse.ok)return json({error:`Apify Store 搜索失败（HTTP ${storeResponse.status}）`},400,origin);
-   const storeBody=await storeResponse.json();const items=(storeBody.data?.items||[]).map((item:Record<string,unknown>)=>({id:String(item.username&&item.name?`${item.username}/${item.name}`:item.id||""),name:String(item.title||item.name||item.id||"Unnamed Actor"),username:String(item.username||""),description:String(item.description||""),url:String(item.url||""),stats:item.stats||{},pricingInfo:item.currentPricingInfo||item.pricingInfo||null})).filter((item:Record<string,unknown>)=>Boolean(item.id));
+   const storeBody=await storeResponse.json();const items=(storeBody.data?.items||[]).map((item:Record<string,unknown>)=>({id:String(item.username&&item.name?`${item.username}~${item.name}`:item.id||""),name:String(item.title||item.name||item.id||"Unnamed Actor"),username:String(item.username||""),description:String(item.description||""),url:String(item.url||""),stats:item.stats||{},pricingInfo:item.currentPricingInfo||item.pricingInfo||null})).filter((item:Record<string,unknown>)=>Boolean(item.id));
    return json({ok:true,items,total:storeBody.data?.total||items.length},200,origin);
   }
   if(action==="test"){
