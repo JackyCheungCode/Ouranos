@@ -204,8 +204,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  },[schema,values])
  useEffect(()=>{if(aiGenerated&&aiAnalyzedContext&&aiAnalyzedContext!==aiContextKey){setAiApplied(false);setAiError('市场或搜索任务配置已变化。之前的 AI 分析不能直接应用，请重新分析。')}},[aiContextKey])
  const availableProviders = providerByPlatform[channel] || ['Apify']
- const visiblePlatforms = directoryPlatforms.filter(item=>page.platformKeys.includes(item.platform_key))
- const categories = [...new Set(visiblePlatforms.map(item=>item.category_key))]
+ const pagePlatforms = directoryPlatforms.filter(item=>page.platformKeys.includes(item.platform_key))
+ const categories = [...new Set(pagePlatforms.map(item=>item.category_key))]
+ const visiblePlatforms = pagePlatforms.filter(item=>item.category_key===selectedCategory)
  const categoryLabels:Record<string,string>={social:'社交媒体',search:'搜索与地图',b2b:'B2B 商业平台',commerce:'电商平台',web:'企业网站与商业数据'}
  const canSearchSelectedProvider = provider.toLowerCase()==='apify'
  useEffect(()=>{const first=directoryPlatforms.find(item=>page.platformKeys.includes(item.platform_key));if(first){if(!page.platformKeys.includes(channel))setChannel(first.platform_key);setSelectedCategory(first.category_key);setActorQuery(first.search_terms||first.platform_name)}},[page.id,directoryPlatforms])
@@ -363,7 +364,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   try{
    const {data:sessionData,error:sessionError}=await supabase.auth.getSession()
    if(sessionError||!sessionData.session?.access_token)throw new Error('登录状态已失效，请重新登录。')
-   const supportedPlatforms=visiblePlatforms.length?visiblePlatforms.map(item=>({id:item.platform_key,name:item.platform_name})):platformGroups.flatMap(group=>group.items.filter(([id])=>page.platformKeys.includes(id)).map(([id,name])=>({id,name})))
+   const supportedPlatforms=pagePlatforms.length?pagePlatforms.map(item=>({id:item.platform_key,name:item.platform_name})):platformGroups.flatMap(group=>group.items.filter(([id])=>page.platformKeys.includes(id)).map(([id,name])=>({id,name})))
    const response=await fetch('https://ouranos-ai-assistant.xg-y.workers.dev',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+sessionData.session.access_token},
@@ -478,6 +479,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  return <div className="ldw-shell ldw-manual-first">
   <div className="ldw-workflow-head"><div><span className="ldw-eyebrow">MANUAL DISCOVERY</span><h2>{page.title} · 数据源配置</h2><p>{page.description} 选择平台、服务商和 Actor 后，系统读取真实 Schema 并生成中文参数表单。</p></div><button type="button" className="ldw-ai-sidebar-trigger" aria-expanded={aiSidebarOpen} onClick={()=>setAiSidebarOpen(value=>!value)}><Sparkles size={14}/>{aiSidebarOpen?'收起 AI 助手':'打开 AI 助手'}</button></div>
+  <div className="ldp-page-context"><div><b>本页重点筛选</b><span>{page.filters.join(' · ')}</span></div><div><b>目标客户资料</b><span>{page.outputs}</span></div><small>{page.rule}</small></div>
   <div className="ldw-manual-layout">
    <main className="ldw-manual-main">
     <section className="ldw-card">
