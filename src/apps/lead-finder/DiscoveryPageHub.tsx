@@ -1,7 +1,3 @@
-import {
-  Building2, CalendarDays, Contact, Database, Globe2, MapPin, Search,
-  ShoppingBag, Store, Users, Factory, ClipboardList
-} from 'lucide-react'
 import './DiscoveryPageHub.css'
 
 export type DiscoveryPageDefinition = {
@@ -32,20 +28,20 @@ export const discoveryPages: DiscoveryPageDefinition[] = [
   { id:'website-leads', title:'网站线索发现', subtitle:'官网企业与联系方式', description:'从已知企业网站、行业目录和公开商业页面提取 About、Contact、Products 等页面中的企业主体与商务联系方式。', group:'商业机会发现', platformKeys:['company-sites','directories'], platformNames:['企业官方网站','企业商业目录'], filters:['网站 / 域名','国家 / 语言','行业关键词','提取页面类型','联系方式类型'], outputs:'企业档案、官网、公开邮箱、电话及联系页面', rule:'网页内容只作为证据，结构化企业 / 联系人资料才可入库。' },
 ]
 
-const iconMap = {
-  'map-discovery': MapPin,
-  'social-discovery': Users,
-  'search-engine-discovery': Search,
-  'b2b-procurement': Factory,
-  'independent-sites': Store,
-  'cross-border-sellers': ShoppingBag,
-  'enterprise-database': Database,
-  'decision-makers': Contact,
-  'industry-directories': Building2,
-  'tender-opportunities': ClipboardList,
-  'exhibitors': CalendarDays,
-  'website-leads': Globe2,
-} as const
+const iconMap: Record<string,string> = {
+  'map-discovery': 'fa-solid fa-map-location-dot',
+  'social-discovery': 'fa-solid fa-users',
+  'search-engine-discovery': 'fa-solid fa-magnifying-glass',
+  'b2b-procurement': 'fa-solid fa-industry',
+  'independent-sites': 'fa-solid fa-store',
+  'cross-border-sellers': 'fa-solid fa-cart-shopping',
+  'enterprise-database': 'fa-solid fa-database',
+  'decision-makers': 'fa-solid fa-address-card',
+  'industry-directories': 'fa-solid fa-building',
+  'tender-opportunities': 'fa-solid fa-clipboard-list',
+  'exhibitors': 'fa-solid fa-calendar-days',
+  'website-leads': 'fa-solid fa-globe',
+}
 
 const groups = ['本地与企业发现','社交与联系人发现','电商与贸易发现','商业机会发现']
 
@@ -59,9 +55,9 @@ export default function DiscoveryPageHub({ onSelect }: { onSelect: (page: Discov
     {groups.map(group => <section className="ldp-group" key={group}>
       <div className="ldp-group-head"><h3>{group}</h3><span>{discoveryPages.filter(page=>page.group===group).length} 个入口</span></div>
       <div className="ldp-grid">{discoveryPages.filter(page=>page.group===group).map(page => {
-        const Icon = iconMap[page.id as keyof typeof iconMap]
+        const iconClass = iconMap[page.id]
         return <button type="button" className="ldp-card" key={page.id} onClick={()=>onSelect(page)}>
-          <span className="ldp-card-icon"><Icon size={19}/></span>
+          <span className="ldp-card-icon"><i className={iconClass} aria-hidden="true"/></span>
           <span className="ldp-card-main"><b>{page.title}</b><small>{page.subtitle}</small><span>{page.description}</span></span>
           <span className="ldp-card-meta"><span>{page.platformNames.slice(0,4).join(' · ')}{page.platformNames.length>4?' 等':''}</span><span>主要条件：{page.filters.slice(0,3).join(' · ')}</span><i>进入页面 →</i></span>
         </button>
