@@ -191,7 +191,7 @@ export default function LeadFinderApp() {
  }
  useEffect(()=>{void refreshTasks()},[workspace?.id])
  const refreshTaskLogs=async(taskId:string)=>{if(!supabase||!workspace)return;setTaskLogsLoading(true);const {data,error}=await supabase.from('integration_events').select('id,message,status,created_at,details').eq('workspace_id',workspace.id).eq('action','update').contains('details',{event_type:'lead_task_log',task_id:taskId}).order('created_at',{ascending:false}).limit(150);if(!error)setTaskLogs((data||[]) as TaskLog[]);setTaskLogsLoading(false)}
- useEffect(()=>{if(!activeTask||!workspace?.id)return;void refreshTaskLogs(activeTask);const timer=window.setInterval(()=>{void refreshTasks();void refreshTaskLogs(activeTask)},3000);return()=>window.clearInterval(timer)},[activeTask,workspace?.id])
+ useEffect(()=>{if(!activeTask||!workspace?.id)return;void refreshTaskLogs(activeTask);const timer=window.setInterval(()=>{void refreshTasks();void refreshTaskLogs(activeTask);void refreshRawResults(activeTask,0,false)},3000);return()=>window.clearInterval(timer)},[activeTask,workspace?.id])
  const refreshRawResults=async(taskId:string,page=0,append=false)=>{
   if(!supabase||!workspace)return
   setRawResultsLoading(true);setRawResultsError('')
