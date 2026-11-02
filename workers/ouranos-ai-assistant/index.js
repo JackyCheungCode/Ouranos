@@ -245,7 +245,9 @@ async function runConversation(env, model, body, origin) {
   if (!schema || !isRecord(schema.properties) || !Object.keys(schema.properties).length) {
     return json({ error: "未提供有效的 Actor 输入 Schema" }, 400, origin);
   }
-  const compact = compactSchema(schema);
+  const inferredRequired = Array.isArray(body.required_fields) ? body.required_fields.filter(key => typeof key === "string" && Object.hasOwn(schema.properties, key)) : [];
+  const effectiveSchema = { ...schema, required: [...new Set([...(Array.isArray(schema.required) ? schema.required : []), ...inferredRequired])] };
+  const compact = compactSchema(effectiveSchema);
   const shared = {
     user_request: clip(body.user_request || "", 3500),
     conversation: normalizeHistory(body.conversation),
@@ -270,7 +272,7 @@ async function runConversation(env, model, body, origin) {
   const mergedActorInput = { ...shared.previous_actor_input, ...combined.actor_input };
   const unknown = rejectUnknownKeys(mergedActorInput, schema);
   if (unknown.length) return json({ error: "AI 生成了 Schema 不支持的字段，已阻止填入", details: unknown }, 422, origin);
-  const missingRequired = (Array.isArray(schema.required) ? schema.required : []).filter(key => {
+  const missingRequired = (Array.isArray(effectiveSchema.required) ? effectiveSchema.required : []).filter(key => {
     const value = mergedActorInput[key];
     return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
   });
