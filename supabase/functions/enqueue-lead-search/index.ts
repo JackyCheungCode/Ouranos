@@ -42,11 +42,34 @@ Deno.serve(async(req:Request)=>{
     const connection=connectionMap.get(String(catalog.provider_key)) as Record<string,unknown>|undefined;
     if(!connection||connection.status!=="connected"||connection.is_enabled!==true)return json({error:`请先连接并启用服务商：${catalog.provider_key}`},409,origin);
     const config=(selection.config||{}) as Record<string,unknown>;const defaults=(config.input_defaults||{}) as Record<string,unknown>;const mapping=(config.input_mapping||{}) as Record<string,string>;const outputMapping=(config.field_mapping||catalog.field_mapping||{}) as Record<string,unknown>;
-    const input:Record<string,unknown>={...defaults};
-    for(const [inputField,profilePath] of Object.entries(mapping)){const value=getPath(searchProfile,profilePath);if(value!==undefined&&value!==null&&value!=="")setPath(input,inputField,value);}
-    if(input.customGeolocation&&typeof input.customGeolocation==='object'&&!Array.isArray(input.customGeolocation)&&Object.keys(input.customGeolocation as Record<string,unknown>).length===0)delete input.customGeolocation;const schema=(catalog.input_schema||{}) as Record<string,unknown>;const required=Array.isArray(schema.required)?schema.required as string[]:[];
-    const missingFields=required.filter(field=>input[field]===undefined||input[field]===null||input[field]==="");
-    if(missingFields.length)return json({error:`渠道 ${selection.channel_key} 的 Actor 缺少必填参数`,adapter_key:selection.adapter_key,missing_input_fields:missingFields},422,origin);
+    const submittedActorInput=profile.actor_input&&typeof profile.actor_input==="object"&&!Array.isArray(profile.actor_input)?profile.actor_input as Record<string,unknown>:{};
+    // The live Schema form is authoritative. Keep defaults/mappings only as a
+    // compatibility fallback for older draft tasks that predate actor_input.
+    const input:Record<string,unknown>=Object.keys(submittedActorInput).length?{...submittedActorInput}:{...defaults};
+    if(!Object.keys(submittedActorInput).length){
+      for(const [inputField,profilePath] of Object.entries(mapping)){const value=getPath(searchProfile,profilePath);if(value!==undefined&&value!==null&&value!=="")setPath(input,inputField,value);}
+    }
+    const schema=(catalog.input_schema||{}) as Record<string,unknown>;
+    const missingRequired=(node:Record<string,unknown>,value:unknown,path=""):string[]=>{
+      const properties=node.properties&&typeof node.properties==="object"&&!Array.isArray(node.properties)?node.properties as Record<string,Record<string,unknown>>:{};
+      const required=Array.isArray(node.required)?node.required as string[]:[];
+      const missing:string[]=[];
+      for(const field of required){
+        const fieldValue=value&&typeof value==="object"&&!Array.isArray(value)?(value as Record<string,unknown>)[field]:undefined;
+        const empty=fieldValue===undefined||fieldValue===null||fieldValue===""||(Array.isArray(fieldValue)&&fieldValue.length===0)||(fieldValue&&typeof fieldValue==="object"&&!Array.isArray(fieldValue)&&Object.keys(fieldValue as Record<string,unknown>).length===0);
+        const fieldPath=path?path+"."+field:field;
+        if(empty){missing.push(fieldPath);continue;}
+        const child=properties[field];
+        if(child&&fieldValue&&typeof fieldValue==="object"&&!Array.isArray(fieldValue))missing.push(...missingRequired(child,fieldValue,fieldPath));
+        if(child&&Array.isArray(fieldValue)&&child.items&&typeof child.items==="object"){
+          fieldValue.forEach((item,index)=>{if(item&&typeof item==="object"&&!Array.isArray(item))missing.push(...missingRequired(child.items as Record<string,unknown>,item,fieldPath+"["+index+"]"));});
+        }
+      }
+      return missing;
+    };
+    if(profile.actor_id&&catalog.external_actor_id&&String(profile.actor_id)!==String(catalog.external_actor_id))return json({error:"任务中保存的 Actor 与当前数据源不一致，请重新创建搜索任务。",adapter_key:selection.adapter_key},409,origin);
+    const missingFields=missingRequired(schema,input);
+    if(missingFields.length)return json({error:"渠道 "+selection.channel_key+" 的 Actor 缺少必填参数",adapter_key:selection.adapter_key,missing_input_fields:missingFields},422,origin);
     const pricing=(catalog.pricing_model||{}) as Record<string,unknown>;const maxCost=Number(config.max_cost||0);
     if(catalog.provider_key==="kuajingmofang"&&maxCost<=0)return json({error:"跨境魔方按接口计费，请先为该适配器设置单次费用上限（人民币）"},409,origin);
     const estimated=typeof pricing.estimated_cost==="number"?pricing.estimated_cost:typeof pricing.price_per_call==="number"?pricing.price_per_call:null;
