@@ -185,6 +185,9 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [targetType,setTargetType] = useState<'companies'|'contacts'|'both'>('both')
  const [targetCount,setTargetCount] = useState('100')
  const [maxCost,setMaxCost] = useState('10')
+ const [facebookHasEmail,setFacebookHasEmail] = useState(false)
+ const [facebookHasPhone,setFacebookHasPhone] = useState(false)
+ const [facebookHasWebsite,setFacebookHasWebsite] = useState(false)
  const [taskName,setTaskName] = useState('')
  const [busy,setBusy] = useState(false)
  const [error,setError] = useState('')
@@ -500,6 +503,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   setBusy(true);setError('')
   try {
    const actorInput:Record<string,unknown>={...schemaValidation.payload}
+   if(page.id==='facebook-pages'){if(facebookHasEmail)actorInput.hasEmail=true;if(facebookHasPhone)actorInput.hasPhone=true;if(facebookHasWebsite)actorInput.hasWebsite=true}
     const taskTitle=taskName.trim()||product.trim()||keywords.trim()||actor.title
    const actorId=selectedProviderKey==='apify'?actor.username+'~'+actor.name:actor.name
     const schemaHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stableStringify(schema))).then(d=>[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''))
@@ -559,6 +563,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
       <label className="ldw-field"><span className="ldw-field-label">任务名称</span><input value={taskName} onChange={event=>setTaskName(event.target.value)} placeholder="例如：美国户外用品经销商发现"/></label>
       <label className="ldw-field"><span className="ldw-field-label">目标客户数量</span><input type="number" min="1" max="50000" value={targetCount} onChange={event=>{const value=event.target.value;setTargetCount(value);if(schema?.properties?.maxResults)setValues(current=>({...current,maxResults:value===""?"":Number(value)}))}} /><small>本次希望收集的企业主页数量，实际数量受搜索索引和地区覆盖影响。</small></label>
       <label className="ldw-field"><span className="ldw-field-label">单次任务费用上限（USD） *</span><input type="number" min="0.01" step="0.01" value={maxCost} onChange={event=>setMaxCost(event.target.value)} /><small>Actor 页面当前标价约 $4 / 1,000 个返回主页；官网补全、主页透明度等可选功能可能产生额外费用。</small></label>
+      <label className="ldw-field"><span className="ldw-field-label">联系方式筛选</span><span><input type="checkbox" checked={facebookHasEmail} onChange={event=>setFacebookHasEmail(event.target.checked)}/> 仅保留公开邮箱</span><span><input type="checkbox" checked={facebookHasPhone} onChange={event=>setFacebookHasPhone(event.target.checked)}/> 仅保留公开电话</span><span><input type="checkbox" checked={facebookHasWebsite} onChange={event=>setFacebookHasWebsite(event.target.checked)}/> 仅保留公开官网</span><small>这些筛选由 Actor 的 API 支持，但未出现在其可视化 Schema 字段中；系统仅在用户主动勾选时提交。</small></label>
      </div>
     </section>}
     {schema&&actor?<section className="ldw-card ldw-manual-schema-card">
