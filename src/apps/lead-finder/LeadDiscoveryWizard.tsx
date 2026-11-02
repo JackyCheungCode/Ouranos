@@ -309,7 +309,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   setActorMaintenanceStatus(String(data.maintenance_status||'unmaintained'))
   const nextSchema=(data.input_schema || {}) as JsonSchema
   const requirements=deriveSchemaRequirements(nextSchema)
-   let initial=Object.fromEntries(schemaKeys(nextSchema).map(([key,field])=>[key,getDefaultValue(field,requirements.requiredFields.has(key))]))
+   let initial:Record<string,unknown>=Object.fromEntries(schemaKeys(nextSchema).map(([key,field])=>[key,getDefaultValue(field,requirements.requiredFields.has(key))]))
    const {data:configuredSelections}=await supabase.from('workspace_adapter_selections').select('config,discovery_adapter_catalog!inner(external_actor_id)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true)
    const configured=(configuredSelections||[]).find((row:any)=>row.discovery_adapter_catalog?.external_actor_id===actorId)
    const configuredConfig=(configured?.config||{}) as Record<string,unknown>
