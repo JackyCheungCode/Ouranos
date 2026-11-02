@@ -5,7 +5,7 @@ const ALLOWED_MODELS = new Set([
 const MAX_BODY_BYTES = 500000;
 const MAX_BATCH_CHARS = 4200;
 const MAX_FIELDS_PER_BATCH = 6;
-const MAX_HISTORY_ITEMS = 6;
+const MAX_HISTORY_ITEMS = 12;
 const MAX_HISTORY_CHARS = 700;
 const MAX_ESTIMATED_INPUT_TOKENS = 14000;
 const MAX_FIELD_TEXT = 900;
@@ -159,7 +159,7 @@ const FIELD_SYSTEM = [
   "用简体中文理解业务目标，根据字段 title、description、type、format、pattern、enum、default、prefill、example、required 和约束生成本组参数。",
   "用户不懂技术参数。对未知的关键字段只提出一个最重要的问题，不得猜 URL、关键词、地点、站点、日期或其他业务值。",
   "只生成本组 properties 中存在的字段；不允许生成 Schema 以外字段。枚举必须使用 Schema 原始值，严格遵循类型和约束。",
-  "保留 previous_actor_input 中用户已确认且仍有效的值；本轮用户回答优先。Schema 默认值可使用，但要在 field_explanations 标明来源。不得把已提供的关键词、数量、地点等信息再次询问。",
+  "保留 previous_actor_input 中用户已确认且仍有效的值；本轮用户回答优先。Schema 默认值可使用，但要在 field_explanations 标明来源。不得把已提供的关键词、数量、地点等信息再次询问。用户用简短回答（例如“10”“美国”“USB cable”）时，必须结合最近一轮对话判断其对应字段并写入参数，不要要求用户重复完整句子。missing_information 只能列出当前仍为空且确实阻止任务正确执行的信息；如果 previous_actor_input 已有值，绝不能再列为缺失。",
   "除了填写参数，还要结合用户目标和 Actor 能力主动给出有价值的业务建议，例如关键词更具体、地区范围、结果数量、筛选方式或数据质量注意事项。建议必须具体、可执行，不得擅自改写用户已确认参数；没有必要建议时返回空数组。",
   "可选字段如果无关或未提供可以省略，不要因此阻止提交。missing_information 只包含阻止正确执行的必填或关键业务信息。",
   "如果 Actor 能力与用户要找的数据类型不匹配，必须明确提醒，不得声称能获取其不支持的数据。",
