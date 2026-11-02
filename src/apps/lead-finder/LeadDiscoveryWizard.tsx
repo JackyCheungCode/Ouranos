@@ -553,7 +553,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      {!directoryProviders.length&&<div className="ldw-provider-note">服务商目录暂不可用。</div>}
     </section>
     </>}
-    {page.id === "facebook-pages" && actor && <section className="ldw-card ldw-facebook-task-card">
+    {page.id === "facebook-pages" && <section className="ldw-card ldw-facebook-task-card">
      <div className="ldw-step-title"><span>1</span><div><h3>填写本次发现任务需求</h3><p>先设定任务名称、目标数量与费用上限，再填写 Actor 搜索条件。</p></div></div>
      <div className="ldw-form-grid">
       <label className="ldw-field"><span className="ldw-field-label">任务名称</span><input value={taskName} onChange={event=>setTaskName(event.target.value)} placeholder="例如：美国户外用品经销商发现"/></label>
