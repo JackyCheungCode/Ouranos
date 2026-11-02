@@ -298,3 +298,27 @@
 .dark .ldw-ai-actor-picker{background:#20252e}
 .dark .ldw-ai-actor-search input{background:#191e25;color:#e7e8ec}
 @media(max-width:600px){.ldw-ai-actor-picker{margin-left:10px;margin-right:10px}.ldw-ai-actor-search{flex-direction:column}.ldw-ai-actor-search button{min-height:34px}}
+
+/* AI chat identities: animated assistant orb and calm static user avatar */
+.ldw-chat-message{display:flex;align-items:flex-start;gap:9px;max-width:min(92%,760px)}
+.ldw-chat-message.user{align-self:flex-end;flex-direction:row-reverse}
+.ldw-chat-avatar{width:29px;height:29px;flex:0 0 29px;display:grid;place-items:center;border-radius:50%;margin-top:1px}
+.ldw-chat-avatar.ai{position:relative;color:#fff;background:radial-gradient(circle at 32% 25%,#f5dff0 0,#a879a2 32%,#684d77 72%,#433c66 100%);box-shadow:0 0 0 2px #eee5ef,0 2px 10px #76556f35;animation:ldw-ai-orbit 3.2s ease-in-out infinite}
+.ldw-chat-avatar.ai:before{content:"";position:absolute;inset:-4px;border:1px solid #b993b7;border-radius:50%;opacity:.55;animation:ldw-ai-pulse 2.4s ease-out infinite}
+.ldw-chat-avatar.ai svg{filter:drop-shadow(0 1px 2px #38283f);animation:ldw-ai-twinkle 2s ease-in-out infinite}
+.ldw-chat-avatar.user{color:#6f596b;background:#eee8ee;border:1px solid #ded3df}
+.ldw-chat-message-body{min-width:0;flex:1}
+.ldw-chat-message-body>span{display:block;font-size:8px;color:#714b67;letter-spacing:.02em;margin-bottom:3px}
+.ldw-chat-message-body p{margin:0}
+.ldw-chat-message.user .ldw-chat-message-body>span{text-align:right}
+.ldw-ai-recommendations{padding:9px 10px;border:1px solid #e4d9e5;border-left:3px solid #8a6687;border-radius:3px;background:#faf7fa}
+.ldw-ai-recommendations>b{display:flex;align-items:center;gap:6px;font-size:9px;color:#684b68}
+.ldw-ai-recommendations ul{margin:6px 0 0;padding-left:17px}
+.ldw-ai-recommendations li{font-size:9px;line-height:1.6;color:#59616b;margin:3px 0}
+@keyframes ldw-ai-orbit{0%,100%{transform:translateY(0) rotate(-4deg);filter:hue-rotate(0)}50%{transform:translateY(-2px) rotate(5deg);filter:hue-rotate(12deg)}}
+@keyframes ldw-ai-pulse{0%{transform:scale(.88);opacity:.65}80%,100%{transform:scale(1.28);opacity:0}}
+@keyframes ldw-ai-twinkle{0%,100%{transform:scale(.92);opacity:.85}50%{transform:scale(1.08);opacity:1}}
+@media(prefers-reduced-motion:reduce){.ldw-chat-avatar.ai,.ldw-chat-avatar.ai:before,.ldw-chat-avatar.ai svg{animation:none}}
+
+.ldw-chat-message>span.ldw-chat-avatar{font-size:initial;letter-spacing:normal;margin:1px 0 0;color:inherit}
+.ldw-chat-message>span.ldw-chat-avatar.user{color:#6f596b}

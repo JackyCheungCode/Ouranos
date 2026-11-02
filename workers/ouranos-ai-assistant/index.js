@@ -5,7 +5,7 @@ const ALLOWED_MODELS = new Set([
 const MAX_BODY_BYTES = 500000;
 const MAX_BATCH_CHARS = 4200;
 const MAX_FIELDS_PER_BATCH = 6;
-const MAX_HISTORY_ITEMS = 6;
+const MAX_HISTORY_ITEMS = 12;
 const MAX_HISTORY_CHARS = 700;
 const MAX_ESTIMATED_INPUT_TOKENS = 14000;
 const MAX_FIELD_TEXT = 900;
@@ -159,10 +159,11 @@ const FIELD_SYSTEM = [
   "用简体中文理解业务目标，根据字段 title、description、type、format、pattern、enum、default、prefill、example、required 和约束生成本组参数。",
   "用户不懂技术参数。对未知的关键字段只提出一个最重要的问题，不得猜 URL、关键词、地点、站点、日期或其他业务值。",
   "只生成本组 properties 中存在的字段；不允许生成 Schema 以外字段。枚举必须使用 Schema 原始值，严格遵循类型和约束。",
-  "保留 previous_actor_input 中用户已确认且仍有效的值；本轮用户回答优先。Schema 默认值可使用，但要在 field_explanations 标明来源。",
+  "保留 previous_actor_input 中用户已确认且仍有效的值；本轮用户回答优先。Schema 默认值可使用，但要在 field_explanations 标明来源。不得把已提供的关键词、数量、地点等信息再次询问。用户用简短回答（例如“10”“美国”“USB cable”）时，必须结合最近一轮对话判断其对应字段并写入参数，不要要求用户重复完整句子。missing_information 只能列出当前仍为空且确实阻止任务正确执行的信息；如果 previous_actor_input 已有值，绝不能再列为缺失。",
+  "除了填写参数，还要结合用户目标和 Actor 能力主动给出有价值的业务建议，例如关键词更具体、地区范围、结果数量、筛选方式或数据质量注意事项。建议必须具体、可执行，不得擅自改写用户已确认参数；没有必要建议时返回空数组。",
   "可选字段如果无关或未提供可以省略，不要因此阻止提交。missing_information 只包含阻止正确执行的必填或关键业务信息。",
   "如果 Actor 能力与用户要找的数据类型不匹配，必须明确提醒，不得声称能获取其不支持的数据。",
-  "只返回 JSON：{assistant_message:string,actor_input:object,missing_information:string[],field_explanations:object,warnings:string[]}。JSON 之外不要输出文字。",
+  "只返回 JSON：{assistant_message:string,actor_input:object,missing_information:string[],field_explanations:object,warnings:string[],strategy:string,suggestions:string[]}。JSON 之外不要输出文字。",
 ].join("\n");
 async function runFieldBatch(env, model, shared, schema, entries, depth = 0) {
   const properties = Object.fromEntries(entries);
@@ -200,6 +201,8 @@ async function runFieldBatch(env, model, shared, schema, entries, depth = 0) {
     if (unknown.length) throw new Error("AI_UNKNOWN_SCHEMA_FIELDS: " + unknown.join("; "));
     return {
       assistant_messages: generated.assistant_message ? [clip(generated.assistant_message, 900)] : [],
+      strategy: generated.strategy ? clip(generated.strategy, 900) : "",
+      suggestions: Array.isArray(generated.suggestions) ? generated.suggestions.map(item => clip(item, 320)).slice(0, 6) : [],
       actor_input: generated.actor_input,
       missing_information: Array.isArray(generated.missing_information) ? generated.missing_information.map(item => clip(item, 260)) : [],
       field_explanations: isRecord(generated.field_explanations) ? generated.field_explanations : {},
@@ -229,6 +232,8 @@ async function runFieldBatch(env, model, shared, schema, entries, depth = 0) {
 function mergeBatchResults(left, right) {
   return {
     assistant_messages: [...(left.assistant_messages || []), ...(right.assistant_messages || [])],
+    strategy: [left.strategy, right.strategy].filter(Boolean).join("\n"),
+    suggestions: [...(left.suggestions || []), ...(right.suggestions || [])],
     actor_input: { ...(left.actor_input || {}), ...(right.actor_input || {}) },
     missing_information: [...(left.missing_information || []), ...(right.missing_information || [])],
     field_explanations: { ...(left.field_explanations || {}), ...(right.field_explanations || {}) },
@@ -240,7 +245,9 @@ async function runConversation(env, model, body, origin) {
   if (!schema || !isRecord(schema.properties) || !Object.keys(schema.properties).length) {
     return json({ error: "未提供有效的 Actor 输入 Schema" }, 400, origin);
   }
-  const compact = compactSchema(schema);
+  const inferredRequired = Array.isArray(body.required_fields) ? body.required_fields.filter(key => typeof key === "string" && Object.hasOwn(schema.properties, key)) : [];
+  const effectiveSchema = { ...schema, required: [...new Set([...(Array.isArray(schema.required) ? schema.required : []), ...inferredRequired])] };
+  const compact = compactSchema(effectiveSchema);
   const shared = {
     user_request: clip(body.user_request || "", 3500),
     conversation: normalizeHistory(body.conversation),
@@ -262,10 +269,11 @@ async function runConversation(env, model, body, origin) {
     // Make earlier generated values available to later groups for cross-field dependencies.
     shared.previous_actor_input = { ...(shared.previous_actor_input || {}), ...result.actor_input };
   }
-  const unknown = rejectUnknownKeys(combined.actor_input, schema);
+  const mergedActorInput = { ...shared.previous_actor_input, ...combined.actor_input };
+  const unknown = rejectUnknownKeys(mergedActorInput, schema);
   if (unknown.length) return json({ error: "AI 生成了 Schema 不支持的字段，已阻止填入", details: unknown }, 422, origin);
-  const missingRequired = (Array.isArray(schema.required) ? schema.required : []).filter(key => {
-    const value = combined.actor_input[key];
+  const missingRequired = (Array.isArray(effectiveSchema.required) ? effectiveSchema.required : []).filter(key => {
+    const value = mergedActorInput[key];
     return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
   });
   const missingInformation = [...new Set([
@@ -282,8 +290,9 @@ async function runConversation(env, model, body, origin) {
     ok: true, mode: "conversation", model,
     assistant_message: assistantMessage,
     summary: clip("已结合 " + Object.keys(schema.properties).length + " 个 Schema 字段完成分组分析。", 300),
-    strategy: "",
-    actor_input: combined.actor_input,
+    strategy: clip(combined.strategy || "", 1400),
+    suggestions: [...new Set(combined.suggestions || [])].slice(0, 8),
+    actor_input: mergedActorInput,
     missing_information: missingInformation,
     field_explanations: combined.field_explanations,
     warnings: [...new Set(combined.warnings)].slice(0, 30),
