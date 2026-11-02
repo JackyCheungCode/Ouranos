@@ -29,18 +29,18 @@ export const discoveryPages: DiscoveryPageDefinition[] = [
 ]
 
 const iconMap: Record<string,string> = {
-  'map-discovery': 'fa-solid fa-map-location-dot',
-  'social-discovery': 'fa-solid fa-users',
-  'search-engine-discovery': 'fa-solid fa-magnifying-glass',
-  'b2b-procurement': 'fa-solid fa-industry',
-  'independent-sites': 'fa-solid fa-store',
-  'cross-border-sellers': 'fa-solid fa-cart-shopping',
-  'enterprise-database': 'fa-solid fa-database',
-  'decision-makers': 'fa-solid fa-address-card',
-  'industry-directories': 'fa-solid fa-building',
-  'tender-opportunities': 'fa-solid fa-clipboard-list',
-  'exhibitors': 'fa-solid fa-calendar-days',
-  'website-leads': 'fa-solid fa-globe',
+  'map-discovery': 'fas fa-map-marked-alt',
+  'social-discovery': 'fas fa-users',
+  'search-engine-discovery': 'fas fa-search',
+  'b2b-procurement': 'fas fa-industry',
+  'independent-sites': 'fas fa-store',
+  'cross-border-sellers': 'fas fa-shopping-cart',
+  'enterprise-database': 'fas fa-database',
+  'decision-makers': 'fas fa-id-card',
+  'industry-directories': 'fas fa-building',
+  'tender-opportunities': 'fas fa-clipboard-list',
+  'exhibitors': 'fas fa-calendar-alt',
+  'website-leads': 'fas fa-globe',
 }
 
 const groups = ['本地与企业发现','社交与联系人发现','电商与贸易发现','商业机会发现']
