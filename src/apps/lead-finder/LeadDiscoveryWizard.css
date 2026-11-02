@@ -396,3 +396,9 @@
 .ldw-facebook-task-card .ldw-field small{display:block;color:var(--odoo-muted);font-size:11px;line-height:1.5}
 .dark .ldw-facebook-actor-card{background:#20252e}
 @media(max-width:640px){.ldw-facebook-task-card .ldw-form-grid{grid-template-columns:1fr}.ldw-facebook-actor-card button{width:100%}}
+
+.ldw-facebook-advanced{grid-column:1/-1;margin-top:14px;padding:13px 15px;border:1px solid var(--odoo-line);border-radius:8px;background:var(--odoo-soft,#f8f7f9)}
+.ldw-facebook-advanced summary{cursor:pointer;color:var(--odoo-muted);font-size:13px;font-weight:650}
+.ldw-facebook-advanced[open] summary{margin-bottom:14px;color:var(--odoo-text)}
+.ldw-facebook-advanced .ldw-form-grid{margin-top:12px}
+.dark .ldw-facebook-advanced{background:#20252e}
