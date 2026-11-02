@@ -421,7 +421,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
       if(providerByPlatform[platform.id]?.includes('Apify')){
        setActors([]);setActorQuery('');setCandidateOffset(0);setHasMoreCandidates(false)
        setChatMessages(current=>[...current,{role:'assistant',content:'已识别平台：'+platform.name+'。系统只会展示 Actor 配置中心中已审核、已启用且维护正常的数据源。'}])
-      
+      }else{
        setChatMessages(current=>[...current,{role:'assistant',content:'已识别平台：'+platform.name+'。当前暂未接入该平台的 Actor 搜索，请选择已支持 Apify 的平台，或稍后再试。'}])
       }
       setAiSummary(String(result.summary||''));return
