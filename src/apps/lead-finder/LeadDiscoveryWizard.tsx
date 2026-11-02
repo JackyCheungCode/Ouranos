@@ -15,6 +15,7 @@ type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[
 type MapLocation = { lat:number; lon:number; label:string }
 type ChatMessage = { role:'user'|'assistant'; content:string }
 type DirectoryPlatform = { platform_key:string; platform_name:string; category_key:string; search_terms:string; description:string; sort_order:number }
+type DirectoryProvider = { provider_key:string; provider_name:string; provider_type:string; description:string; is_active:boolean; sort_order:number }
 const marketMarkerIcon=divIcon({className:'ldw-map-marker',html:'<span></span>',iconSize:[22,22],iconAnchor:[11,11]})
 const platformGroups = [
  { label: '搜索引擎与地图', items: [['google-maps','Google Maps','google maps business places'],['google-search','Google Search','google search results'],['bing','Bing','bing search results'],['yelp','Yelp','yelp business'] ] },
@@ -109,7 +110,15 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [provider,setProvider] = useState('Apify')
  const [directoryPlatforms,setDirectoryPlatforms] = useState<DirectoryPlatform[]>([])
  const [directoryReady,setDirectoryReady] = useState(false)
- useEffect(()=>{let active=true;if(!supabase){setDirectoryReady(true);return}supabase.from('discovery_platforms').select('platform_key,platform_name,category_key,search_terms,description,sort_order').eq('is_active',true).order('sort_order').then(({data,error})=>{if(!active)return;if(!error&&data?.length)setDirectoryPlatforms(data as DirectoryPlatform[]);setDirectoryReady(true)},()=>{if(active)setDirectoryReady(true)});return()=>{active=false}},[])
+ const [directoryProviders,setDirectoryProviders] = useState<DirectoryProvider[]>([])
+ const [selectedCategory,setSelectedCategory] = useState('social')
+ const [aiSidebarOpen,setAiSidebarOpen] = useState(false)
+ useEffect(()=>{let active=true;if(!supabase){setDirectoryReady(true);return}
+  Promise.all([
+   supabase.from('discovery_platforms').select('platform_key,platform_name,category_key,search_terms,description,sort_order').eq('is_active',true).order('sort_order'),
+   supabase.from('discovery_providers').select('provider_key,provider_name,provider_type,description,is_active,sort_order').eq('is_active',true).order('sort_order')
+  ]).then(([platformResult,providerResult])=>{if(!active)return;if(!platformResult.error&&platformResult.data?.length)setDirectoryPlatforms(platformResult.data as DirectoryPlatform[]);if(!providerResult.error&&providerResult.data?.length)setDirectoryProviders(providerResult.data as DirectoryProvider[]);setDirectoryReady(true)},()=>{if(active)setDirectoryReady(true)});
+  return()=>{active=false}},[])
  const [countryCode,setCountryCode] = useState('')
  const [selectedCountries,setSelectedCountries] = useState<string[]>([])
  const [countryQuery,setCountryQuery] = useState('')
@@ -192,6 +201,10 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  },[schema,values])
  useEffect(()=>{if(aiGenerated&&aiAnalyzedContext&&aiAnalyzedContext!==aiContextKey){setAiApplied(false);setAiError('市场或搜索任务配置已变化。之前的 AI 分析不能直接应用，请重新分析。')}},[aiContextKey])
  const availableProviders = providerByPlatform[channel] || ['Apify']
+ const categories = [...new Set(directoryPlatforms.map(item=>item.category_key))]
+ const visiblePlatforms = directoryPlatforms.filter(item=>item.category_key===selectedCategory)
+ const categoryLabels:Record<string,string>={social:'社交媒体',search:'搜索与地图',b2b:'B2B 商业平台',commerce:'电商平台',web:'企业网站与商业数据'}
+ const canSearchSelectedProvider = provider.toLowerCase()==='apify'
  const selectedCountry = countries.find(c=>c.code===countryCode)
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
  const toggleCountry = (code:string) => {
@@ -238,6 +251,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
 
  const searchActors = async (queryOverride?:string) => {
+  if(provider.toLowerCase()!=='apify'){setError('该服务商已进入目录，但尚未接入搜索与执行接口。当前不能将其请求转发给 Apify。');return}
   setActorBusy(true);setError('');setNotice('')
   try {
    const term=(queryOverride||actorQuery).trim() || directoryPlatforms.find(item=>item.platform_key===channel)?.search_terms || searchTerms[channel] || channel
@@ -456,7 +470,39 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const price=pricing.pricePerUnitUsd ? ' · $'+String(pricing.pricePerUnitUsd)+unit : ''
   return model+price
  }
- return <div className="ldw-shell">
+ return <div className="ldw-shell ldw-manual-first">
+  <div className="ldw-workflow-head"><div><span className="ldw-eyebrow">MANUAL DISCOVERY</span><h2>手动配置数据采集</h2><p>按平台目录选择数据源，读取实际 Schema 后填写参数。AI 仅作为可选辅助。</p></div><button type="button" className="ldw-ai-sidebar-trigger" aria-expanded={aiSidebarOpen} onClick={()=>setAiSidebarOpen(value=>!value)}><Sparkles size={14}/>{aiSidebarOpen?'收起 AI 助手':'打开 AI 助手'}</button></div>
+  <div className="ldw-manual-layout">
+   <main className="ldw-manual-main">
+    <section className="ldw-card">
+     <div className="ldw-step-title"><span>1</span><div><h3>选择数据大类</h3><p>先确定你要采集的数据来源类型。</p></div></div>
+     {directoryReady&&categories.length>0?<div className="ldw-category-grid">{categories.map(key=><button type="button" key={key} className={selectedCategory===key?'selected':''} onClick={()=>{setSelectedCategory(key);const first=directoryPlatforms.find(item=>item.category_key===key);if(first)setChannel(first.platform_key)}}>{categoryLabels[key]||key}</button>)}</div>:<div className="ldw-loading">{directoryReady?'平台目录暂不可用，请刷新页面重试。':'正在同步平台目录…'}</div>}
+    </section>
+    <section className="ldw-card">
+     <div className="ldw-step-title"><span>2</span><div><h3>选择具体平台</h3><p>同一大类下可选择不同平台，平台目录由数据库维护。</p></div></div>
+     <div className="ldw-platform-grid ldw-platform-grid-manual">{visiblePlatforms.map(item=><button type="button" key={item.platform_key} className={channel===item.platform_key?'selected':''} onClick={()=>{setChannel(item.platform_key);setActorQuery(item.search_terms||item.platform_name)}}><img className="ldw-brand-logo" src={platformLogo(item.platform_key)} alt="" onError={event=>{event.currentTarget.style.display='none'}}/><span>{item.platform_name}</span>{channel===item.platform_key&&<Check size={13}/>}</button>)}</div>
+     {!visiblePlatforms.length&&<div className="ldw-loading">当前类别暂无已启用平台。</div>}
+     {directoryPlatforms.find(item=>item.platform_key===channel)?.description&&<p className="ldw-provider-note">{directoryPlatforms.find(item=>item.platform_key===channel)?.description}</p>}
+    </section>
+    <section className="ldw-card">
+     <div className="ldw-step-title"><span>3</span><div><h3>选择服务商</h3><p>服务商与平台是独立目录；只有已接入执行接口的服务商可以继续。</p></div></div>
+     <div className="ldw-provider-grid ldw-provider-grid-manual">{directoryProviders.map(item=>{const enabled=item.provider_key==='apify';const selected=provider.toLowerCase()===item.provider_key;return <button type="button" key={item.provider_key} disabled={!enabled} className={selected?'selected':''} onClick={()=>setProvider(item.provider_name)}><span className="ldw-provider-name"><b>{item.provider_name}</b>{selected&&<Check size={13}/>}</span><small>{item.description||item.provider_type}{enabled?' · 已接入 Actor 搜索与 Schema 读取':' · 目录已登记，执行接口尚未接入'}</small></button>})}</div>
+     {!directoryProviders.length&&<div className="ldw-provider-note">服务商目录暂不可用。</div>}
+    </section>
+    <section className="ldw-card">
+     <div className="ldw-step-title"><span>4</span><div><h3>选择采集器 / Actor</h3><p>搜索当前服务商的真实产品目录，你可以自行决定使用哪一个。</p></div></div>
+     {canSearchSelectedProvider?<><div className="ldw-actor-search"><input value={actorQuery} onChange={event=>setActorQuery(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();void searchActors()}}} placeholder="输入 Actor 名称或采集关键词"/><button type="button" onClick={()=>void searchActors()} disabled={actorBusy||!actorQuery.trim()}>{actorBusy?<Loader2 size={13}/>:<Search size={13}/>} 搜索 Apify Store</button></div>{actorBusy&&<div className="ldw-loading"><Loader2 size={14}/> 正在搜索 Actor…</div>}{actors.length>0&&<div className="ldw-ai-actor-options"><b>搜索结果（{actors.length}）</b>{actors.map(item=><button type="button" key={item.id} className={actor?.id===item.id?'selected':''} onClick={()=>void selectActor(item)} disabled={schemaBusy}><span><b>{item.title||item.name}</b><small>{item.description||item.username+'/'+item.name}</small><small>{pricingLabel(item)}</small></span><span>{actor?.id===item.id?'已选择':'选择'} <ArrowRight size={12}/></span></button>)}</div>}</>:<div className="ldw-provider-note">当前服务商尚未接入搜索和执行接口。为避免错误调用，不会将此选择转发到其他服务商。</div>}
+    </section>
+    {schema&&actor?<section className="ldw-card ldw-manual-schema-card">
+     <div className="ldw-step-title"><span>5</span><div><h3>按 Schema 填写参数</h3><p>字段名称以中文展示；必填、类型、范围和 Actor 原始字段均保留。</p></div></div>
+     <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个输入字段 · 来自 Actor 最新构建的真实 Schema</small><small>{pricingLabel(actor)}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
+     {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span></li>)}</ol></div>}
+     <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>
+     <div className="ldw-request-preview"><div className="ldw-request-preview-heading"><b>最终提交数据预览</b><span>{Object.keys(schemaValidation.payload).length} 个字段</span></div><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过':`请修正 ${Object.keys(schemaValidation.errors).length} 项字段问题`}</div></div>
+     <div className="ldw-submit-row"><span>仅当 Schema 校验通过并确认费用上限后，才会创建任务并提交执行。</span><button disabled={!schema||!actor||busy||!schemaValidation.valid||aiMissingInformation.length>0||!canSearchSelectedProvider} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
+    </section>:<div className="ldw-chat-hint">完成前四步后，选择 Actor 即可读取 Schema 并显示手动参数表单。</div>}
+   </main>
+   {aiSidebarOpen&&<aside className="ldw-ai-sidebar">
   <section className="ldw-card ldw-ai-step ldw-chat-card ldw-chat-first">
    <div className="ldw-step-title"><span><MessageCircle size={16}/></span><div><h3>AI 采集助手</h3><p>描述业务目标，AI 将识别平台并搜索候选 Actor；你在对话中选择后，AI 再读取 Schema 并填写参数。</p></div></div>
    <div className="ldw-chat-history" aria-live="polite">{chatMessages.map((message,index)=><div key={index} className={'ldw-chat-message '+message.role}><span className={'ldw-chat-avatar '+(message.role==='assistant'?'ai':'user')} aria-hidden="true">{message.role==='assistant'?<Sparkles size={15}/>:<UserRound size={15}/>}</span><div className="ldw-chat-message-body"><span>{message.role==='assistant'?'AI 助手':'你'}</span><p>{message.content}</p></div></div>)}{aiBusy&&<div className="ldw-chat-message assistant"><span className="ldw-chat-avatar ai" aria-hidden="true"><Sparkles size={15}/></span><div className="ldw-chat-message-body"><span>AI 助手</span><p className="ldw-chat-thinking"><Loader2 size={13}/> 正在理解需求并分析参数…</p></div></div>}</div>
@@ -480,15 +526,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    {!schema&&<div className="ldw-chat-hint">描述目标后，系统会搜索候选 Actor。你可以直接在本对话中选择，AI 随后读取 Schema 并配置参数。</div>}
    <div className="ldw-submit-row"><span>确认后将使用上方展示的同一份 Schema 参数提交并启动采集。</span><button disabled={!schema||!actor||busy||!schemaValidation.valid||aiMissingInformation.length>0||aiBusy} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认提交数据并启动采集'} <ArrowRight size={15}/></button></div>
   </section>
-  <button type="button" className="ldw-manual-toggle" aria-expanded={manualConfigOpen} onClick={()=>setManualConfigOpen(value=>!value)}><span><b>手动配置（Actor Schema）</b><small>{actor?'当前 Actor：'+actor.title+' · 仅显示该 Actor 定义的输入参数':'选择 Actor 后，这里将显示它的 Schema 参数'}</small></span><span>{manualConfigOpen?'收起参数':'展开参数'} <ChevronDown size={15}/></span></button>
-  {manualConfigOpen&&<div className="ldw-manual-config-body">
-   {schema&&actor?<section className="ldw-card">
-    <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个输入字段 · 来自 Actor 最新构建的真实 Schema</small><small>{pricingLabel(actor)}</small></div><span><ShieldCheck size={13}/> Schema 已读取</span></div>
-    {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span></li>)}</ol></div>}
-    <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>
-    <div className="ldw-request-preview"><div className="ldw-request-preview-heading"><b>最终提交数据预览</b><span>{Object.keys(schemaValidation.payload).length} 个字段</span></div><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过':`请修正 ${Object.keys(schemaValidation.errors).length} 项字段问题`}</div></div>
-   </section>:<div className="ldw-chat-hint">尚未选择 Actor。请先在上方 AI 对话中描述需求，你可以在上方对话中选择合适的 Actor。</div>}
-  </div>}
+   </aside>}
+  </div>
   {error&&<div className="ldw-error">{error}</div>}{notice&&<div className="ldw-notice">{notice}</div>}
  </div>
 }
