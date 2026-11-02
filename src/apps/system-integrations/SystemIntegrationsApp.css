@@ -112,3 +112,8 @@
 .int-cost-grid article>small{font-size:8px;color:var(--int-muted);line-height:1.45}
 .dark .int-cost-grid article>strong{color:#d0b7d0}
 @media(max-width:650px){.int-cost-grid{grid-template-columns:1fr 1fr}.int-cost-summary-head{flex-direction:column}}
+
+.apify-output-review-note{display:flex;flex-direction:column;gap:5px;margin:12px 0;padding:11px 12px;border:1px solid #eadfe9;border-radius:6px;background:#faf7fa;color:#675b68;font-size:12px}
+.apify-output-review-note b{font-size:12px;color:#4f4050}
+.apify-output-review-note span{font-weight:700;color:#805e7d}
+.apify-output-review-note small{font-size:11px;line-height:1.55;color:#817783}
