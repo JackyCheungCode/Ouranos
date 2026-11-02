@@ -277,26 +277,26 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     const types=Array.isArray(row.supported_record_types)?(row.supported_record_types as string[]).map(x=>x==='company'?'企业':'联系人').join(' / '):'客户资料'
     return {id,title:String(row.adapter_name||name||id),name:name||id,username:username||'',description:'已审核 · 支持'+types+' · Build '+String(row.adapter_version||''),url:String(caps.actor_url||''),currentPricingInfo:(row.pricing_model||{}) as Record<string,unknown>}
    }).filter(item=>item.username&&item.name)
-   setApprovedActors(current=>append?[...current,...mapped]:mapped)
+   setApprovedActors(mapped)
    setApprovedOffset(offset+rows.length);setHasMoreApproved(rows.length===5)
   }catch(e){setError(e instanceof Error?e.message:'读取已审核 Actor 目录失败')}
   finally{setApprovedBusy(false)}
  }
  useEffect(()=>{void loadApprovedActors(0,false)},[channel,provider])
- const searchActors = async (queryOverride?:string,append=false) => {
+ const searchActors = async (queryOverride?:string,append=false,previous=false) => {
   if(provider.toLowerCase()!=='apify'){setError('该服务商已进入目录，但尚未接入搜索与执行接口。当前不能将其请求转发给 Apify。');return}
   setActorBusy(true);setError('');setNotice('')
   if(!append){setActors([]);setCandidateOffset(0);setHasMoreCandidates(false)}
   try {
    const term=(queryOverride||actorQuery).trim() || directoryPlatforms.find(item=>item.platform_key===channel)?.search_terms || searchTerms[channel] || channel
    const url=new URL('https://api.apify.com/v2/store')
-   url.searchParams.set('search',term);url.searchParams.set('limit','5');url.searchParams.set('offset',String(append?candidateOffset:0));url.searchParams.set('sortBy','popularity');url.searchParams.set('responseFormat','full')
+   url.searchParams.set('search',term);url.searchParams.set('limit','5');const pageOffset=append?candidateOffset:previous?Math.max(0,candidateOffset-10):0;url.searchParams.set('offset',String(pageOffset));url.searchParams.set('sortBy','popularity');url.searchParams.set('responseFormat','full')
    const response=await fetch(url.toString(),{headers:{Accept:'application/json'}})
    if(!response.ok)throw new Error('Apify Store 搜索失败，请稍后重试')
    const body=await response.json();const items=(body.data?.items || []) as Actor[]
    const approvedIds=new Set(approvedActors.map(item=>item.username+'~'+item.name))
    const candidates=items.filter(item=>!approvedIds.has(item.username+'~'+item.name))
-   setActors(current=>append?[...current,...candidates]:candidates);setCandidateOffset(append?candidateOffset+items.length:items.length);setHasMoreCandidates(items.length===5);if(!candidates.length&&!append)setNotice('没有找到新的待审核候选 Actor。可以调整关键词再搜索。')
+   setActors(candidates);setCandidateOffset(pageOffset+items.length);setHasMoreCandidates(items.length===5);if(!candidates.length&&!append)setNotice('没有找到新的待审核候选 Actor。可以调整关键词再搜索。')
   }catch(e){setError(e instanceof Error?e.message:'无法搜索 Apify Store')}
   finally{setActorBusy(false)}
  }
