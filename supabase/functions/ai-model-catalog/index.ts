@@ -34,7 +34,7 @@ Deno.serve(async(req:Request)=>{
    case "minimax":endpoint="https://api.minimax.io/v1/models";break;
    case "workers-ai":if(!/^[a-f0-9]{32}$/.test(account))return json({error:"Cloudflare Account ID 格式不正确"},400,origin);endpoint="https://api.cloudflare.com/client/v4/accounts/"+account+"/ai/models/search?per_page=100";break;
    case "custom-openai":if(!base.startsWith("https://"))return json({error:"自定义 API Base URL 必须使用 HTTPS"},400,origin);endpoint=base.replace(/\/$/,"")+"/models";break;
-   default:return json({error:"暂不支持该模型服务商"},400,origin);
+   default:return json({models:fallback[provider]||[],source:"fallback"},200,origin);
   }
   if(provider==="workers-ai"){const response=await fetch(endpoint,{headers:{Authorization:"Bearer "+key},signal:AbortSignal.timeout(15000)});if(!response.ok)return json({error:"Cloudflare 返回 HTTP "+response.status},400,origin);const data=await response.json();const models=(data.result||[]).map((m:Record<string,unknown>)=>String(m.name||m.id||"")).filter(Boolean);return json({models:models.length?models:fallback[provider],source:models.length?"remote":"fallback"},200,origin);}
   const response=await fetch(endpoint,{method,headers,signal:AbortSignal.timeout(15000)});if(!response.ok){const message=await response.text();return json({error:"服务商模型目录请求失败（HTTP "+response.status+"）",detail:message.slice(0,180)},400,origin);}
