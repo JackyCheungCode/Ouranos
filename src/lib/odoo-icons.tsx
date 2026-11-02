@@ -90,3 +90,6 @@ export const ContactRound = icon('address-card')
 export type LucideIcon = React.ComponentType<IconProps>
 
 export const Pencil = icon('pencil-alt')
+
+export const Ban = icon('ban')
+export const Link2 = icon('link')
