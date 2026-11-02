@@ -19,6 +19,11 @@ type DirectoryPlatform = { platform_key:string; platform_name:string; category_k
 type DirectoryProvider = { provider_key:string; provider_name:string; provider_type:string; description:string; is_active:boolean; sort_order:number }
 type ProviderAdapterRow={adapter_key:string;config:Record<string,unknown>;discovery_adapter_catalog:{adapter_name:string;external_actor_id:string;input_schema:JsonSchema;verification_status:string;maintenance_status:string;is_active:boolean;provider_key:string;pricing_model?:Record<string,unknown>}}
 const marketMarkerIcon=divIcon({className:'ldw-map-marker',html:'<span></span>',iconSize:[22,22],iconAnchor:[11,11]})
+const facebookProfileActors = [
+ {username:'silentflow',name:'facebook-search-profiles-scraper',title:'Silentflow · Facebook 个人资料搜索',description:'支持关键词、城市及国家/地区匹配；可补充公开主页详情。'},
+ {username:'alien_force',name:'facebook-search-scraper',title:'Alien Force · Facebook 搜索',description:'支持 People 搜索及地点解析；地点过滤能否生效取决于 Facebook 地点匹配。'},
+ {username:'memo23',name:'facebook-search-scraper',title:'Memo23 · Facebook 搜索',description:'支持 People 搜索及城市 Place UID；当前通用表单不传 Place UID，地区作为关键词辅助。'}
+] as const
 const platformGroups = [
  { label: '搜索引擎与地图', items: [['google-maps','Google Maps','google maps business places'],['google-search','Google Search','google search results'],['bing','Bing','bing search results'],['yelp','Yelp','yelp business'] ] },
  { label: '社交媒体', items: [['instagram','Instagram','instagram profiles'],['facebook','Facebook','facebook pages'],['linkedin','LinkedIn','linkedin companies'],['tiktok','TikTok','tiktok profiles'],['youtube','YouTube','youtube channels'],['x','X / Twitter','twitter profiles'] ] },
@@ -339,7 +344,12 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   setNotice(data.verification_status==='verified'&&data.maintenance_status==='maintained'?'已读取 Actor 最新输入 Schema。该数据源已通过客户输出审核。':'已读取 Actor 最新输入 Schema。该 Actor 尚未通过直接客户资料审核，当前只能预览参数，不能启动正式采集。')
   setSchemaBusy(false)
  }
- useEffect(()=>{if(page.id!=="facebook-pages"||!canSearchSelectedProvider||actor||schemaBusy)return;void selectActor({id:"coregent~facebook-pages-leads-scraper",name:"facebook-pages-leads-scraper",username:"coregent",title:"Facebook Pages & Business Leads Scraper",description:"按关键词与地区发现企业主页，提取公开商务资料。",url:"https://apify.com/coregent/facebook-pages-leads-scraper"})},[page.id,canSearchSelectedProvider,actor?.id,schemaBusy])
+ const selectFacebookActor=(option:typeof facebookProfileActors[number])=>{
+  const configured=approvedActors.find(item=>item.username===option.username&&item.name===option.name)
+  if(!configured){setError('该 Actor 尚未在当前工作空间完成登记、审核并启用，暂不能选择。');return}
+  setActor(configured);setSelectedAdapterKey(configured.adapterKey||'');setSchema(null);setValues({});setActorPickerOpen(false)
+  setActorVerificationStatus('verified');setActorMaintenanceStatus('maintained');setError('');setNotice('已选择 '+option.title+'。通用表单参数将按该 Actor 的固定接口格式提交，不读取动态 Schema。')
+ }
  const selectProviderAdapter=(row:ProviderAdapterRow)=>{
   const catalog=row.discovery_adapter_catalog;const nextSchema=(catalog.input_schema||{}) as JsonSchema
   setSelectedAdapterKey(row.adapter_key);setActor({id:catalog.external_actor_id,name:catalog.external_actor_id,username:selectedProviderKey,title:catalog.adapter_name,description:'已审核 · 已启用 · '+selectedProviderKey,url:'',adapterKey:row.adapter_key,currentPricingInfo:catalog.pricing_model||{}})
@@ -495,20 +505,45 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   void sendAssistantTurn(chatMessages,aiRequest)
  },[schema,actor?.id,aiContextKey])
  const startSearch = async () => {
+  const isFacebookPeople=page.id==='facebook-pages'
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
-  if(!schema||!actor)return
-  if(actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'){setError('该 Actor 尚未通过直接客户资料审核或维护状态检查，暂不能启动正式采集。请在数据源审核完成后再试。');return}
-  if(!schemaValidation.valid){const [firstPath,firstMessage]=Object.entries(schemaValidation.errors)[0]||[];const issue=firstPath?schemaPathLabel(schema||{},firstPath)+'：'+firstMessage:'';setError('发现 '+Object.keys(schemaValidation.errors).length+' 项字段问题。'+(issue?'请先检查「'+issue+'」。':''));if(firstPath){const anchor=schemaPathAnchor(firstPath.split('.')[0].split('[')[0]);window.setTimeout(()=>document.getElementById(anchor)?.scrollIntoView({behavior:'smooth',block:'center'}),0)}return}
-  if(page.id!=='facebook-pages'&&(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0)){setError('请设置大于 0 的单次费用上限。');return}
+  if(!actor){setError('请先选择一个 Facebook 个人资料 Actor。');return}
+  if(!isFacebookPeople&&!schema)return
+  if(actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'){setError('该 Actor 尚未通过直接客户资料审核或维护状态检查，暂不能启动正式采集。');return}
+  if(isFacebookPeople){
+   if(!keywords.trim()){setError('请填写搜索关键词，例如 real estate agent、software engineer。');return}
+   if(!countryCode){setError('请选择目标国家或地区。');return}
+   const count=Number(targetCount)
+   if(!Number.isInteger(count)||count<10||count>500){setError('采集人数请填写 10 到 500 之间的整数。');return}
+  }else if(!schemaValidation.valid){
+   const [firstPath,firstMessage]=Object.entries(schemaValidation.errors)[0]||[];const issue=firstPath?schemaPathLabel(schema||{},firstPath)+'：'+firstMessage:''
+   setError('发现 '+Object.keys(schemaValidation.errors).length+' 项字段问题。'+(issue?'请先检查「'+issue+'」。':''));if(firstPath){const anchor=schemaPathAnchor(firstPath.split('.')[0].split('[')[0]);window.setTimeout(()=>document.getElementById(anchor)?.scrollIntoView({behavior:'smooth',block:'center'}),0)}return
+  }
+  if(!isFacebookPeople&&(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0)){setError('请设置大于 0 的单次费用上限。');return}
   setBusy(true);setError('')
   try {
-   const actorInput:Record<string,unknown>={...schemaValidation.payload}
-   if(page.id==='facebook-pages'){for(const [key,value] of Object.entries(values)){if(value!==undefined&&value!==null&&value!==''&&/^(has.?email|has.?phone|has.?website)$/i.test(key))actorInput[key]=value}}
-    const taskTitle=taskName.trim()||product.trim()||keywords.trim()||actor.title
    const actorId=selectedProviderKey==='apify'?actor.username+'~'+actor.name:actor.name
-    const schemaHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stableStringify(schema))).then(d=>[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''))
-    const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel,provider_key:selectedProviderKey,adapter_key:selectedAdapterKey,ai_analysis:aiGenerated?{model:aiModel,user_request:aiRequest,conversation:chatMessages,summary:aiSummary,strategy:aiStrategy,actor_input:actorInput,field_explanations:aiFieldExplanations,missing_information:aiMissingInformation,warnings:aiWarnings,analyzed_at:new Date().toISOString()}:null}
+   let actorInput:Record<string,unknown>={}
+   if(isFacebookPeople){
+    const country=selectedCountry?.geoName||selectedCountry?.name||countryCode
+    const location=[city.trim(),country].filter(Boolean).join(', ')
+    const count=Number(targetCount)
+    if(actor.username==='silentflow'){
+     actorInput={searchQueries:[keywords.trim()],location,maxItems:count,includeDetails:true}
+    }else if(actor.username==='alien_force'){
+     actorInput={search_type:'people',keyword:keywords.trim(),location,results_limit:count,cookies:[]}
+    }else if(actor.username==='memo23'){
+     actorInput={queries:[keywords.trim()+' '+location].filter(Boolean),searchType:'people',maxItems:count}
+    }else{
+     throw new Error('当前 Facebook Actor 不在固定支持列表中，请重新选择。')
+    }
+   }else{
+    actorInput={...schemaValidation.payload}
+   }
+   const taskTitle=taskName.trim()||(isFacebookPeople?'Facebook个人客户：'+keywords.trim():product.trim()||keywords.trim()||actor.title)
+   const schemaHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stableStringify(isFacebookPeople?{}:schema))).then(d=>[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''))
+   const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:isFacebookPeople?'contacts':targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:isFacebookPeople?null:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel,provider_key:selectedProviderKey,adapter_key:selectedAdapterKey,ai_analysis:isFacebookPeople?null:aiGenerated?{model:aiModel,user_request:aiRequest,conversation:chatMessages,summary:aiSummary,strategy:aiStrategy,actor_input:actorInput,field_explanations:aiFieldExplanations,missing_information:aiMissingInformation,warnings:aiWarnings,analyzed_at:new Date().toISOString()}:null}
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspaceId,created_by:userId,name:taskTitle,status:'draft',target_profile:profile,selected_channels:[channel],target_count:Number(targetCount)}).select('id').single()
    if(taskError)throw new Error(taskError.message)
    const {data:selections,error:selectionQueryError}=await supabase.from('workspace_adapter_selections').select('id,adapter_key,config,discovery_adapter_catalog!inner(external_actor_id,provider_key,verification_status,maintenance_status,is_active)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true).eq('discovery_adapter_catalog.provider_key',selectedProviderKey)
@@ -533,7 +568,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   return model+price
  }
  return <div className="ldw-shell ldw-manual-first">
-  <div className="ldw-workflow-head"><div><span className="ldw-eyebrow">MANUAL DISCOVERY</span><h2>{page.title} · 数据源配置</h2><p>{page.description} 选择平台、服务商和 Actor 后，系统读取真实 Schema 并生成中文参数表单。</p></div>{page.id!=='facebook-pages'&&<button type="button" className="ldw-ai-sidebar-trigger" aria-expanded={aiSidebarOpen} onClick={()=>setAiSidebarOpen(value=>!value)}><Sparkles size={14}/>{aiSidebarOpen?'收起 AI 助手':'打开 AI 助手'}</button>}</div>
+  <div className="ldw-workflow-head"><div><span className="ldw-eyebrow">MANUAL DISCOVERY</span><h2>{page.title} · 数据源配置</h2><p>{page.description} Facebook 个人客户发现使用统一中文表单；选择 Actor 后由系统转换其专属参数。</p></div>{page.id!=='facebook-pages'&&{page.id!=='facebook-pages'&&<button type="button" className="ldw-ai-sidebar-trigger" aria-expanded={aiSidebarOpen} onClick={()=>setAiSidebarOpen(value=>!value)}><Sparkles size={14}/>{aiSidebarOpen?'收起 AI 助手':'打开 AI 助手'}</button>}}</div>
   <div className="ldp-page-context"><div><b>本页重点筛选</b><span>{page.filters.join(' · ')}</span></div><div><b>目标客户资料</b><span>{page.outputs}</span></div><small>{page.rule}</small></div>
   <div className="ldw-manual-layout">
    <main className="ldw-manual-main">
@@ -591,14 +626,30 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      )}
     </section>
     </>}
-    {schema&&actor?<section className="ldw-card ldw-manual-schema-card">
-     <div className="ldw-step-title"><span>{page.id === "facebook-pages" ? "1" : "5"}</span><div><h3>{page.id === "facebook-pages" ? "填写 Facebook 客户发现条件" : "按 Actor Schema 填写发现条件"}</h3><p>{page.id === "facebook-pages" ? "填写关键词、目标地区和采集数量即可开始；其他高级参数使用 Actor 默认值。" : "字段名称以中文展示；必填、类型、范围和 Actor 原始字段均保留。"}</p></div></div>
+    {page.id==='facebook-pages' ? <section className="ldw-card ldw-facebook-task-card">
+     <div className="ldw-step-title"><span>1</span><div><h3>填写通用搜索条件</h3><p>先填写客户关键词与目标地区，再选择一个 Facebook 个人资料 Actor。</p></div></div>
+     <div className="ldw-form-grid">
+      <label className="ldw-field"><span>搜索关键词 <b>* 必填</b></span><input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="例如：real estate agent、software engineer、wedding photographer"/><small>填写职业、行业、业务类型或目标人群；一次填写一个清晰关键词。</small></label>
+      <label className="ldw-field"><span>国家 / 地区 <b>* 必填</b></span><select value={countryCode} onChange={e=>{setCountryCode(e.target.value);setSelectedCountries(e.target.value?[e.target.value]:[]);setRegion('__all__');setCity('')}}><option value="">请选择国家或地区</option>{countries.map(c=><option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select><small>不同 Actor 的国家过滤方式不同，具体能力见下方说明。</small></label>
+      <label className="ldw-field"><span>城市（可选）</span><input value={city} onChange={e=>setCity(e.target.value)} placeholder="例如：Tokyo、New York、London"/><small>建议使用英文城市名，以便 Actor 识别 Facebook 地点。</small></label>
+      <label className="ldw-field"><span>最多抓取人数 <b>* 必填</b></span><input type="number" min={10} max={500} step={1} value={targetCount} onChange={e=>setTargetCount(e.target.value)}/><small>统一限制为 10–500 人；实际返回数量可能少于设置值。</small></label>
+     </div>
+     <div className="ldw-step-title ldw-facebook-actor-step"><span>2</span><div><h3>选择一个抓取 Actor</h3><p>三个 Actor 使用同一套表单，系统会自动转换成各自需要的参数。</p></div></div>
+     <div className="ldw-facebook-actor-options">
+      {facebookProfileActors.map(option=>{const configured=approvedActors.find(item=>item.username===option.username&&item.name===option.name);const selected=actor?.username===option.username&&actor?.name===option.name;return <button type="button" key={option.username} className={selected?'selected':''} disabled={!configured||!canSearchSelectedProvider} onClick={()=>selectFacebookActor(option)}>
+       <span><b>{option.title}</b><small>{option.description}</small><small>{configured?'已登记 · 已审核 · 已启用':'尚未在当前工作空间完成登记 / 审核 / 启用'}</small></span><span>{selected?'已选择':configured?'选择 Actor':'暂不可用'} <ArrowRight size={12}/></span>
+      </button>})}
+     </div>
+     {!canSearchSelectedProvider&&<div className="ldw-provider-note">请先在「系统设置 → 集成」连接并启用 Apify，之后才能选择 Actor。</div>}
+     {actor&&<div className="ldw-selected-actor-summary"><div><b>{actor.title}</b><small>Actor ID：{actor.username}~{actor.name} · 审核通过</small></div><a href={actor.username==='silentflow'?'https://apify.com/silentflow/facebook-search-profiles-scraper':actor.username==='alien_force'?'https://apify.com/alien_force/facebook-search-scraper':'https://apify.com/memo23/facebook-search-scraper'} target="_blank" rel="noreferrer">查看 Actor 文档</a></div>}
+     <div className="ldw-facebook-capability-note"><b>地区筛选差异</b><ul><li><b>Silentflow：</b>城市可使用 Facebook 地点筛选；国家 / 地区按公开资料中的城市、家乡、工作或学校信息匹配。</li><li><b>Alien Force：</b>通过 Facebook 地点解析过滤 People 结果；地点名称无法解析时可能跳过过滤。</li><li><b>Memo23：</b>本表单将城市和国家拼入关键词提高相关性，不等同于精准地区过滤；其精确城市筛选需要 Facebook Place UID。</li></ul></div>
+     <div className="ldw-submit-row"><span>{actor?'已选 Actor。提交前请确认目标地区与数量；执行仍受数据源审核及费用策略约束。':'请先填写关键词和国家，并选择一个已审核启用的 Actor。'}</span><button disabled={!actor||!keywords.trim()||!countryCode||busy||!canSearchSelectedProvider||actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
+    </section> : schema&&actor ? <section className="ldw-card ldw-manual-schema-card">
+     <div className="ldw-step-title"><span>5</span><div><h3>按 Actor Schema 填写发现条件</h3><p>字段名称以中文展示；必填、类型、范围和 Actor 原始字段均保留。</p></div></div>
      <div className="ldw-schema-heading"><div><b>{actor.title}</b><small>{schemaKeys(schema).length} 个输入字段 · 来自 Actor 最新构建的真实 Schema</small><small>{pricingLabel(actor)}</small></div><span><ShieldCheck size={13}/> Schema 已读取 · {actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'客户输出已审核':'待客户输出审核'}</span></div>
-     {Object.keys(schemaValidation.errors).length>0&&<div className="ldw-schema-error-summary" role="alert"><div><b>发现 {Object.keys(schemaValidation.errors).length} 项需要修正</b><span>点击错误可跳转到对应字段。</span></div><ol>{Object.entries(schemaValidation.errors).map(([path,message])=><li key={path}><a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema,path)}</a><span>{message}</span></li>)}</ol></div>}
-     {page.id === "facebook-pages" ? (() => { const requirements=deriveSchemaRequirements(schema); const fields=schemaKeys(schema); const core=fields.filter(([key])=>{const k=key.toLowerCase();return requirements.requiredFields.has(key)||requirements.atLeastOneGroups.some(group=>group.includes(key))||/search.?queries|search.?terms|search.?query|keywords?|^query$|locations?|country(code)?|^city$|region|state|province|max.?results|max.?items|has.?email|has.?phone|has.?website/.test(k)}); const advanced=fields.filter(([key])=>!core.some(([coreKey])=>coreKey===key)); return <><div className="ldw-form-grid">{core.map(renderField)}</div>{advanced.length>0&&<details className="ldw-facebook-advanced"><summary>高级参数（{advanced.length} 项，通常无需修改）</summary><div className="ldw-form-grid">{advanced.map(renderField)}</div></details>}</> })() : <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>}
-     <div className="ldw-request-preview"><div className="ldw-request-preview-heading"><b>最终提交数据预览</b><span>{Object.keys(schemaValidation.payload).length} 个字段</span></div><pre>{JSON.stringify(schemaValidation.payload,null,2)}</pre><div className={schemaValidation.valid?'ldw-validation-ok':'ldw-validation-error'}>{schemaValidation.valid?'Schema 校验通过':<>发现 {Object.keys(schemaValidation.errors).length} 项字段问题：{Object.entries(schemaValidation.errors).slice(0,3).map(([path,message],index)=><span key={path}>{index>0?'；':''}<a href={'#'+schemaPathAnchor(path.split('.')[0].split('[')[0])}>{schemaPathLabel(schema||{},path)}</a>：{message}</span>)}{Object.keys(schemaValidation.errors).length>3?'；其余问题请查看上方错误清单':''}</>}</div></div>
-     <div className="ldw-submit-row"><span>{actorVerificationStatus==='verified'&&actorMaintenanceStatus==='maintained'?'Schema 校验通过并确认费用上限后，才会创建任务。':'当前 Actor 尚未通过客户输出审核，不能创建正式采集任务。'}</span><button disabled={!schema||!actor||busy||!schemaValidation.valid||!canSearchSelectedProvider||actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
-    </section>:page.id === "facebook-pages" ? <section className="ldw-card"><div className="ldw-step-title"><span>1</span><div><h3>准备 Facebook 发现引擎</h3><p>系统自动读取固定 Actor 的真实 Schema，无需手动选择采集器。</p></div></div>{schemaBusy?<div className="ldw-loading"><Loader2 size={15}/> 正在读取 Facebook 发现参数…</div>:canSearchSelectedProvider?<div className="ldw-provider-note">正在准备 Facebook Actor 参数；若没有自动开始，请刷新页面重试。</div>:<div className="ldw-provider-note">请先前往「系统设置 → 集成」连接并测试 Apify。连接完成后，本页会自动读取 Facebook Actor 参数。</div>}</section>:<div className="ldw-chat-hint">完成前四步后，选择 Actor 即可读取 Schema 并显示手动参数表单。</div>}
+     <div className="ldw-form-grid">{schemaKeys(schema).map(renderField)}</div>
+     <div className="ldw-submit-row"><span>Schema 校验通过并确认费用上限后，才会创建任务。</span><button disabled={!schema||!actor||busy||!schemaValidation.valid||!canSearchSelectedProvider||actorVerificationStatus!=='verified'||actorMaintenanceStatus!=='maintained'} onClick={()=>void startSearch()}>{busy?<><Loader2 size={15}/> 正在创建…</>:'确认参数并启动采集'} <ArrowRight size={15}/></button></div>
+    </section> : <div className="ldw-chat-hint">完成前四步后，选择 Actor 即可读取 Schema 并显示手动参数表单。</div>
    </main>
    {aiSidebarOpen&&page.id!=='facebook-pages'&&<aside className="ldw-ai-sidebar">
   <section className="ldw-card ldw-ai-step ldw-chat-card ldw-chat-first">
