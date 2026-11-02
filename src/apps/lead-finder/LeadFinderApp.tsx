@@ -221,7 +221,6 @@ export default function LeadFinderApp() {
   if(!duplicatesResult.error)setDuplicateCandidates((duplicatesResult.data||[]) as typeof duplicateCandidates)
   setInboxLoading(false)
  }
- useEffect(()=>{if(tab==='review')void refreshInbox()},[tab,workspace?.id])
  const reviewRecord = async(record:InboxRecord,status:'pending'|'approved'|'rejected'|'duplicate',action:'approve'|'reject'|'mark_duplicate'|'unmark_duplicate')=>{
   if(!supabase||!workspace||!user)return
   const updatePayload:Record<string,unknown>={review_status:status,reviewed_by:user.id,reviewed_at:new Date().toISOString()};if(status==='pending')updatePayload.duplicate_of=null
