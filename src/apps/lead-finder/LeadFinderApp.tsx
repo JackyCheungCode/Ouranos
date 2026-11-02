@@ -285,7 +285,7 @@ export default function LeadFinderApp() {
   <div className="lead-page-head"><div className="lead-page-title"><Target size={23} strokeWidth={1.8}/><h1>线索发现</h1></div><div className="lead-head-actions"><span className="lead-mode-pill"><Sparkles size={14}/> AI 辅助</span></div></div>
   <div className="lead-tabs" role="tablist" aria-label="潜在客户搜索导航">
    <button className={tab==='search'?'active':''} onClick={()=>{setTab('search');setActiveTask(null);setSelectedDiscoveryPage(null)}}><Target size={16}/> 创建搜索</button>
-   {!selectedDiscoveryPage&&<button className={tab==='tasks'?'active':''} onClick={()=>{setTab('tasks');setActiveTask(null)}}><Workflow size={16}/> 搜索任务 <span>{tasks.length}</span></button>}
+   {selectedDiscoveryPage?.id!=='linkedin-candidates'&&<button className={tab==='tasks'?'active':''} onClick={()=>{setTab('tasks');setActiveTask(null)}}><Workflow size={16}/> 搜索任务 <span>{tasks.length}</span></button>}
   </div>
 
   {tab==='search'&&(selectedDiscoveryPage ? <div className="ldp-selected-page">
