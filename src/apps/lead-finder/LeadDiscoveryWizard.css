@@ -319,3 +319,6 @@
 @keyframes ldw-ai-pulse{0%{transform:scale(.88);opacity:.65}80%,100%{transform:scale(1.28);opacity:0}}
 @keyframes ldw-ai-twinkle{0%,100%{transform:scale(.92);opacity:.85}50%{transform:scale(1.08);opacity:1}}
 @media(prefers-reduced-motion:reduce){.ldw-chat-avatar.ai,.ldw-chat-avatar.ai:before,.ldw-chat-avatar.ai svg{animation:none}}
+
+.ldw-chat-message>span.ldw-chat-avatar{font-size:initial;letter-spacing:normal;margin:1px 0 0;color:inherit}
+.ldw-chat-message>span.ldw-chat-avatar.user{color:#6f596b}
