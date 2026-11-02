@@ -1,12 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    alias: {
-      'lucide-react': fileURLToPath(new URL('./src/lib/odoo-icons.tsx', import.meta.url)),
-    },
-  },
+  resolve: { alias: { 'lucide-react': new URL('./src/lib/odoo-icons.tsx', import.meta.url).pathname } },
 })
