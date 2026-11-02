@@ -49,7 +49,7 @@ async function testProvider(provider:string,secret:string,kind:string,baseUrl?:s
     if(provider==="openrouter"){const r=await fetch("https://openrouter.ai/api/v1/models",{headers:{Authorization:`Bearer ${apiKey}`},signal:timeout});return {success:r.ok,message:r.ok?"OpenRouter API Key 验证成功":`OpenRouter 返回 HTTP ${r.status}`,statusCode:r.status};}
     if(provider==="qwen"||provider==="zhipu"||provider==="moonshot"||provider==="siliconflow"||provider==="groq"||provider==="cerebras"||provider==="mistral"||provider==="xai"||provider==="custom-openai"){
       const endpoints:Record<string,string>={qwen:"https://dashscope.aliyuncs.com/compatible-mode/v1/models",zhipu:"https://open.bigmodel.cn/api/paas/v4/models",moonshot:"https://api.moonshot.cn/v1/models",siliconflow:"https://api.siliconflow.cn/v1/models",groq:"https://api.groq.com/openai/v1/models",cerebras:"https://api.cerebras.ai/v1/models",mistral:"https://api.mistral.ai/v1/models",xai:"https://api.x.ai/v1/models"};
-      const endpoint=provider==="custom-openai"&&baseUrl?baseUrl.replace(/\\/$/,"")+"/models":endpoints[provider];
+      const endpoint=provider==="custom-openai"&&baseUrl?(baseUrl.endsWith("/")?baseUrl.slice(0,-1):baseUrl)+"/models":endpoints[provider];
       if(!endpoint)return {success:false,manual:true,message:"该 AI 服务暂未配置自动连接测试。"};
       const r=await fetch(endpoint,{headers:{Authorization:`Bearer ${apiKey}`},signal:timeout});
       return {success:r.ok,message:r.ok?`${provider} API Key 验证成功`:`${provider} 返回 HTTP ${r.status}`,statusCode:r.status};
