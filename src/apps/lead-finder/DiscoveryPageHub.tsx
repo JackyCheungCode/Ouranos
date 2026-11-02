@@ -15,7 +15,7 @@ export type DiscoveryPageDefinition = {
 
 export const discoveryPages: DiscoveryPageDefinition[] = [
   { id:'linkedin-candidates', title:'从 LinkedIn 发现', subtitle:'职业联系人与决策人', description:'按关键词、国家、职位、技能和资历发现公开职业主页；人工清洗后，再补充公开可用的职业资料与联系方式。', group:'职业社交平台', platformKeys:['linkedin'], platformNames:['LinkedIn'], filters:['关键词','国家 / 地区','职位','技能','资历 / 经验'], outputs:'LinkedIn 主页、职业信息、公开邮箱 / 电话', rule:'先发现、后人工筛选；只补全公开可用联系方式。' },
-  { id:'facebook-pages', title:'从 Facebook 发现', subtitle:'企业主页与本地商业客户', description:'通过 Apify 支持的 Facebook 搜索与商业主页 Lead Actor，按行业关键词和城市发现公开企业主页；可提取企业类别、官网、地址、公开电话及邮箱（以主页实际公开字段为准）。', group:'社交媒体平台', platformKeys:['facebook'], platformNames:['Facebook'], filters:['行业 / 产品关键词','国家 / 城市','企业主页类别','结果数量','公开联系方式'], outputs:'Facebook 企业主页、企业类别、官网、地址、公开电话 / 邮箱', rule:'仅发现公开 Facebook 企业主页与商家页面；不把个人主页、帖子、评论、群组或活动当作客户。' },
+  { id:'facebook-pages', title:'从 Facebook 发现', subtitle:'企业主页与本地商业客户', description:'通过 Apify 的 Facebook Pages & Business Leads Scraper，按行业关键词和城市直接发现公开企业主页，并提取企业类别、官网、地址、公开电话及邮箱（以主页实际公开字段为准）。推荐 Actor：coregent/facebook-pages-leads-scraper。', group:'社交媒体平台', platformKeys:['facebook'], platformNames:['Facebook'], filters:['行业 / 产品关键词','国家 / 城市','企业主页类别','结果数量','公开联系方式'], outputs:'Facebook 企业主页、企业类别、官网、地址、公开电话 / 邮箱', rule:'仅发现公开 Facebook 企业主页与商家页面；不把个人主页、帖子、评论、群组或活动当作客户。' },
 ]
 
 const iconMap: Record<string,string> = {
