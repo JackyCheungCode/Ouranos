@@ -291,7 +291,7 @@ export default function LeadFinderApp() {
  const visibleChannels = channelGroups.map(g=>({...g,channels:g.channels.filter(c=>(c.name+c.detail+c.providers.join('')).toLowerCase().includes(channelQuery.toLowerCase()))})).filter(g=>g.channels.length)
 
  return <div className="lead-workspace">
-  <div className="lead-page-head"><div><div className="lead-eyebrow">PROSPECTING / LEAD DISCOVERY</div><h1>潜在客户搜索</h1><p>跨渠道发现目标企业与联系人，经过人工审核后再转入正式客户目录。</p></div><div className="lead-head-actions"><span className="lead-mode-pill"><Sparkles size={14}/> AI 智能规划</span></div></div>
+  <div className="lead-page-head"><div><div className="lead-eyebrow">LEAD DEVELOPMENT</div><h1>线索发现</h1></div><div className="lead-head-actions"><span className="lead-mode-pill"><Sparkles size={14}/> AI 辅助</span></div></div>
   <div className="lead-tabs" role="tablist" aria-label="潜在客户搜索导航">
    <button className={tab==='search'?'active':''} onClick={()=>{setTab('search');setActiveTask(null);setSelectedDiscoveryPage(null)}}><Target size={16}/> 创建搜索</button>
    <button className={tab==='tasks'?'active':''} onClick={()=>{setTab('tasks');setActiveTask(null)}}><Workflow size={16}/> 搜索任务 <span>{tasks.length}</span></button>
