@@ -52,7 +52,7 @@ export default function LinkedInDiscoveryApp({workspaceId,userId}:{workspaceId:s
    supabase.from('linkedin_candidates').select('*').eq('workspace_id',workspaceId).eq('run_id',runId).order('created_at',{ascending:false}).limit(1000),
    supabase.from('linkedin_discovery_logs').select('id,level,stage,message,details,created_at').eq('workspace_id',workspaceId).eq('run_id',runId).order('created_at',{ascending:false}).limit(100)
   ])
-  if(c.error)setError(c.error.message);else setCandidates((c.data||[]) as Candidate[])
+  if(c.error)setError(c.error.message);else{const incoming=(c.data||[]) as Candidate[];setCandidates(current=>{const dirty=new Map(current.filter(row=>row.dirty).map(row=>[row.id,row]));return incoming.map(row=>dirty.get(row.id)||row)})}
   if(l.error)setError(l.error.message);else setLogs((l.data||[]) as Log[])
   setLoading(false)
  },[workspaceId])
@@ -89,7 +89,7 @@ export default function LinkedInDiscoveryApp({workspaceId,userId}:{workspaceId:s
  const saveRows=async(rows:Candidate[])=>{
   if(!rows.length)return
   setBusy(true);setError('')
-  try{const result=await invoke('save_candidates',{changes:rows.map(row=>({id:row.id,clean_status:row.clean_status,selected_for_enrichment:row.selected_for_enrichment,full_name:row.full_name||'',headline:row.headline||'',job_title:row.job_title||'',company_name:row.company_name||'',country:row.country||'',location:row.location||''}))});setNotice(`已保存 ${result.saved} 条清洗记录，当前选中 ${result.selected} 条`);await refreshRunData(activeRunId);await refreshRuns()}catch(e){setError(e instanceof Error?e.message:'保存失败')}finally{setBusy(false)}
+  try{const result=await invoke('save_candidates',{changes:rows.map(row=>({id:row.id,clean_status:row.clean_status,selected_for_enrichment:row.selected_for_enrichment,full_name:row.full_name||'',headline:row.headline||'',job_title:row.job_title||'',company_name:row.company_name||'',country:row.country||'',location:row.location||''}))});setNotice(`已保存 ${result.saved} 条清洗记录，当前选中 ${result.selected} 条`);setCandidates(current=>current.map(row=>({...row,dirty:false})));await refreshRunData(activeRunId);await refreshRuns()}catch(e){setError(e instanceof Error?e.message:'保存失败')}finally{setBusy(false)}
  }
  const keepAll=()=>setCandidates(rows=>rows.map(row=>({...row,clean_status:'keep',selected_for_enrichment:true,dirty:true})))
  const visibleCandidates=useMemo(()=>candidates.filter(row=>(filter==='all'||row.clean_status===filter)&&(!tableQuery||[row.full_name,row.headline,row.job_title,row.company_name,row.country,row.profile_url,row.contact_email].some(x=>String(x||'').toLowerCase().includes(tableQuery.toLowerCase())))),[candidates,filter,tableQuery])
