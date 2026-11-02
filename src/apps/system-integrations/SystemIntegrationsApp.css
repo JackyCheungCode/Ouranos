@@ -166,7 +166,7 @@
 .odoo-actor-feedback.success{border-color:#cbded0;background:#f1f7f2;color:#54735c}
 .odoo-actor-feedback.error{border-color:#e8ceca;background:#fff5f3;color:#a34f47}
 .odoo-actor-workspace{display:grid;grid-template-columns:180px minmax(270px,340px) minmax(360px,1fr);min-height:570px;border:1px solid var(--oa-line);border-radius:6px;background:var(--oa-panel);overflow:hidden}
-.odoo-actor-sidebar{padding:12px 8px;border-right:1px solid var(--oa-line);background:var(--oa-soft)}
+.odoo-actor-sidebar{padding:12px 8px;border-right:1px solid var(--oa-line);background:var(--oa-soft);overflow-y:auto;max-height:750px}
 .odoo-actor-side-title{display:flex;align-items:center;gap:7px;margin:0 7px 9px;color:var(--oa-muted);font-size:10px;font-weight:750}
 .odoo-actor-sidebar>button{display:flex;align-items:center;justify-content:space-between;width:100%;gap:8px;padding:8px 9px;margin:2px 0;border:0;border-radius:4px;background:transparent;color:var(--oa-ink);font-size:10px;text-align:left;cursor:pointer}
 .odoo-actor-sidebar>button:hover{background:var(--oa-panel)}
