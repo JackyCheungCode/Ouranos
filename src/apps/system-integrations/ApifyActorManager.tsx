@@ -77,7 +77,7 @@ export default function ApifyActorManager({canSync}:{canSync:boolean}){
     const value=raw[key]??''
     if(schema.required?.includes(key)&&(value===''||value===undefined||value===null))throw new Error(`必填字段未填写：${field.title||key}`)
     if(field.type==='boolean')output[key]=Boolean(value)
-    else if(field.type==='integer'){if(value!=='')output[key]=Number(value)}
+    else if(field.type==='integer'||field.type==='number'){if(value!==''){const parsed=Number(value);if(!Number.isFinite(parsed))throw new Error(`字段格式不正确：${field.title||key}`);output[key]=parsed}}
     else if(field.type==='array'||field.type==='object'){if(String(value).trim())output[key]=JSON.parse(String(value))}
     else if(value!=='')output[key]=String(value)
    }
