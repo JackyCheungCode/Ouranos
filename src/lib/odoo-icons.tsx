@@ -1,10 +1,10 @@
 import type { CSSProperties, HTMLAttributes } from 'react'
-import React from 'react'
+import type React from 'react'
 
 type IconProps = HTMLAttributes<HTMLElement> & { size?: number | string; strokeWidth?: number; fill?: string; color?: string }
 const icon = (glyph: string) => function OdooIcon({ size, fill, color, style, ...props }: IconProps) {
   const merged: CSSProperties = { fontSize: typeof size === 'number' ? size : size, color, ...style }
-  return <i {...props} className={['fa-solid', 'fa-' + glyph, props.className].filter(Boolean).join(' ')} style={merged} aria-hidden={props['aria-hidden'] ?? true} />
+  return <i {...props} className={['fas', 'fa-' + glyph, props.className].filter(Boolean).join(' ')} style={merged} aria-hidden={props['aria-hidden'] ?? true} />
 }
 export const Activity = icon('chart-line')
 export const ArrowLeft = icon('arrow-left')
