@@ -282,14 +282,14 @@ export default function LeadFinderApp() {
  const visibleChannels = channelGroups.map(g=>({...g,channels:g.channels.filter(c=>(c.name+c.detail+c.providers.join('')).toLowerCase().includes(channelQuery.toLowerCase()))})).filter(g=>g.channels.length)
 
  return <div className="lead-workspace">
-  <div className="lead-page-head"><div><div className="lead-eyebrow">LEAD DEVELOPMENT</div><h1>线索发现</h1></div><div className="lead-head-actions"><span className="lead-mode-pill"><Sparkles size={14}/> AI 辅助</span></div></div>
+  <div className="lead-page-head"><div className="lead-page-title"><Target size={23} strokeWidth={1.8}/><h1>线索发现</h1></div><div className="lead-head-actions"><span className="lead-mode-pill"><Sparkles size={14}/> AI 辅助</span></div></div>
   <div className="lead-tabs" role="tablist" aria-label="潜在客户搜索导航">
    <button className={tab==='search'?'active':''} onClick={()=>{setTab('search');setActiveTask(null);setSelectedDiscoveryPage(null)}}><Target size={16}/> 创建搜索</button>
-   <button className={tab==='tasks'?'active':''} onClick={()=>{setTab('tasks');setActiveTask(null)}}><Workflow size={16}/> 搜索任务 <span>{tasks.length}</span></button>
+   {!selectedDiscoveryPage&&<button className={tab==='tasks'?'active':''} onClick={()=>{setTab('tasks');setActiveTask(null)}}><Workflow size={16}/> 搜索任务 <span>{tasks.length}</span></button>}
   </div>
 
   {tab==='search'&&(selectedDiscoveryPage ? <div className="ldp-selected-page">
-   <div className="ldp-selected-head"><button type="button" onClick={()=>setSelectedDiscoveryPage(null)}>← 返回 12 类发现入口</button><div><h2>{selectedDiscoveryPage.title}</h2><p>{selectedDiscoveryPage.description}</p></div></div>
+   <div className="ldp-selected-head"><button type="button" onClick={()=>setSelectedDiscoveryPage(null)}>← 返回 12 类发现入口</button>{selectedDiscoveryPage.id!=='linkedin-candidates'&&<div><h2>{selectedDiscoveryPage.title}</h2><p>{selectedDiscoveryPage.description}</p></div>}</div>
    {selectedDiscoveryPage.id==='linkedin-candidates' ? <LinkedInDiscoveryApp workspaceId={workspace?.id||''} userId={user?.id||''}/> : <LeadDiscoveryWizard key={selectedDiscoveryPage.id} page={selectedDiscoveryPage} workspaceId={workspace?.id||''} userId={user?.id||''} onTaskCreated={()=>{void refreshTasks();setTab('tasks');setSelectedDiscoveryPage(null)}}/>}
   </div> : <DiscoveryPageHub onSelect={setSelectedDiscoveryPage}/>)}
 
