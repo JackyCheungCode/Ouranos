@@ -117,3 +117,8 @@
 .apify-output-review-note b{font-size:12px;color:#4f4050}
 .apify-output-review-note span{font-weight:700;color:#805e7d}
 .apify-output-review-note small{font-size:11px;line-height:1.55;color:#817783}
+
+.apify-output-review-types{display:flex;gap:18px;flex-wrap:wrap}
+.apify-output-review-types label{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#5e5361}
+.apify-output-review-note textarea{width:100%;min-height:56px;resize:vertical;border:1px solid #ddd4df;border-radius:5px;padding:8px;font:inherit;font-size:11px;color:#4e4651;background:#fff}
+.apify-output-review-note .apify-save-inputs{align-self:flex-start}
