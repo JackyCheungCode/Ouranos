@@ -116,7 +116,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  useEffect(()=>{let active=true;if(!supabase){setDirectoryReady(true);return}
   Promise.all([
    supabase.from('discovery_platforms').select('platform_key,platform_name,category_key,search_terms,description,sort_order').eq('is_active',true).order('sort_order'),
-   supabase.from('discovery_providers').select('provider_key,provider_name,provider_type,description,is_active,sort_order').eq('is_active',true).order('sort_order')
+   supabase.from('discovery_providers').select('provider_key,provider_name,provider_type,description,is_active').eq('is_active',true).order('provider_name')
   ]).then(([platformResult,providerResult])=>{if(!active)return;if(!platformResult.error&&platformResult.data?.length)setDirectoryPlatforms(platformResult.data as DirectoryPlatform[]);if(!providerResult.error&&providerResult.data?.length)setDirectoryProviders(providerResult.data as DirectoryProvider[]);setDirectoryReady(true)},()=>{if(active)setDirectoryReady(true)});
   return()=>{active=false}},[])
  const [countryCode,setCountryCode] = useState('')
@@ -216,7 +216,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
 
  useEffect(()=>{ setActor(null); setSchema(null); setActors([]); setValues({});  setError(''); setNotice('') },[channel])
  useEffect(()=>{ setActor(null);setSchema(null);setValues({});setError('');setNotice('') },[provider])
- useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label)},[channel])
+ useEffect(()=>{const group=platformGroups.find(g=>g.items.some(([id])=>id===channel));if(group)setExpandedPlatformGroup(group.label);const current=directoryPlatforms.find(item=>item.platform_key===channel);if(current)setSelectedCategory(current.category_key)},[channel,directoryPlatforms])
  useEffect(()=>{
   let active=true
   if(!countryCode){setRegionResults([]);setRegion('__all__');setRegionManual('');setCity('');setMapLocation(null);setRegionLoadError('');setLocationBusy(false);return}
