@@ -209,7 +209,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const visiblePlatforms = pagePlatforms.filter(item=>item.category_key===selectedCategory)
  const categoryLabels:Record<string,string>={social:'社交媒体',search:'搜索与地图',b2b:'B2B 商业平台',commerce:'电商平台',web:'企业网站与商业数据'}
  const canSearchSelectedProvider = provider.toLowerCase()==='apify'
- useEffect(()=>{const first=directoryPlatforms.find(item=>page.platformKeys.includes(item.platform_key));if(first){if(!page.platformKeys.includes(channel))setChannel(first.platform_key);setSelectedCategory(first.category_key);setActorQuery(first.search_terms||first.platform_name)}},[page.id,directoryPlatforms])
+ useEffect(()=>{const first=page.platformKeys.map(key=>directoryPlatforms.find(item=>item.platform_key===key)).find((item):item is DirectoryPlatform=>Boolean(item));if(first){if(!page.platformKeys.includes(channel))setChannel(first.platform_key);setSelectedCategory(first.category_key);setActorQuery(first.search_terms||first.platform_name)}},[page.id,directoryPlatforms])
  const selectedCountry = countries.find(c=>c.code===countryCode)
  const selectedCountryItems = countries.filter(c=>selectedCountries.includes(c.code))
  const toggleCountry = (code:string) => {
