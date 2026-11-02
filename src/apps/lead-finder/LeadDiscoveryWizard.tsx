@@ -568,7 +568,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   return model+price
  }
  return <div className="ldw-shell ldw-manual-first">
-  <div className="ldw-workflow-head"><div><span className="ldw-eyebrow">MANUAL DISCOVERY</span><h2>{page.title} · 数据源配置</h2><p>{page.description} Facebook 个人客户发现使用统一中文表单；选择 Actor 后由系统转换其专属参数。</p></div>{page.id!=='facebook-pages'&&{page.id!=='facebook-pages'&&<button type="button" className="ldw-ai-sidebar-trigger" aria-expanded={aiSidebarOpen} onClick={()=>setAiSidebarOpen(value=>!value)}><Sparkles size={14}/>{aiSidebarOpen?'收起 AI 助手':'打开 AI 助手'}</button>}}</div>
+  <div className="ldw-workflow-head"><div><span className="ldw-eyebrow">MANUAL DISCOVERY</span><h2>{page.title} · 数据源配置</h2><p>{page.description} {page.id==='facebook-pages'?'Facebook 个人客户发现使用统一中文表单；选择 Actor 后由系统转换其专属参数。':'选择平台、服务商和 Actor 后，系统读取真实 Schema 并生成中文参数表单。'}</p></div>{page.id!=='facebook-pages'&&<button type="button" className="ldw-ai-sidebar-trigger" aria-expanded={aiSidebarOpen} onClick={()=>setAiSidebarOpen(value=>!value)}><Sparkles size={14}/>{aiSidebarOpen?'收起 AI 助手':'打开 AI 助手'}</button>}</div>
   <div className="ldp-page-context"><div><b>本页重点筛选</b><span>{page.filters.join(' · ')}</span></div><div><b>目标客户资料</b><span>{page.outputs}</span></div><small>{page.rule}</small></div>
   <div className="ldw-manual-layout">
    <main className="ldw-manual-main">
