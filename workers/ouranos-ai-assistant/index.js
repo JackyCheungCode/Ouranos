@@ -122,25 +122,34 @@ function isRecord(value) {
 }
 async function runIntent(env, model, body, origin) {
   const platforms = Array.isArray(body.supported_platforms) ? body.supported_platforms.slice(0, 80) : [];
+  const candidates = Array.isArray(body.actor_candidates) ? body.actor_candidates.slice(0, 16).map(item => ({
+    id: clip(item?.id || "", 180), actor_id: clip(item?.actor_id || "", 180),
+    name: clip(item?.name || "", 220), description: clip(item?.description || "", 700),
+    pricing: clip(item?.pricing || "", 220),
+  })) : [];
   const conversation = normalizeHistory(body.conversation);
   const system = [
-    "你是 Ouranos 的业务需求接待助手。用简体中文理解用户目标，识别用户明确提到或可可靠推断的平台。",
+    "你是 Ouranos 的业务需求接待与采集器推荐助手。用简体中文理解用户目标，识别最合适的平台。",
     "platform_id 必须来自 supported_platforms；无法确定时返回 null。不要编造平台 ID。",
-    "一次只问一个最重要的澄清问题。Actor 未选择前不生成 Actor 参数。提醒用户手动搜索并选择 Actor，之后根据该 Actor 的真实 Schema 继续确认。",
-    "不得承诺平台不提供的隐私数据。只返回 JSON：{platform_id:string|null,assistant_message:string,summary:string,clarifying_question:string|null}。",
+    "如果提供 actor_candidates，必须从候选项中选择最适合用户目标的一个，recommended_actor_id 必须使用候选项的 id 或 actor_id 原值；如果没有真正匹配的候选项，返回 null 并解释原因。比较采集能力与用户目标，不以人气作为唯一标准。",
+    "如果尚缺少决定平台或采集目标的关键信息，一次只问一个最重要的问题。Actor 未读取 Schema 前不生成参数。",
+    "不得承诺平台不提供的隐私数据；候选 Actor 只能采集其描述和能力明确支持的数据。只返回 JSON：{platform_id:string|null,recommended_actor_id:string|null,assistant_message:string,summary:string,clarifying_question:string|null}。",
   ].join("\n");
   const input = {
     messages: [{ role: "system", content: system }, { role: "user", content: JSON.stringify({
       user_request: clip(body.user_request || "", 3500), conversation,
-      supported_platforms: platforms,
+      supported_platforms: platforms, actor_candidates: candidates,
     }) }],
-    response_format: { type: "json_object" }, max_tokens: 1100, temperature: 0.2,
+    response_format: { type: "json_object" }, max_tokens: 1500, temperature: 0.2,
   };
   const intent = parseAiJson(await env.AI.run(model, input));
   const requestedPlatform = String(intent.platform_id || "");
   const platformId = platforms.some(item => item.id === requestedPlatform) ? requestedPlatform : null;
+  const requestedActor = String(intent.recommended_actor_id || "");
+  const recommendedActorId = candidates.some(item => item.id === requestedActor || item.actor_id === requestedActor) ? requestedActor : null;
   return json({ ok: true, mode: "intent", model, platform_id: platformId,
-    assistant_message: clip(intent.assistant_message || "我已记录你的需求。请展开手动配置，选择平台和 Actor。", 1600),
+    recommended_actor_id: recommendedActorId,
+    assistant_message: clip(intent.assistant_message || "我已理解你的需求，正在确认合适的平台和采集器。", 1600),
     summary: clip(intent.summary || "", 700),
     clarifying_question: intent.clarifying_question ? clip(intent.clarifying_question, 500) : null,
   }, 200, origin);
