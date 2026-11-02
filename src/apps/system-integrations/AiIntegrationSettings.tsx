@@ -48,7 +48,7 @@ export default function AiIntegrationSettings({initialProviderKey='openai'}:{ini
     <div className="ai-config-block"><div className="ai-block-title"><div><h4>连接凭证</h4><p>先填写密钥，再获取模型列表。密钥不会回显，也不会保存在浏览器本地。</p></div><span className={'ai-state '+(row?row.is_enabled?'connected':'configured':'')}>{statusText(row)}</span></div>
      {provider.kind==='workers-ai'&&<label>Cloudflare Account ID<input value={accountId} onChange={e=>setAccountId(e.target.value)} placeholder="Cloudflare 账户 ID"/></label>}
      {provider.kind==='custom'&&<label>API Base URL<input value={baseUrl} onChange={e=>setBaseUrl(e.target.value)} placeholder="https://your-api.example.com/v1"/></label>}
-     {provider.kind!=='custom'&&provider.kind!=='workers-ai'&&provider.endpoint&&<label>API Base URL <small>可修改为兼容代理地址</small><input value={baseUrl} onChange={e=>setBaseUrl(e.target.value)} placeholder={provider.endpoint}/></label>}
+
      <label>{provider.kind==='workers-ai'?'Cloudflare API Token':'API Key'}<input type="password" autoComplete="new-password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder={configured?'已保存密钥不会回显；输入新值可轮换':'粘贴服务商 API Key / Token'}/></label>
      <div className="ai-action-row"><button className="ai-secondary" disabled={loading||!apiKey.trim()} onClick={()=>void fetchModels()}><RefreshCw size={14} className={loading?'ai-spin':''}/>{loading?'正在获取…':'获取模型列表'}</button><span>支持自动获取与手动选择模型</span></div>
     </div>
