@@ -63,7 +63,7 @@ export default function DiscoveryPageHub({ onSelect }: { onSelect: (page: Discov
         return <button type="button" className="ldp-card" key={page.id} onClick={()=>onSelect(page)}>
           <span className="ldp-card-icon"><Icon size={19}/></span>
           <span className="ldp-card-main"><b>{page.title}</b><small>{page.subtitle}</small><span>{page.description}</span></span>
-          <span className="ldp-card-meta"><span>{page.platformNames.slice(0,4).join(' · ')}{page.platformNames.length>4?' 等':''}</span><i>进入页面 →</i></span>
+          <span className="ldp-card-meta"><span>{page.platformNames.slice(0,4).join(' · ')}{page.platformNames.length>4?' 等':''}</span><span>主要条件：{page.filters.slice(0,3).join(' · ')}</span><i>进入页面 →</i></span>
         </button>
       })}</div>
     </section>)}
