@@ -536,7 +536,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   <div className="ldp-page-context"><div><b>本页重点筛选</b><span>{page.filters.join(' · ')}</span></div><div><b>目标客户资料</b><span>{page.outputs}</span></div><small>{page.rule}</small></div>
   <div className="ldw-manual-layout">
    <main className="ldw-manual-main">
-    <>
+    {page.id !== "facebook-pages" && <>
     <section className="ldw-card">
      <div className="ldw-step-title"><span>1</span><div><h3>选择发现类别</h3><p>当前入口：{page.title}。平台范围已按该页面限定。</p></div></div>
      {directoryReady&&categories.length>0?<div className="ldw-category-grid">{categories.map(key=><button type="button" key={key} className={selectedCategory===key?'selected':''} onClick={()=>{setSelectedCategory(key);const first=directoryPlatforms.find(item=>item.category_key===key);if(first)setChannel(first.platform_key)}}>{categoryLabels[key]||key}</button>)}</div>:<div className="ldw-loading">{directoryReady?'平台目录暂不可用，请刷新页面重试。':'正在同步平台目录…'}</div>}
