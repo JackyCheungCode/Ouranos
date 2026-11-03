@@ -172,3 +172,16 @@
 .li-hero-copy{display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-width:0}
 .li-hero h2{font-size:22px;font-weight:650;line-height:1.3;color:#34313a;margin:5px 0 0}
 @media(max-width:680px){.li-hero h2{font-size:20px}}
+
+
+/* Shared discovery loading and durable raw-result table */
+@keyframes ouranos-spin { to { transform: rotate(360deg); } }
+.lead-spin,.ldw-spin { animation: ouranos-spin .9s linear infinite; display:inline-block; vertical-align:middle; }
+.lead-raw-table-wrap { width:100%; overflow:auto; border:1px solid var(--line,#e5e7eb); border-radius:12px; }
+.lead-raw-table { width:100%; min-width:760px; border-collapse:collapse; font-size:13px; }
+.lead-raw-table th,.lead-raw-table td { padding:11px 12px; border-bottom:1px solid var(--line,#e5e7eb); text-align:left; vertical-align:top; }
+.lead-raw-table th { position:sticky; top:0; background:var(--surface,#f8fafc); color:var(--muted,#64748b); font-weight:650; white-space:nowrap; }
+.lead-raw-table tbody tr:last-child td { border-bottom:0; }
+.lead-raw-table td a { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+.lead-raw-table td .lead-quiet-button { padding:5px 8px; }
+.lead-raw-table .lead-raw-result-json { min-width:0; max-width:100%; white-space:pre-wrap; overflow-wrap:anywhere; }
