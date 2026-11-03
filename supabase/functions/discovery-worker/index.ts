@@ -19,9 +19,9 @@ async function processItems(run:Record<string,unknown>,items:unknown[],admin:str
  let savedCount=0;
  for(const raw of items){
   const payload=raw&&typeof raw==="object"?raw:{value:raw};
-  const sourceUrl=asText(mapped(raw,{},"source_url",["url","sourceUrl","profileUrl","profile_url","link","website"]))||null;
-  const sourceTitle=asText(getPath(raw,"name"))||asText(getPath(raw,"fullName"))||asText(getPath(raw,"username"))||asText(getPath(raw,"title"))||null;
-  const stableId=asText(getPath(raw,"id"))||asText(getPath(raw,"userId"))||asText(getPath(raw,"profileId"))||sourceUrl||await hash(JSON.stringify(payload));
+  const sourceUrl=asText(mapped(raw,{},"source_url",["url","sourceUrl","pageUrl","profileUrl","profile_url","groupUrl","eventUrl","postUrl","commentUrl","reelUrl","listingUrl","adUrl","permalink","link","website"]))||null;
+  const sourceTitle=asText(getPath(raw,"name"))||asText(getPath(raw,"pageName"))||asText(getPath(raw,"groupTitle"))||asText(getPath(raw,"eventName"))||asText(getPath(raw,"listingTitle"))||asText(getPath(raw,"productTitle"))||asText(getPath(raw,"fullName"))||asText(getPath(raw,"username"))||asText(getPath(raw,"caption"))||asText(getPath(raw,"postText"))||asText(getPath(raw,"text"))||asText(getPath(raw,"title"))||null;
+  const stableId=asText(getPath(raw,"id"))||asText(getPath(raw,"facebookId"))||asText(getPath(raw,"pageId"))||asText(getPath(raw,"postId"))||asText(getPath(raw,"groupId"))||asText(getPath(raw,"eventId"))||asText(getPath(raw,"reelId"))||asText(getPath(raw,"adArchiveId"))||asText(getPath(raw,"listingId"))||asText(getPath(raw,"commentId"))||asText(getPath(raw,"userId"))||asText(getPath(raw,"profileId"))||sourceUrl||await hash(JSON.stringify(payload));
   const rows=await insertRows(
    "lead_source_records?on_conflict=workspace_id,task_id,provider_key,channel_key,external_record_id&select=id",
    [{workspace_id:run.workspace_id,task_id:run.task_id,provider_key:run.provider_key,channel_key:run.channel_key,external_record_id:stableId,source_url:sourceUrl,source_title:sourceTitle,raw_payload:payload}],
@@ -69,7 +69,7 @@ async function processRun(run:Record<string,unknown>,admin:string){
   const usage=obj(started.usage);if(cookieSecretRef){await rest("rpc/integration_secret_delete",admin,{method:"POST",body:JSON.stringify({p_secret_id:cookieSecretRef})});delete config.login_cookies_secret_ref;}
   if(await taskIsCancelled(String(run.task_id),workspaceId,admin)){await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status:'cancelled',provider_job_id:started.providerJobId,provider_status:'cancelled',locked_by:null,lease_expires_at:null,completed_at:new Date().toISOString(),updated_at:new Date().toISOString()})});return;}
   if(started.state==="completed"){
-   const items=extractItems(started.raw);const counts=await processItems(run,items,admin);await logTask(String(run.task_id),workspaceId,run,'completed','服务商同步返回结果，原始结果已保存；标准线索转换为独立步骤',admin,{item_count:items.length});
+   const items=extractItems(started.raw);const counts=await processItems(run,items,admin);await logTask(String(run.task_id),workspaceId,run,'completed','服务商同步返回结果，Actor 原始记录已完整保存',admin,{item_count:items.length});
    const costValue=usage.cost_usd??(usage.currency?usage.actual_cost??usage.cost:provider==="kuajingmofang"?usage.actual_cost??usage.cost:undefined);const cost=Number(costValue);const costCurrency=String(usage.currency||(usage.cost_usd?"USD":provider==="kuajingmofang"?"CNY":run.cost_currency||"USD"));
    await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:"completed",provider_job_id:started.providerJobId,provider_cursor:started.cursor||null,provider_status:"completed",adapter_config_snapshot:config,records_found:items.length,completed_at:now,lease_expires_at:null,locked_by:null,usage_metrics:usage,billing_details:{...obj(run.billing_details),usage},actual_cost:Number.isFinite(cost)&&cost>0?cost:null,cost_currency:costCurrency,result_summary:{...counts,item_count:items.length},updated_at:now})});
   }else{
