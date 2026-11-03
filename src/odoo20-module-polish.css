@@ -1,0 +1,55 @@
+/* Final module alignment: LinkedIn and provider configuration pages. */
+.ouranos-platform .linkedin-discovery { gap:12px; padding:14px 20px 24px; color:#383838; }
+.ouranos-platform .li-hero { padding:0 0 13px; background:transparent; border-bottom:1px solid #dedede; }
+.ouranos-platform .li-hero h2 { margin:0; font-size:23px; font-weight:650; letter-spacing:-.4px; }
+.ouranos-platform .li-hero p,.ouranos-platform .li-hero .li-eyebrow,.ouranos-platform .li-hero-mark { display:none; }
+.ouranos-platform .li-wizard { background:#fff; border:1px solid #dedede; border-radius:8px; overflow:hidden; }
+.ouranos-platform .li-wizard button { padding:11px 16px; border-bottom-width:2px; font-size:11px; }
+.ouranos-platform .li-panel { padding:16px; border:1px solid #dedede; border-radius:8px; }
+.ouranos-platform .li-panel-title { align-items:center; margin-bottom:12px; }
+.ouranos-platform .li-panel-title h3 { margin:0; font-size:14px; font-weight:650; }
+.ouranos-platform .li-panel-title p { display:none; }
+.ouranos-platform .li-field-label { color:#4c4c4c; font-size:11px; font-weight:600; }
+.ouranos-platform .li-metrics,.ouranos-platform .li-enrich-summary { border-color:#e5e5e5; }
+.ouranos-platform .li-metrics b,.ouranos-platform .li-enrich-summary b { color:#454545; font-size:19px; }
+.ouranos-platform .li-table-wrap { border:1px solid #e2e2e2; border-radius:7px; overflow:auto; }
+.ouranos-platform .li-candidate-table th,.ouranos-platform .li-final-table th { background:#f0f0f0; color:#555; }
+.ouranos-platform .li-policy-note { border-radius:6px; background:#f7f7f7; }
+.ouranos-platform .li-notice { border-radius:6px; }
+.ouranos-platform .li-empty { border:1px dashed #d8d8d8; border-radius:7px; }
+.ouranos-platform .api-settings-header,
+.ouranos-platform .ai-settings-head { padding:0 0 14px; margin-bottom:16px; border-bottom:1px solid #dedede; }
+.ouranos-platform .api-settings-header h1,
+.ouranos-platform .ai-settings-head h1 { margin:0; font-size:22px; font-weight:650; }
+.ouranos-platform .api-settings-eyebrow,
+.ouranos-platform .ai-settings-eyebrow,
+.ouranos-platform .api-provider-description,
+.ouranos-platform .ai-provider-detail p,
+.ouranos-platform .ai-security-foot { display:none; }
+.ouranos-platform .api-settings-layout,
+.ouranos-platform .ai-settings-layout { gap:14px; }
+.ouranos-platform .api-provider-list,
+.ouranos-platform .api-provider-detail,
+.ouranos-platform .ai-provider-list,
+.ouranos-platform .ai-provider-detail,
+.ouranos-platform .api-config-section,
+.ouranos-platform .ai-config-block,
+.ouranos-platform .ai-model-block { border-radius:8px; border-color:#dedede; box-shadow:none; }
+.ouranos-platform .api-provider-list-title,
+.ouranos-platform .ai-provider-list-title { padding:12px 14px; background:#f5f5f5; }
+.ouranos-platform .api-provider-name,
+.ouranos-platform .ai-provider-label { font-size:12px; font-weight:600; }
+.ouranos-platform .api-provider-detail-head,
+.ouranos-platform .ai-provider-title { padding-bottom:12px; border-bottom:1px solid #e7e7e7; }
+.ouranos-platform .api-config-section-title,
+.ouranos-platform .ai-block-title { font-size:13px; font-weight:650; }
+.ouranos-platform .ai-primary,
+.ouranos-platform .api-settings button[class*="primary"] { border-radius:6px; }
+.ouranos-platform .api-settings-summary,
+.ouranos-platform .ai-settings-summary { border-radius:7px; }
+@media(max-width:720px) {
+ .ouranos-platform .linkedin-discovery { padding:10px 12px 18px; }
+ .ouranos-platform .li-wizard { overflow-x:auto; }
+ .ouranos-platform .li-wizard button { flex:none; }
+ .ouranos-platform .api-settings-layout,.ouranos-platform .ai-settings-layout { grid-template-columns:1fr; }
+}
