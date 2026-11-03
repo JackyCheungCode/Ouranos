@@ -22,7 +22,7 @@ export const platformApps: PlatformApp[] = [
     icon: 'fas fa-search',
     color: '#714B67',
     category: '客户开发',
-    navigation: ['发现平台', '采集任务', '采集数据'],
+    navigation: ['发现平台', '采集任务', '采集数据', '线索收件箱'],
   },
   {
     id: 'settings',
@@ -33,7 +33,7 @@ export const platformApps: PlatformApp[] = [
     icon: 'fas fa-sliders-h',
     color: '#65758B',
     category: '管理',
-    navigation: ['数据服务', 'AI 模型', '工作空间'],
+    navigation: ['设置概览', 'API 集成设置', 'AI 集成'],
   },
 ]
 
