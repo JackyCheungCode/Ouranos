@@ -4,6 +4,7 @@ import AppShell from './platform/AppShell'
 import './index.css'
 import './platform/platform.css'
 import './odoo20-frost-theme.css'
+import './odoo20-unified.css'
 
 function AppContent() {
   const { user, workspace, loading, configured } = useAuth()
