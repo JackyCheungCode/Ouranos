@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { getProviderAdapter, type AdapterContext, type ProviderKey } from "../_shared/provider-adapters.ts";
+import { getProviderAdapter, type AdapterContext, type ProviderKey } from "./_shared/provider-adapters.ts";
 
 const WORKER_SECRET_ID="8052bb93-5044-4e23-a0ac-481bfb7fbadf";
 function serviceKey(){const legacy=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");if(legacy)return legacy;const keys=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")??"{}");return keys.default as string|undefined;}
