@@ -117,6 +117,9 @@ function MarketMap({selected,location}:{selected:typeof countries;location:MapLo
 }
 
 export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated, page }: Props) {
+ const isFacebookPeople=page.id==='facebook-pages'
+ const isFacebookMatrix=page.id==='facebook-matrix'
+ const facebookMatrixActorId='get-leads~all-in-one-facebook-scraper'
  const [channel,setChannel] = useState(page.platformKeys[0] || 'google-maps')
  const [provider,setProvider] = useState('Apify')
  const [directoryPlatforms,setDirectoryPlatforms] = useState<DirectoryPlatform[]>([])
@@ -534,9 +537,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   void sendAssistantTurn(chatMessages,aiRequest)
  },[schema,actor?.id,aiContextKey])
  const startSearch = async () => {
-  const isFacebookPeople=page.id==='facebook-pages'
-  const isFacebookMatrix=page.id==='facebook-matrix'
-  const facebookMatrixActorId='get-leads~all-in-one-facebook-scraper'
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
   if(!actor){setError('请先选择一个 Facebook 个人资料 Actor。');return}
