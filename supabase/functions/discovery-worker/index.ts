@@ -20,26 +20,16 @@ async function processItems(run:Record<string,unknown>,items:unknown[],admin:str
  for(const raw of items){
   const companyName=asText(mapped(raw,mapping,"company_name",["company.name","organization.name","companyName","businessName","company_name"]));
   const contactName=asText(mapped(raw,mapping,"contact_name",["contact.name","fullName","full_name","person.name","person_name"]));
-  if(!companyName&&!contactName){skippedCount++;continue;}processedCount++;
-  const website=asText(mapped(raw,mapping,"website",["website","websiteUrl","company.website","url"]));
-  const email=asText(mapped(raw,mapping,"email",["email","emailAddress","contact.email"]));
-  const phone=asText(mapped(raw,mapping,"phone",["phone","phoneNumber","contact.phone"]));
-  const countryName=asText(mapped(raw,mapping,"country_name",["country","countryName","location.country"]));
-  const countryCode=asText(mapped(raw,mapping,"country_code",["countryCode","country_code"])).toUpperCase();
-  const address=asText(mapped(raw,mapping,"address",["address","fullAddress","location.address"]));
-  const jobTitle=asText(mapped(raw,mapping,"job_title",["jobTitle","title","position"]));
-  const department=asText(mapped(raw,mapping,"department",["department"]));
-  const productCategories=categories(mapped(raw,mapping,"product_categories",["categories","industries","productCategories"]));
-  const socialLinks=obj(mapped(raw,mapping,"social_links",["socialLinks","social_profiles"]));
-  const description=asText(mapped(raw,mapping,"description",["description","summary","about"]));
-  const employeeRange=asText(mapped(raw,mapping,"employee_range",["employeeRange","companySize","employees"]));
   const sourceUrl=asText(mapped(raw,mapping,"source_url",["url","sourceUrl","profileUrl","link","website"]));
-  const sourceTitle=companyName||contactName||asText(getPath(raw,"title"))||null;
-  const externalId=asText(mapped(raw,mapping,"external_record_id",["id","externalId","placeId","profileId"]))||await hash(JSON.stringify(raw));
+  const sourceTitle=companyName||contactName||asText(mapped(raw,mapping,"contact_name",["name","fullName","full_name","title","username"]))||asText(getPath(raw,"title"))||asText(getPath(raw,"name"))||null;
+  const externalId=asText(mapped(raw,mapping,"external_record_id",["id","externalId","placeId","profileId","userId"]))||sourceUrl||await hash(JSON.stringify(raw));
+  // Persist every provider row as source evidence, even when it cannot yet be normalized
+  // into a company/contact. This keeps the original scrape reviewable and exportable.
   const sourceRows=await insertRows("lead_source_records?on_conflict=workspace_id,task_id,provider_key,channel_key,external_record_id&select=id",[{workspace_id:run.workspace_id,task_id:run.task_id,provider_key:run.provider_key,channel_key:run.channel_key,external_record_id:externalId,source_url:sourceUrl||null,source_title:sourceTitle,confidence:Number(mapped(raw,mapping,"confidence",["confidence","score"]))||null,raw_payload:raw&&typeof raw==="object"?raw:{value:raw}}],admin);
   let sourceId=sourceRows[0]?.id;
   if(!sourceId){const existingSource=await rest(`lead_source_records?select=id&workspace_id=eq.${encodeURIComponent(String(run.workspace_id))}&task_id=eq.${encodeURIComponent(String(run.task_id))}&provider_key=eq.${encodeURIComponent(String(run.provider_key))}&channel_key=eq.${encodeURIComponent(String(run.channel_key))}&external_record_id=eq.${encodeURIComponent(externalId)}&limit=1`,admin);if(existingSource.ok)sourceId=(await existingSource.json())[0]?.id;}
   if(!sourceId)throw new Error("Unable to resolve source evidence record ID");
+  if(!companyName&&!contactName){skippedCount++;continue;}processedCount++;
   let companyInboxId:string|null=null;
   if(companyName){
    const normalizedDomain=normalDomain(website);
