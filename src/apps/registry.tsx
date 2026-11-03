@@ -1,56 +1,86 @@
-import {
-  Activity, BarChart3, Bot, Building2, CalendarClock, Check, ClipboardList, Cloud,
-  Contact, Database, FileText, Globe2, LayoutDashboard, Mail, Network, Send,
-  Settings, ShieldCheck, Sparkles, Target, TrendingUp, Users, WandSparkles,
-  Workflow, Zap, Boxes, Layers3, Truck, Wallet, Headset, PackageCheck
-} from 'lucide-react'
+import { Settings, Target } from 'lucide-react'
 import type { AppItem, AppGroup } from './types'
 
+/**
+ * Active application launcher registry.
+ * Only modules mounted by AppShell belong in this list.
+ * Planned and prototype modules are documented separately in moduleRoadmap.
+ */
 export const groups: AppGroup[] = [
-  { id: 'workspace', title: '工作空间', subtitle: '集中处理日常工作与待办事项' },
-  { id: 'prospecting', title: '客户开发', subtitle: '发现潜在客户与目标企业' },
-  { id: 'sales', title: '销售管理', subtitle: '管理商机、报价与客户关系' },
-  { id: 'data', title: '数据智能', subtitle: '构建可信赖的商业数据资产' },
-  { id: 'ai', title: 'AI 智能', subtitle: '使用人工智能研究与自动化' },
-  { id: 'marketing', title: '营销中心', subtitle: '触达目标客户并开展营销活动' },
-  { id: 'analytics', title: '商业分析', subtitle: '洞察销售表现与市场机会' },
-  { id: 'admin', title: '系统管理', subtitle: '配置工作空间、成员与权限' },
+  { id: 'active', title: '当前可用', subtitle: '已接入真实业务页面与数据流程' },
 ]
+
 export const apps: AppItem[] = [
-  { id:'dashboard',name:'工作台',subtitle:'业务总览',group:'workspace',icon:LayoutDashboard,color:'#714B67',description:'集中查看客户开发、销售活动与团队绩效的整体情况。' },
-  { id:'activities',name:'我的待办',subtitle:'任务与提醒',group:'workspace',icon:CalendarClock,color:'#E08B36',description:'在统一工作区管理每日重点、客户跟进与待办提醒。' },
-  { id:'lead-finder',name:'潜在客户搜索',subtitle:'发现潜在客户',group:'prospecting',icon:Target,color:'#167D9A',description:'按国家、行业、产品和企业画像发现目标客户。' },
-  { id:'companies',name:'企业数据库',subtitle:'企业档案',group:'prospecting',icon:Building2,color:'#4776B8',description:'搜索企业资料、官方网站、所在地及商业信息。' },
-  { id:'contacts',name:'联系人搜索',subtitle:'寻找决策人',group:'prospecting',icon:Contact,color:'#239B82',description:'寻找采购经理、企业高管及其他关键业务联系人。' },
-  { id:'market-intel',name:'市场情报',subtitle:'市场研究',group:'prospecting',icon:Globe2,color:'#A16BB5',description:'研究市场需求、行业趋势、国家机会与潜在风险。' },
-  { id:'competitors',name:'竞争对手搜索',subtitle:'竞争格局',group:'prospecting',icon:Network,color:'#C16D4A',description:'梳理竞争企业、同类供应商、品牌及市场参与者。' },
-  { id:'crm',name:'客户关系管理',subtitle:'客户关系',group:'sales',icon:Users,color:'#714B67',description:'管理客户档案、联系人、沟通历史与负责人。' },
-  { id:'pipeline',name:'销售管道',subtitle:'商机阶段',group:'sales',icon:Workflow,color:'#168A9A',description:'跟踪从新线索、需求沟通到谈判及成交的每个商机。' },
-  { id:'quotations',name:'报价管理',subtitle:'价格与报价单',group:'sales',icon:FileText,color:'#C18A32',description:'创建、整理并跟踪客户报价单及商务条款。' },
-  { id:'orders',name:'销售订单',subtitle:'订单履约',group:'sales',icon:PackageCheck,color:'#168A9A',description:'从报价转订单，管理确认、备货、履约与交付。' },
-  { id:'shipments',name:'出货管理',subtitle:'仓储与物流',group:'sales',icon:Truck,color:'#4776B8',description:'管理拣货、质检、发货、物流追踪与签收。' },
-  { id:'invoices',name:'收款管理',subtitle:'应收与核销',group:'sales',icon:Wallet,color:'#239B82',description:'管理应收款、付款记录、部分收款与账款核销。' },
-  { id:'aftersales',name:'售后服务',subtitle:'服务与退换货',group:'sales',icon:Headset,color:'#A16BB5',description:'处理质量反馈、退换货、补发、退款及客户确认。' },
-  { id:'sales-activities',name:'销售活动',subtitle:'电话与会议',group:'sales',icon:ClipboardList,color:'#4776B8',description:'记录电话、会议、邮件以及下一次客户触达计划。' },
-  { id:'data-hub',name:'数据中心',subtitle:'统一数据集',group:'data',icon:Database,color:'#4776B8',description:'导入、整理和浏览来自多个渠道的商业数据。' },
-  { id:'providers',name:'数据源目录',subtitle:'服务商能力目录',group:'data',icon:Cloud,color:'#168A9A',description:'浏览外部数据服务商的能力与支持渠道，API 连接配置统一在系统集成中管理。' },
-  { id:'enrichment',name:'数据补全',subtitle:'完善数据档案',group:'data',icon:WandSparkles,color:'#A16BB5',description:'为企业和联系人档案补充更多商业信息。' },
-  { id:'cleaning',name:'数据清洗',subtitle:'质量与去重',group:'data',icon:Check,color:'#239B82',description:'标准化、验证并去除企业和联系人数据中的重复项。' },
-  { id:'trade',name:'贸易情报',subtitle:'进出口数据',group:'data',icon:Boxes,color:'#C16D4A',description:'分析贸易活动、产品编码、采购商、供应商与贸易趋势。' },
-  { id:'copilot',name:'AI 助手',subtitle:'智能工作助手',group:'ai',icon:Sparkles,color:'#714B9B',description:'通过自然语言查询数据，并获取 Ouranos 工作流程建议。' },
-  { id:'research',name:'AI 深度调研',subtitle:'企业深度研究',group:'ai',icon:Bot,color:'#4776B8',description:'生成有依据的企业、产品、行业与市场研究报告。' },
-  { id:'scoring',name:'线索评分',subtitle:'优先级排序',group:'ai',icon:TrendingUp,color:'#239B82',description:'根据理想客户画像评估线索，并解释每项评分依据。' },
-  { id:'agents',name:'AI 智能体',subtitle:'自动化工作流',group:'ai',icon:Zap,color:'#D28A36',description:'编排多步骤研究、数据补全与潜在客户筛选流程。' },
-  { id:'email-marketing',name:'邮件营销',subtitle:'邮件活动',group:'marketing',icon:Mail,color:'#4776B8',description:'创建定向邮件营销活动，并监控送达与互动情况。' },
-  { id:'sequences',name:'邮件序列',subtitle:'自动跟进',group:'marketing',icon:Send,color:'#239B82',description:'构建定时邮件跟进序列，并管理审批与退订设置。' },
-  { id:'campaigns',name:'营销活动',subtitle:'活动管理',group:'marketing',icon:Layers3,color:'#C16D4A',description:'统筹市场、产品、展会及客户开发营销活动。' },
-  { id:'templates',name:'模板中心',subtitle:'可复用内容',group:'marketing',icon:FileText,color:'#A16BB5',description:'保存可复用的客户开发邮件、报价、研究及 AI 提示词模板。' },
-  { id:'sales-analytics',name:'销售分析',subtitle:'销售表现',group:'analytics',icon:BarChart3,color:'#168A9A',description:'分析销售活动、转化率、销售管道健康度与团队表现。' },
-  { id:'market-analytics',name:'市场分析',subtitle:'市场表现',group:'analytics',icon:Globe2,color:'#4776B8',description:'洞察潜在客户分布、行业覆盖范围与市场机会。' },
-  { id:'users',name:'用户与团队',subtitle:'成员与组织',group:'admin',icon:Users,color:'#714B67',description:'管理工作空间成员、团队、数据归属与组织架构。' },
-  { id:'permissions',name:'角色与权限',subtitle:'访问控制',group:'admin',icon:ShieldCheck,color:'#239B82',description:'配置基于角色的访问权限，控制数据查看与修改范围。' },
-  { id:'settings',name:'系统设置',subtitle:'工作空间配置',group:'admin',icon:Settings,color:'#68758A',description:'配置工作空间偏好、默认选项及业务参数。' },
-  { id:'integrations',name:'系统集成',subtitle:'连接外部服务',group:'admin',icon:Network,color:'#C18A4A',description:'连接外部工具并配置获准使用的系统集成。' },
+  {
+    id: 'lead-development',
+    name: '线索发现',
+    subtitle: 'Lead Discovery',
+    group: 'active',
+    icon: Target,
+    color: '#714B67',
+    description: '发现公开潜在客户，管理采集任务、原始数据与线索审核。',
+  },
+  {
+    id: 'settings',
+    name: '系统管理',
+    subtitle: 'System Management',
+    group: 'active',
+    icon: Settings,
+    color: '#65758B',
+    description: '管理数据服务 API、Actor 目录与 AI 模型连接。',
+  },
 ]
-export const recentIds = ['lead-finder','companies','crm','market-intel']
-export const initialFavorites = ['dashboard','lead-finder','crm','research']
+
+export type ModuleStatus = 'active' | 'prototype' | 'planned' | 'merged'
+
+export type ModuleRoadmapItem = {
+  id: string
+  name: string
+  group: string
+  status: ModuleStatus
+  note: string
+}
+
+/**
+ * Product capability inventory, not a navigation source.
+ * "prototype" means the current page is local/demo state and is not persisted.
+ */
+export const moduleRoadmap: ModuleRoadmapItem[] = [
+  { id:'dashboard', name:'工作台', group:'工作空间', status:'planned', note:'尚无独立工作台页面。' },
+  { id:'activities', name:'我的待办', group:'工作空间', status:'prototype', note:'仅有通用演示工作流，尚未接入统一待办数据。' },
+  { id:'lead-finder', name:'线索发现', group:'客户开发', status:'active', note:'已接入发现入口、任务、采集数据与线索审核。' },
+  { id:'companies', name:'企业数据库', group:'客户开发', status:'prototype', note:'存在本地演示页面，尚未接入持久化企业档案。' },
+  { id:'contacts', name:'联系人搜索', group:'客户开发', status:'planned', note:'尚无独立联系人搜索模块。' },
+  { id:'market-intel', name:'市场情报', group:'客户开发', status:'planned', note:'尚无独立市场研究工作区。' },
+  { id:'competitors', name:'竞争对手搜索', group:'客户开发', status:'planned', note:'尚无独立竞品发现流程。' },
+  { id:'crm', name:'客户关系管理', group:'销售管理', status:'prototype', note:'存在本地演示记录，尚未接入 CRM 数据模型。' },
+  { id:'pipeline', name:'销售管道', group:'销售管理', status:'prototype', note:'当前为通用本地演示页面。' },
+  { id:'quotations', name:'报价管理', group:'销售管理', status:'prototype', note:'当前为通用本地演示页面。' },
+  { id:'orders', name:'销售订单', group:'销售管理', status:'prototype', note:'当前为通用本地演示页面。' },
+  { id:'shipments', name:'出货管理', group:'销售管理', status:'prototype', note:'当前为通用本地演示页面。' },
+  { id:'invoices', name:'收款管理', group:'销售管理', status:'prototype', note:'当前为通用本地演示页面。' },
+  { id:'aftersales', name:'售后服务', group:'销售管理', status:'prototype', note:'当前为通用本地演示页面。' },
+  { id:'sales-activities', name:'销售活动', group:'销售管理', status:'prototype', note:'当前为通用本地演示页面。' },
+  { id:'data-hub', name:'数据中心', group:'数据智能', status:'planned', note:'尚无统一数据集管理页面。' },
+  { id:'providers', name:'数据源目录', group:'数据智能', status:'merged', note:'服务商配置已归入系统管理的 API 集成设置。' },
+  { id:'enrichment', name:'数据补全', group:'数据智能', status:'planned', note:'尚无独立、完整的数据补全工作区。' },
+  { id:'cleaning', name:'数据清洗', group:'数据智能', status:'planned', note:'尚无独立数据清洗工作区。' },
+  { id:'trade', name:'贸易情报', group:'数据智能', status:'planned', note:'有发现入口概念，尚无完整贸易数据产品流程。' },
+  { id:'copilot', name:'AI 助手', group:'AI 智能', status:'prototype', note:'发现配置中有 AI 辅助能力，尚无独立助手工作区。' },
+  { id:'research', name:'AI 深度调研', group:'AI 智能', status:'planned', note:'尚无独立研究报告工作区。' },
+  { id:'scoring', name:'线索评分', group:'AI 智能', status:'prototype', note:'线索审核中展示评分字段，尚未形成完整评分管理模块。' },
+  { id:'agents', name:'AI 智能体', group:'AI 智能', status:'planned', note:'尚无可视化智能体编排工作区。' },
+  { id:'email-marketing', name:'邮件营销', group:'营销中心', status:'prototype', note:'仅有通用本地演示页面，未接入邮件发送服务。' },
+  { id:'sequences', name:'邮件序列', group:'营销中心', status:'prototype', note:'仅有通用本地演示页面，未接入自动发送。' },
+  { id:'campaigns', name:'营销活动', group:'营销中心', status:'prototype', note:'仅有通用本地演示页面，未接入活动数据。' },
+  { id:'templates', name:'模板中心', group:'营销中心', status:'planned', note:'尚无独立模板管理模块。' },
+  { id:'sales-analytics', name:'销售分析', group:'商业分析', status:'planned', note:'尚无真实销售数据分析页面。' },
+  { id:'market-analytics', name:'市场分析', group:'商业分析', status:'planned', note:'尚无真实市场数据分析页面。' },
+  { id:'users', name:'用户与团队', group:'系统管理', status:'planned', note:'尚无完整成员与团队管理页面。' },
+  { id:'permissions', name:'角色与权限', group:'系统管理', status:'planned', note:'尚无完整角色权限管理页面。' },
+  { id:'settings', name:'系统设置', group:'系统管理', status:'active', note:'API 集成、Actor 管理与 AI 模型设置已接入。' },
+  { id:'integrations', name:'系统集成', group:'系统管理', status:'merged', note:'独立旧入口已合并到系统管理，避免重复配置。' },
+]
+
+export const recentIds = ['lead-development', 'settings']
+export const initialFavorites = ['lead-development', 'settings']
