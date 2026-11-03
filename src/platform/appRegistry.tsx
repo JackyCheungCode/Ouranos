@@ -1,5 +1,5 @@
 
-export type PlatformAppId = 'lead-development' | 'settings'
+export type PlatformAppId = 'lead-development' | 'ops-discovery' | 'settings'
 
 export type PlatformApp = {
   id: PlatformAppId
@@ -13,7 +13,7 @@ export type PlatformApp = {
   navigation: string[]
 }
 
-export const platformApps: PlatformApp[] = [
+export const platformApps: PlatformApp[] = [{id:'ops-discovery',name:'运维和发现',englishName:'Operations & Discovery',description:'Facebook 数据发现矩阵与采集运维。',tagline:'多模式发现与任务运维',icon:'fab fa-facebook',color:'#1877F2',category:'数据运营',navigation:['Facebook','Facebook发现']},
   {
     id: 'lead-development',
     name: '线索发展',
