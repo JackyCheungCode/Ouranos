@@ -185,3 +185,21 @@
 .lead-raw-table td a { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
 .lead-raw-table td .lead-quiet-button { padding:5px 8px; }
 .lead-raw-table .lead-raw-result-json { min-width:0; max-width:100%; white-space:pre-wrap; overflow-wrap:anywhere; }
+
+/* Odoo-style unified lead result list */
+.lead-results-page{padding-bottom:28px}
+.lead-results-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;border:1px solid #dedde0;border-bottom:0;background:#fff;color:#6b6870;font-size:12px}
+.lead-results-search{display:flex;align-items:center;gap:9px;min-width:260px;max-width:520px;flex:1;color:#77717b}
+.lead-results-search input{width:100%;border:0;outline:0;background:transparent;color:#29252b;font:inherit;font-size:13px}
+.lead-results-table-wrap{overflow:auto;border:1px solid #dedde0;background:#fff}
+.lead-results-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;white-space:nowrap}
+.lead-results-table thead th{position:sticky;top:0;z-index:1;background:#f7f7f8;color:#625d66;font-weight:600;text-align:left;padding:11px 13px;border-bottom:1px solid #dedde0}
+.lead-results-table tbody td{padding:10px 13px;border-bottom:1px solid #eeedef;color:#45414a;vertical-align:middle;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.lead-results-table tbody tr:hover{background:#f8f6f8}
+.lead-result-person{display:flex;align-items:center;gap:10px;min-width:190px}
+.lead-result-person img{width:34px;height:34px;border-radius:50%;object-fit:cover;background:#eee}
+.lead-result-person div{display:flex;flex-direction:column;gap:4px}
+.lead-result-person b{font-weight:600;color:#29252b}
+.lead-result-person a{display:inline-flex;align-items:center;gap:4px;color:#714b67;text-decoration:none;font-size:11px}
+.lead-result-source{display:inline-block;padding:3px 7px;border-radius:3px;background:#f1edf1;color:#714b67;text-transform:capitalize}
+@media(max-width:760px){.lead-results-toolbar{align-items:stretch;flex-direction:column}.lead-results-search{max-width:none;min-width:0}}
