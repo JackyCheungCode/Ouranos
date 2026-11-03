@@ -117,7 +117,8 @@ export default function FacebookDiscoveryApp({ onOpenPersonalSearch }: { onOpenP
   if(modeField?.enum?.length&&!modeField.enum.some(option=>String(option)===String(actorModeValue)))return '当前 Actor Schema 暂不支持「'+mode.title+'」模式，请刷新 Schema 或选择其他模式。'
   for(const [key,field] of Object.entries(props)){const value=values[key];if(empty(value))continue;const type=asType(field);if((type==='integer'||type==='number')&&(!Number.isFinite(Number(value))||(type==='integer'&&!Number.isInteger(Number(value)))))return (FIELD_LABELS[key]||field.title||key)+' 必须填写有效数值。';if((type==='integer'||type==='number')&&field.minimum!==undefined&&Number(value)<field.minimum)return (FIELD_LABELS[key]||field.title||key)+' 不能小于 '+field.minimum+'。';if((type==='integer'||type==='number')&&field.maximum!==undefined&&Number(value)>field.maximum)return (FIELD_LABELS[key]||field.title||key)+' 不能大于 '+field.maximum+'。';if(field.enum?.length&&!field.enum.some(option=>String(option)===String(value)))return (FIELD_LABELS[key]||field.title||key)+' 不是有效选项。'}
   if(missingRequired.length)return '请补充必填项：'+missingRequired.map(k=>FIELD_LABELS[k]||props[k]?.title||k).join('、')
-  if(!cookieReady)return '当前模式需要 Facebook 登录 Cookie。'\n  if(cookieValue.trim()&&(!/c_user\\s*=/.test(cookieValue)||!/xs\\s*=/.test(cookieValue)))return 'Cookie 格式不完整，请同时提供 c_user 和 xs。'
+  if(!cookieReady)return '当前模式需要 Facebook 登录 Cookie。'
+  if(cookieValue.trim()&&(!/c_user\s*=/.test(cookieValue)||!/xs\s*=/.test(cookieValue)))return 'Cookie 格式不完整，请同时提供 c_user 和 xs。'
   if(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0)return '请设置大于 0 的单次费用上限。'
   if(modeId==='pages'&&empty(values.pages)&&empty(values.searchQueries))return '主页链接或搜索关键词至少填写一项。'
   if(modeId==='search'&&empty(values.searchQueries))return '请填写至少一个搜索关键词。'
