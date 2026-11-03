@@ -1,0 +1,193 @@
+/* Ouranos unified Odoo 20 Frost application layer.
+   Shared layout and density rules; feature-specific behavior remains untouched. */
+:root {
+  --o20-bg: #f1f1f1;
+  --o20-surface: #fff;
+  --o20-border: #dedede;
+  --o20-text: #383838;
+  --o20-muted: #777;
+  --o20-primary: #714b67;
+  --o20-primary-soft: #f1ebf0;
+  --o20-radius: 8px;
+}
+.ouranos-platform { background:var(--o20-bg); color:var(--o20-text); }
+.ouranos-platform .platform-main { min-width:0; }
+.ouranos-platform .platform-home,
+.ouranos-platform .platform-module,
+.ouranos-platform .platform-settings { max-width:1600px; margin:0 auto; padding:26px 32px 30px; }
+.ouranos-platform .platform-home-heading { margin:0 0 20px; align-items:center; }
+.ouranos-platform .platform-home-heading p,
+.ouranos-platform .platform-home-meta,
+.ouranos-platform .platform-home-foot,
+.ouranos-platform .platform-section-title small,
+.ouranos-platform .platform-card-index,
+.ouranos-platform .platform-card-copy>span { display:none; }
+.ouranos-platform .platform-home-heading h1 { margin:0; font-size:24px; font-weight:650; letter-spacing:-.4px; }
+.ouranos-platform .platform-eyebrow { font-size:10px; letter-spacing:.5px; margin-bottom:5px; }
+.ouranos-platform .platform-app-section { padding:18px; border:1px solid var(--o20-border); border-radius:var(--o20-radius); background:#fff; box-shadow:none; }
+.ouranos-platform .platform-section-title { padding-bottom:12px; margin-bottom:14px; }
+.ouranos-platform .platform-app-grid { gap:10px; }
+.ouranos-platform .platform-app-card { min-height:154px; padding:14px; border:1px solid #e5e5e5; border-radius:8px; }
+.ouranos-platform .platform-card-copy { margin-top:12px; }
+.ouranos-platform .platform-card-copy h2 { font-size:14px; margin:0; }
+.ouranos-platform .platform-card-copy p { margin:5px 0 0; color:#777; font-size:11px; line-height:1.45; }
+.ouranos-platform .platform-card-bottom { padding-top:9px; }
+.ouranos-platform .platform-sidebar-drawer { background:#f7f7f7; }
+.ouranos-platform .platform-sidebar-drawer>button.selected { background:var(--o20-primary-soft); color:var(--o20-primary); }
+.ouranos-platform .platform-breadcrumb { margin-bottom:16px; }
+.ouranos-platform .platform-settings-heading { margin-bottom:18px; }
+.ouranos-platform .platform-settings-heading p,
+.ouranos-platform .platform-settings-welcome>p { display:none; }
+
+/* Shared page headers: one title, no repeated marketing copy. */
+.ouranos-platform .lead-page-head,
+.ouranos-platform .fb-main>header,
+.ouranos-platform .li-page-head,
+.ouranos-platform .platform-settings-heading,
+.ouranos-platform .ow-head {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:16px; margin:0 0 18px; padding:0 0 14px;
+  border-bottom:1px solid var(--o20-border);
+}
+.ouranos-platform .lead-page-head h1,
+.ouranos-platform .fb-main>header h1,
+.ouranos-platform .li-page-head h1,
+.ouranos-platform .platform-settings-heading h1,
+.ouranos-platform .ow-head h1 {
+  margin:0; color:var(--o20-text); font-size:23px; line-height:1.3;
+  font-weight:650; letter-spacing:-.45px;
+}
+.ouranos-platform .lead-page-head p,
+.ouranos-platform .fb-main>header p,
+.ouranos-platform .li-page-head p,
+.ouranos-platform .ow-head p { display:none; }
+.ouranos-platform .lead-eyebrow,
+.ouranos-platform .li-eyebrow,
+.ouranos-platform .ow-kicker { display:none; }
+.ouranos-platform .lead-head-actions,
+.ouranos-platform .fb-head-actions,
+.ouranos-platform .ow-head-actions { gap:7px; }
+
+/* One shared card language across discovery, enrichment, integrations and settings. */
+.ouranos-platform .lead-card,
+.ouranos-platform .lead-side-card,
+.ouranos-platform .lead-content-panel,
+.ouranos-platform .li-card,
+.ouranos-platform .fb-card,
+.ouranos-platform .fb-detail,
+.ouranos-platform .fb-stepper,
+.ouranos-platform .platform-settings-nav,
+.ouranos-platform .platform-settings-content,
+.ouranos-platform .platform-settings-welcome,
+.ouranos-platform .ow-list-panel,
+.ouranos-platform .ow-detail {
+  border:1px solid var(--o20-border); border-radius:8px;
+  background:#fff; box-shadow:none;
+}
+.ouranos-platform .lead-card,
+.ouranos-platform .lead-side-card,
+.ouranos-platform .lead-content-panel,
+.ouranos-platform .li-card,
+.ouranos-platform .fb-card { padding:16px; }
+.ouranos-platform .lead-card-heading { margin-bottom:13px; }
+.ouranos-platform .lead-card-heading h2,
+.ouranos-platform .fb-section-head h2 { margin:0; font-size:14px; font-weight:650; }
+.ouranos-platform .lead-card-heading p,
+.ouranos-platform .fb-section-head p { display:none; }
+.ouranos-platform .lead-step-icon,
+.ouranos-platform .lead-channel-icon,
+.ouranos-platform .lead-mini-icon { border-radius:7px; background:#f1ebf0; color:var(--o20-primary); }
+.ouranos-platform .lead-side-highlight { background:#fff; }
+.ouranos-platform .lead-side-card>p { display:none; }
+.ouranos-platform .lead-tabs { gap:20px; margin-bottom:16px; }
+.ouranos-platform .lead-tabs button { padding-bottom:10px; font-size:12px; }
+.ouranos-platform .fb-app { background:var(--o20-bg); color:var(--o20-text); }
+.ouranos-platform .fb-side { background:#f7f7f7; border-color:var(--o20-border); }
+.ouranos-platform .fb-main { padding:24px 28px; }
+.ouranos-platform .fb-stats { gap:0; background:#fff; border:1px solid var(--o20-border); border-radius:8px; overflow:hidden; }
+.ouranos-platform .fb-stats div { padding:12px 14px; }
+.ouranos-platform .fb-grid button,
+.ouranos-platform .fb-mode-grid button { border:1px solid #e2e2e2; border-radius:7px; }
+.ouranos-platform .fb-grid button.chosen,
+.ouranos-platform .fb-mode-grid button.selected { border-color:#bdaaba; background:#faf7fa; box-shadow:inset 0 0 0 1px #bdaaba; }
+.ouranos-platform .fb-toolbar { background:#ededed; border-radius:7px; }
+.ouranos-platform .fb-toolbar button.active { color:var(--o20-primary); border-radius:6px; }
+.ouranos-platform .fb-stepper { padding:12px 14px; }
+.ouranos-platform .fb-stepper button.current { color:var(--o20-primary); }
+.ouranos-platform .fb-stepper button.current i,
+.ouranos-platform .fb-stepper button.done i { background:var(--o20-primary); border-color:var(--o20-primary); }
+.ouranos-platform .fb-user-search { background:#f8f6f8; border-color:#e2dce4; border-radius:8px; }
+.ouranos-platform .fb-detail { position:static; }
+.ouranos-platform .platform-settings-layout { gap:14px; }
+.ouranos-platform .platform-settings-nav { padding:10px; }
+.ouranos-platform .platform-settings-nav button { border-radius:6px; }
+.ouranos-platform .platform-settings-nav button.active { background:var(--o20-primary-soft); color:var(--o20-primary); }
+.ouranos-platform .platform-settings-content { padding:18px; min-width:0; }
+.ouranos-platform .platform-settings-welcome { border:0; padding:18px; }
+.ouranos-platform .platform-settings-welcome .platform-placeholder-art { display:none; }
+
+/* LinkedIn workflow, provider forms and data tables use the same controls. */
+.ouranos-platform .li-primary,
+.ouranos-platform .lead-primary-button,
+.ouranos-platform .fb-user-search button,
+.ouranos-platform .ow-primary,
+.ouranos-platform .platform-settings-welcome button {
+  min-height:34px; border:1px solid var(--o20-primary);
+  border-radius:6px; background:var(--o20-primary); color:#fff;
+  padding:7px 12px; font-size:11px; font-weight:600;
+}
+.ouranos-platform .li-secondary,
+.ouranos-platform .lead-quiet-button,
+.ouranos-platform .ow-light,
+.ouranos-platform .fb-head-actions button,
+.ouranos-platform .fb-refresh {
+  min-height:34px; border:1px solid var(--o20-border);
+  border-radius:6px; background:#fff; color:#4e4e4e;
+  padding:7px 11px; font-size:11px;
+}
+.ouranos-platform input:not([type=checkbox]):not([type=radio]),
+.ouranos-platform select,
+.ouranos-platform textarea {
+  min-height:34px; border:1px solid #d8d8d8; border-radius:6px;
+  background:#fff; color:#383838; font-size:12px; box-shadow:none;
+}
+.ouranos-platform input:focus,
+.ouranos-platform select:focus,
+.ouranos-platform textarea:focus {
+  border-color:#a58ba0; outline:2px solid #a58ba033; outline-offset:0;
+}
+.ouranos-platform .lead-field>span { font-size:11px; font-weight:600; }
+.ouranos-platform .lead-field input,
+.ouranos-platform .lead-field select { height:36px; background:#fff; }
+.ouranos-platform .li-picker-trigger { border-radius:6px; min-height:35px; }
+.ouranos-platform .li-primary,
+.ouranos-platform .li-secondary { border-radius:6px; }
+.ouranos-platform table { width:100%; border-collapse:separate; border-spacing:0; }
+.ouranos-platform thead th { background:#f1f1f1; color:#555; font-size:11px; font-weight:650; }
+.ouranos-platform th,
+.ouranos-platform td { border-color:#e6e6e6; }
+.ouranos-platform tbody tr:hover td { background:#fafafa; }
+.ouranos-platform [class*="badge"],
+.ouranos-platform [class*="status"],
+.ouranos-platform [class*="pill"] { border-radius:999px; }
+
+/* Density and responsive behavior. */
+@media(max-width:1000px) {
+ .ouranos-platform .platform-home,.ouranos-platform .platform-module,.ouranos-platform .platform-settings { padding:22px 20px; }
+ .ouranos-platform .fb-main { padding:20px; }
+}
+@media(max-width:720px) {
+ .ouranos-platform .platform-home,.ouranos-platform .platform-module,.ouranos-platform .platform-settings { padding:18px 12px; }
+ .ouranos-platform .lead-search-layout,.ouranos-platform .fb-layout { grid-template-columns:minmax(0,1fr); }
+ .ouranos-platform .lead-side-column { display:none; }
+ .ouranos-platform .lead-form-grid { grid-template-columns:minmax(0,1fr); }
+ .ouranos-platform .lead-field-wide { grid-column:auto; }
+ .ouranos-platform .fb-main { padding:16px 12px; }
+ .ouranos-platform .platform-settings-layout { grid-template-columns:1fr; }
+ .ouranos-platform .platform-settings-nav { display:flex; flex-wrap:wrap; gap:5px; }
+ .ouranos-platform .platform-settings-nav-title,
+ .ouranos-platform .platform-settings-nav-group { display:none; }
+ .ouranos-platform .platform-settings-nav button { width:auto; }
+ .ouranos-platform .lead-page-head,.ouranos-platform .fb-main>header,.ouranos-platform .li-page-head { align-items:flex-start; flex-direction:column; }
+ .ouranos-platform .platform-app-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
