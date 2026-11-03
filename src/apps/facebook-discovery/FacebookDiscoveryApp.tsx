@@ -79,8 +79,8 @@ export default function FacebookDiscoveryApp({ onOpenPersonalSearch }: { onOpenP
  const schemaReady=Boolean(schema&&props.scrapeMode&&hasModeInput)
  const resultColumns=useMemo(()=>{
   const keys=new Set<string>()
-  records.slice(0,30).forEach(record=>Object.keys(record.raw_payload||{}).forEach(key=>keys.add(key)))
-  return [...keys].filter(key=>!['__metadata','_meta'].includes(key)).slice(0,8)
+  records.forEach(record=>Object.keys(record.raw_payload||{}).forEach(key=>keys.add(key)))
+  return [...keys].filter(key=>!['__metadata','_meta'].includes(key))
  },[records])
 
  const loadSchema=async()=>{
