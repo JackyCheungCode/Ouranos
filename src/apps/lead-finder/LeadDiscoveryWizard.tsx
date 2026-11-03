@@ -579,7 +579,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    if(taskError)throw new Error(taskError.message)
    const {data:selections,error:selectionQueryError}=await supabase.from('workspace_adapter_selections').select('id,adapter_key,config,discovery_adapter_catalog!inner(external_actor_id,provider_key,verification_status,maintenance_status,is_active)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true).eq('discovery_adapter_catalog.provider_key',selectedProviderKey)
    if(selectionQueryError)throw selectionQueryError
-   const selection=(selections||[]).find((row:any)=>row.adapter_key===selectedAdapterKey&&row.discovery_adapter_catalog?.external_actor_id===actorId&&row.discovery_adapter_catalog?.is_active===true&&(isFacebookPeople||isDirectFacebookMatrix||row.discovery_adapter_catalog?.verification_status==='verified'&&row.discovery_adapter_catalog?.maintenance_status==='maintained'))
+   const selection=(selections||[]).find((row:any)=>row.adapter_key===selectedAdapterKey&&row.discovery_adapter_catalog?.external_actor_id===actorId&&row.discovery_adapter_catalog?.is_active===true&&(isFacebookPeople||isFacebookMatrix||row.discovery_adapter_catalog?.verification_status==='verified'&&row.discovery_adapter_catalog?.maintenance_status==='maintained'))
    if(!selection)throw new Error('当前 Actor 已不在可用目录中，请刷新页面并联系管理员检查配置。')
    const config={...(selection.config||{}),max_cost:Number(maxCost),max_items:Number(targetCount)}
    const {error:selectionError}=await supabase.from('workspace_adapter_selections').update({config,updated_at:new Date().toISOString()}).eq('id',selection.id).eq('workspace_id',workspaceId)
