@@ -5,7 +5,8 @@ import type { Workspace } from '../lib/auth'
 import { platformApps,type PlatformApp,type PlatformAppId } from './appRegistry'
 import { usePlatformRouter } from './router'
 import ModulePlaceholder from './ModulePlaceholder'
-import LeadFinderApp from '../apps/lead-finder/LeadFinderApp'\nimport FacebookDiscoveryApp from '../apps/facebook-discovery/FacebookDiscoveryApp'
+import LeadFinderApp from '../apps/lead-finder/LeadFinderApp'
+import FacebookDiscoveryApp from '../apps/facebook-discovery/FacebookDiscoveryApp'
 import SystemSettingsModule from './SystemSettingsModule'
 type Props={user:User;workspace:Workspace}
 function BrandMark(){return <span className="odoo-brand-mark" aria-hidden="true"><i/><i/><i/></span>}
