@@ -16,39 +16,24 @@ function mapped(raw:unknown,mapping:Record<string,unknown>,field:string,fallback
 function extractItems(raw:unknown):unknown[]{if(Array.isArray(raw))return raw;const r=obj(raw);const data=obj(r.data);for(const candidate of [r.items,r.results,r.records,r.resultObject,r.data,data.items,data.results,data.records,data.data])if(Array.isArray(candidate))return candidate;return [];}
 async function insertRows(path:string,payload:Record<string,unknown>[],admin:string){if(!payload.length)return [];const response=await rest(path,admin,{method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=representation"},body:JSON.stringify(payload)});if(!response.ok){const text=await response.text();throw new Error(`Database insert failed: ${text.slice(0,1000)}`);}return await response.json();}
 async function processItems(run:Record<string,unknown>,items:unknown[],admin:string){
- const mapping=obj(run.field_mapping_snapshot);let companyCount=0;let contactCount=0;let processedCount=0;let skippedCount=0;
+ let savedCount=0;
  for(const raw of items){
-  const companyName=asText(mapped(raw,mapping,"company_name",["company.name","organization.name","companyName","businessName","company_name"]));
-  const contactName=asText(mapped(raw,mapping,"contact_name",["contact.name","fullName","full_name","person.name","person_name"]));
-  const sourceUrl=asText(mapped(raw,mapping,"source_url",["url","sourceUrl","profileUrl","link","website"]));
-  const sourceTitle=companyName||contactName||asText(mapped(raw,mapping,"contact_name",["name","fullName","full_name","title","username"]))||asText(getPath(raw,"title"))||asText(getPath(raw,"name"))||null;
-  const externalId=asText(mapped(raw,mapping,"external_record_id",["id","externalId","placeId","profileId","userId"]))||sourceUrl||await hash(JSON.stringify(raw));
-  // Persist every provider row as source evidence, even when it cannot yet be normalized
-  // into a company/contact. This keeps the original scrape reviewable and exportable.
-  const sourceRows=await insertRows("lead_source_records?on_conflict=workspace_id,task_id,provider_key,channel_key,external_record_id&select=id",[{workspace_id:run.workspace_id,task_id:run.task_id,provider_key:run.provider_key,channel_key:run.channel_key,external_record_id:externalId,source_url:sourceUrl||null,source_title:sourceTitle,confidence:Number(mapped(raw,mapping,"confidence",["confidence","score"]))||null,raw_payload:raw&&typeof raw==="object"?raw:{value:raw}}],admin);
-  let sourceId=sourceRows[0]?.id;
-  if(!sourceId){const existingSource=await rest(`lead_source_records?select=id&workspace_id=eq.${encodeURIComponent(String(run.workspace_id))}&task_id=eq.${encodeURIComponent(String(run.task_id))}&provider_key=eq.${encodeURIComponent(String(run.provider_key))}&channel_key=eq.${encodeURIComponent(String(run.channel_key))}&external_record_id=eq.${encodeURIComponent(externalId)}&limit=1`,admin);if(existingSource.ok)sourceId=(await existingSource.json())[0]?.id;}
-  if(!sourceId)throw new Error("Unable to resolve source evidence record ID");
-  if(!companyName&&!contactName){skippedCount++;continue;}processedCount++;
-  let companyInboxId:string|null=null;
-  if(companyName){
-   const normalizedDomain=normalDomain(website);
-   const normalizedEmail=email.toLowerCase()||null;
-   const normalizedName=companyName.toLowerCase().replace(/\s+/g," ").trim();
-   const normalizedPayload={company_name:companyName,website:website||null,email:email||null,phone:phone||null,country_name:countryName||null,country_code:countryCode||null,address:address||null,product_categories:productCategories,social_links:socialLinks,employee_range:employeeRange||null,description:description||null};
-   const companyRows=await insertRows("lead_inbox_records?on_conflict=workspace_id,source_record_id,record_type,source_item_key&select=id",[{workspace_id:run.workspace_id,task_id:run.task_id,source_item_key:"company",record_type:"company",review_status:"pending",source_record_id:sourceId,display_name:companyName,normalized_name:normalizedName,normalized_domain:normalizedDomain,normalized_email:normalizedEmail,normalized_phone:normalPhone(phone),country_code:countryCode||null,country_name:countryName||null,website:website||null,email:email||null,phone:phone||null,address:address||null,product_categories:productCategories,social_links:socialLinks,employee_range:employeeRange||null,description:description||null,raw_payload:raw&&typeof raw==="object"?raw:{value:raw},normalized_payload:normalizedPayload}],admin);
-   companyInboxId=companyRows[0]?.id||null;if(!companyInboxId){const existingCompany=await rest(`lead_inbox_records?select=id&workspace_id=eq.${encodeURIComponent(String(run.workspace_id))}&source_record_id=eq.${encodeURIComponent(String(sourceId))}&record_type=eq.company&source_item_key=eq.company&limit=1`,admin);if(existingCompany.ok)companyInboxId=(await existingCompany.json())[0]?.id||null;}if(companyInboxId)companyCount++;
+  const payload=raw&&typeof raw==="object"?raw:{value:raw};
+  const sourceUrl=asText(mapped(raw,{},"source_url",["url","sourceUrl","profileUrl","profile_url","link","website"]))||null;
+  const sourceTitle=asText(getPath(raw,"name"))||asText(getPath(raw,"fullName"))||asText(getPath(raw,"username"))||asText(getPath(raw,"title"))||null;
+  const stableId=asText(getPath(raw,"id"))||asText(getPath(raw,"userId"))||asText(getPath(raw,"profileId"))||sourceUrl||await hash(JSON.stringify(payload));
+  const rows=await insertRows(
+   "lead_source_records?on_conflict=workspace_id,task_id,provider_key,channel_key,external_record_id&select=id",
+   [{workspace_id:run.workspace_id,task_id:run.task_id,provider_key:run.provider_key,channel_key:run.channel_key,external_record_id:stableId,source_url:sourceUrl,source_title:sourceTitle,raw_payload:payload}],
+   admin
+  );
+  if(!rows[0]?.id){
+   const existing=await rest(`lead_source_records?select=id&workspace_id=eq.${encodeURIComponent(String(run.workspace_id))}&task_id=eq.${encodeURIComponent(String(run.task_id))}&provider_key=eq.${encodeURIComponent(String(run.provider_key))}&channel_key=eq.${encodeURIComponent(String(run.channel_key))}&external_record_id=eq.${encodeURIComponent(stableId)}&limit=1`,admin);
+   if(!existing.ok||(await existing.json()).length===0)throw new Error("Unable to confirm persisted raw Actor result");
   }
-  if(contactName){
-   const contactEmail=asText(mapped(raw,mapping,"contact_email",["contact.email","email","emailAddress"]));
-   const contactPhone=asText(mapped(raw,mapping,"contact_phone",["contact.phone","phone","phoneNumber"]));
-   const normalizedName=contactName.toLowerCase().replace(/\s+/g," ").trim();
-   const normalizedEmail=contactEmail.toLowerCase()||null;
-   const normalizedPayload={full_name:contactName,job_title:jobTitle||null,department:department||null,email:contactEmail||null,phone:contactPhone||null,country_name:countryName||null,country_code:countryCode||null,company_name:companyName||null};
-   await insertRows("lead_inbox_records?on_conflict=workspace_id,source_record_id,record_type,source_item_key&select=id",[{workspace_id:run.workspace_id,task_id:run.task_id,source_item_key:normalizedEmail||normalizedName,record_type:"contact",review_status:"pending",company_inbox_id:companyInboxId,source_record_id:sourceId,display_name:contactName,normalized_name:normalizedName,normalized_email:normalizedEmail,normalized_phone:normalPhone(contactPhone),country_code:countryCode||null,country_name:countryName||null,job_title:jobTitle||null,department:department||null,email:contactEmail||null,phone:contactPhone||null,address:address||null,product_categories:productCategories,social_links:socialLinks,description:description||null,raw_payload:raw&&typeof raw==="object"?raw:{value:raw},normalized_payload:normalizedPayload}],admin);contactCount++;
-  }
+  savedCount++;
  }
- return {companyCount,contactCount,processedCount,skippedCount};
+ return {companyCount:0,contactCount:0,processedCount:savedCount,skippedCount:0};
 }
 function retryableError(message:string){return /HTTP (408|425|429|500|502|503|504)|timeout|temporar|rate.?limit|network|fetch failed/i.test(message);}
 async function logTask(taskId:string,workspaceId:string,run:Record<string,unknown>|null,stage:string,message:string,admin:string,details:Record<string,unknown>={}){await rest('integration_events',admin,{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({workspace_id:workspaceId,provider_key:String(run?.provider_key||'ouranos'),provider_name:'Ouranos 搜索任务',action:'update',status:stage==='failed'||stage==='import_warning'?'failure':stage==='completed'?'success':'pending',message,duration_ms:null,details:{event_type:'lead_task_log',task_id:taskId,run_id:run?.id||null,channel_key:run?.channel_key||null,stage,...details}})});}
