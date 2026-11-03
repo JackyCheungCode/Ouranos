@@ -5,6 +5,7 @@ import './index.css'
 import './platform/platform.css'
 import './odoo20-frost-theme.css'
 import './odoo20-unified.css'
+import './odoo20-module-polish.css'
 
 function AppContent() {
   const { user, workspace, loading, configured } = useAuth()
