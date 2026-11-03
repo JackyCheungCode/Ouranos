@@ -156,6 +156,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [regionResults,setRegionResults] = useState<Array<{place_id:number;display_name:string;name?:string;lat?:number;lon?:number}>>([])
  const [locationBusy,setLocationBusy] = useState(false)
  const [citySearchBusy,setCitySearchBusy] = useState(false)
+ const [countryPickerOpen,setCountryPickerOpen] = useState(false)
+ const [countrySearch,setCountrySearch] = useState('')
  const [actorQuery,setActorQuery] = useState('')
  const [actorVerificationStatus,setActorVerificationStatus] = useState('unverified')
  const [actorMaintenanceStatus,setActorMaintenanceStatus] = useState('unmaintained')
@@ -259,6 +261,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  useEffect(()=>{
   let active=true
   if(!countryCode){setRegionResults([]);setRegion('__all__');setRegionManual('');setCity('');setMapLocation(null);setRegionLoadError('');setLocationBusy(false);return}
+  if(page.id==='facebook-pages'){setRegionResults([]);setRegion('__all__');setRegionManual('');setMapLocation(null);setRegionLoadError('');setLocationBusy(false);return}
   const countryName=selectedCountry?.geoName||selectedCountry?.name||countryCode
   setLocationBusy(true);setRegion('__all__');setRegionManual('');setCity('');setCityQuery('');setMapLocation(null);setRegionLoadError('')
   const timer=setTimeout(async()=>{
@@ -634,16 +637,17 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
      <div className="ldw-step-title"><span>1</span><div><h3>填写通用搜索条件</h3><p>先填写客户关键词与目标地区，再选择一个 Facebook 个人资料 Actor。</p></div></div>
      <div className="ldw-form-grid">
       <label className="ldw-field"><span>搜索关键词 <b>* 必填</b></span><input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="例如：real estate agent、software engineer、wedding photographer"/><small>填写职业、行业、业务类型或目标人群；一次填写一个清晰关键词。</small></label>
-      <label className="ldw-field"><span>国家 / 地区 <b>* 必填</b></span><select value={countryCode} onChange={e=>{setCountryCode(e.target.value);setSelectedCountries(e.target.value?[e.target.value]:[]);setRegion('__all__');setCity('')}}><option value="">请选择国家或地区</option>{countries.map(c=><option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select><small>不同 Actor 的国家过滤方式不同，具体能力见下方说明。</small></label>
+      <div className="ldw-field ldw-country-field"><span>国家 / 地区 <b>* 必填</b></span><button type="button" className="ldw-country-trigger" aria-expanded={countryPickerOpen} onClick={()=>{setCountryPickerOpen(value=>!value);setCountrySearch('')}}>{selectedCountry?.geoName||'Select a country / region'} <ChevronDown size={15}/></button>{countryPickerOpen&&<div className="ldw-country-menu"><input autoFocus value={countrySearch} onChange={e=>setCountrySearch(e.target.value)} placeholder="Search country / region in English…"/><div className="ldw-country-options">{countries.filter(c=>(c.geoName+' '+c.code).toLowerCase().includes(countrySearch.trim().toLowerCase())).map(c=><button type="button" key={c.code} className={countryCode===c.code?'selected':''} onClick={()=>{setCountryCode(c.code);setSelectedCountries([c.code]);setRegion('__all__');setCity('');setCountryPickerOpen(false);setCountrySearch('')}}>{c.geoName} <small>{c.code}</small></button>)}</div></div>}<small>Country / region names are sent to the Actor in English to avoid localization and parameter mismatch.</small>{locationBusy&&<small className="ldw-inline-loading"><Loader2 size={12}/> 正在加载地区信息…</small>}</div>
       <label className="ldw-field"><span>城市（可选）</span><input value={city} onChange={e=>setCity(e.target.value)} placeholder="例如：Tokyo、New York、London"/><small>建议使用英文城市名，以便 Actor 识别 Facebook 地点。</small></label>
       <label className="ldw-field"><span>最多抓取人数 <b>* 必填</b></span><input type="number" min={10} max={500} step={1} value={targetCount} onChange={e=>setTargetCount(e.target.value)}/><small>统一限制为 10–500 人；实际返回数量可能少于设置值。</small></label>
      </div>
      <div className="ldw-step-title ldw-facebook-actor-step"><span>2</span><div><h3>选择一个抓取 Actor</h3><p>三个 Actor 使用同一套表单，系统会自动转换成各自需要的参数。</p></div></div>
      <div className="ldw-facebook-actor-options">
-      {facebookProfileActors.map(option=>{const configured=approvedActors.find(item=>item.username===option.username&&item.name===option.name);const selected=actor?.username===option.username&&actor?.name===option.name;return <button type="button" key={option.username} className={selected?'selected':''} disabled={!canSearchSelectedProvider} onClick={()=>selectFacebookActor(option)}>
+      {facebookProfileActors.map(option=>{const configured=approvedActors.find(item=>item.username===option.username&&item.name===option.name);const selected=actor?.username===option.username&&actor?.name===option.name;return <button type="button" key={option.username} className={selected?'selected':''} disabled={!canSearchSelectedProvider||busy} onClick={()=>selectFacebookActor(option)}>
        <span><b>{option.title}</b><small>{option.description}</small><small>{configured?'已启用 · 无需审核':'可选择 · 无需人工审核'}</small></span><span>{selected?'已选择':configured?'选择 Actor':'选择'} <ArrowRight size={12}/></span>
       </button>})}
      </div>
+     {approvedBusy&&<div className="ldw-loading"><Loader2 size={14} className="ldw-spin"/> 正在读取 Facebook Actor 配置…</div>}
      {!canSearchSelectedProvider&&<div className="ldw-provider-note">请先在「系统设置 → 集成」连接并启用 Apify，之后才能选择 Actor。</div>}
      {actor&&<div className="ldw-selected-actor-summary"><div><b>{actor.title}</b><small>Actor ID：{actor.username}~{actor.name} · {'已启用 · 无需人工审核'}</small></div><a href={actor.username==='silentflow'?'https://apify.com/silentflow/facebook-search-profiles-scraper':actor.username==='alien_force'?'https://apify.com/alien_force/facebook-search-scraper':'https://apify.com/memo23/facebook-search-scraper'} target="_blank" rel="noreferrer">查看 Actor 文档</a></div>}
      <div className="ldw-facebook-capability-note"><b>地区筛选差异</b><ul><li><b>Silentflow：</b>城市可使用 Facebook 地点筛选；国家 / 地区按公开资料中的城市、家乡、工作或学校信息匹配。</li><li><b>Alien Force：</b>通过 Facebook 地点解析过滤 People 结果；地点名称无法解析时可能跳过过滤。</li><li><b>Memo23：</b>本表单将城市和国家拼入关键词提高相关性，不等同于精准地区过滤；其精确城市筛选需要 Facebook Place UID。</li></ul></div>
