@@ -4,7 +4,6 @@ import type { User } from '@supabase/supabase-js'
 import type { Workspace } from '../lib/auth'
 import { platformApps, type PlatformApp, type PlatformAppId } from './appRegistry'
 import { usePlatformRouter } from './router'
-import ModulePlaceholder from './ModulePlaceholder'
 import LeadFinderApp from '../apps/lead-finder/LeadFinderApp'
 import SystemSettingsModule from './SystemSettingsModule'
 
