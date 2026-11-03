@@ -39,17 +39,18 @@ function retryableError(message:string){return /HTTP (408|425|429|500|502|503|50
 async function logTask(taskId:string,workspaceId:string,run:Record<string,unknown>|null,stage:string,message:string,admin:string,details:Record<string,unknown>={}){await rest('integration_events',admin,{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({workspace_id:workspaceId,provider_key:String(run?.provider_key||'ouranos'),provider_name:'Ouranos 搜索任务',action:'update',status:stage==='failed'||stage==='import_warning'?'failure':stage==='completed'?'success':'pending',message,duration_ms:null,details:{event_type:'lead_task_log',task_id:taskId,run_id:run?.id||null,channel_key:run?.channel_key||null,stage,...details}})});}
 async function taskIsCancelled(taskId:string,workspaceId:string,admin:string){const response=await rest(`lead_search_tasks?select=status&id=eq.${encodeURIComponent(taskId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}&limit=1`,admin);if(!response.ok)throw new Error('Unable to verify task status before continuing');const rows=await response.json();return rows[0]?.status==='cancelled';}
 async function updateTaskSummary(taskId:string,workspaceId:string,admin:string){
- const [runsResponse,inboxResponse]=await Promise.all([
+ const [runsResponse,inboxResponse,sourceResponse]=await Promise.all([
   rest(`lead_task_runs?select=status,actual_cost,estimated_cost,cost_currency&task_id=eq.${encodeURIComponent(taskId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}`,admin),
-  rest(`lead_inbox_records?select=id,record_type,review_status,source_record_id&task_id=eq.${encodeURIComponent(taskId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}`,admin)
+  rest(`lead_inbox_records?select=id,record_type,review_status,source_record_id&task_id=eq.${encodeURIComponent(taskId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}`,admin),
+  rest(`lead_source_records?select=id&task_id=eq.${encodeURIComponent(taskId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}`,admin)
  ]);
- const runs=runsResponse.ok?await runsResponse.json():[];const inbox=inboxResponse.ok?await inboxResponse.json():[];
+ const runs=runsResponse.ok?await runsResponse.json():[];const inbox=inboxResponse.ok?await inboxResponse.json():[];const sources=sourceResponse.ok?await sourceResponse.json():[];
  const pending=runs.some((r:Record<string,unknown>)=>r.status==="queued"||r.status==="running");const successes=runs.some((r:Record<string,unknown>)=>r.status==="completed");const status=pending?"running":successes?"completed":"failed";
  const taskResponse=await rest(`lead_search_tasks?select=status,cost_currency&workspace_id=eq.${encodeURIComponent(workspaceId)}&id=eq.${encodeURIComponent(taskId)}&limit=1`,admin);const taskRows=taskResponse.ok?await taskResponse.json():[];if(taskRows[0]?.status==="cancelled")return;const taskCurrency=String(taskRows[0]?.cost_currency||"USD");const matchingCosts=runs.filter((r:Record<string,unknown>)=>r.cost_currency===taskCurrency&&r.actual_cost!==null);const cost=matchingCosts.reduce((sum:number,r:Record<string,unknown>)=>sum+(Number(r.actual_cost)||0),0);
  const companies=inbox.filter((r:Record<string,unknown>)=>r.record_type==="company"&&r.review_status!=="duplicate").length;
  const contacts=inbox.filter((r:Record<string,unknown>)=>r.record_type==="contact"&&r.review_status!=="duplicate").length;
- const sources=new Set(inbox.map((r:Record<string,unknown>)=>r.source_record_id).filter(Boolean));
- await rest(`lead_search_tasks?workspace_id=eq.${encodeURIComponent(workspaceId)}&id=eq.${encodeURIComponent(taskId)}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status,discovered_count:sources.size,unique_company_count:companies,unique_contact_count:contacts,actual_cost:matchingCosts.length?cost:null,completed_at:pending?null:new Date().toISOString(),updated_at:new Date().toISOString()})});
+ const sourceCount=sources.length;
+ await rest(`lead_search_tasks?workspace_id=eq.${encodeURIComponent(workspaceId)}&id=eq.${encodeURIComponent(taskId)}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status,discovered_count:sourceCount,unique_company_count:companies,unique_contact_count:contacts,actual_cost:matchingCosts.length?cost:null,completed_at:pending?null:new Date().toISOString(),updated_at:new Date().toISOString()})});
 }
 async function processRun(run:Record<string,unknown>,admin:string){
  const workspaceId=String(run.workspace_id);
@@ -83,8 +84,7 @@ async function processRun(run:Record<string,unknown>,admin:string){
   const hasNext=Boolean(page.nextCursor);
   if(!hasNext){
    if(recordsFound===0)await logTask(String(run.task_id),workspaceId,run,'import_warning','Actor 已完成执行，但结果数据集返回 0 条记录。请检查搜索词是否适合 People / 个人资料搜索（建议使用职业、岗位、行业角色或人群描述；仅填写商品名称可能没有匹配个人资料），并确认地区条件没有过度缩小范围。',admin,{item_count:0,imported_count:0,skipped_count:0,actor_id:run.provider_actor_id,search_queries:obj(run.input_payload).searchQueries||obj(run.input_payload).queries||obj(run.input_payload).keyword||null});
-   else if(totals.processedCount===0)await logTask(String(run.task_id),workspaceId,run,'import_warning','服务商返回了 '+recordsFound+' 条数据，原始结果已全部保存。当前没有记录匹配标准联系人/企业字段，因此尚未生成标准线索；这不会影响原始结果表格展示。',admin,{item_count:recordsFound,imported_count:0,skipped_count:totals.skippedCount});
-   else await logTask(String(run.task_id),workspaceId,run,'completed','结果分页读取完成，已保存 '+recordsFound+' 条 Actor 原始记录；标准线索 '+totals.processedCount+' 条。',admin,{item_count:recordsFound,imported_count:totals.processedCount,skipped_count:totals.skippedCount});
+   else await logTask(String(run.task_id),workspaceId,run,'completed','结果分页读取完成，已保存 '+recordsFound+' 条 Actor 原始记录。表格字段直接依据 Actor 返回数据动态生成，不要求匹配联系人或企业字段。',admin,{item_count:recordsFound,saved_raw_count:totals.processedCount,skipped_count:0});
   }
   await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({status:hasNext?"running":"completed",provider_status:hasNext?"fetching":"completed",output_cursor:page.nextCursor||null,records_found:recordsFound,completed_at:hasNext?null:now,lease_expires_at:hasNext?new Date(Date.now()+10000).toISOString():null,locked_by:null,last_polled_at:now,usage_metrics:usage,actual_cost:Number.isFinite(cost)&&cost>0?cost:run.actual_cost,cost_currency:costCurrency,result_summary:{...totals,item_count:recordsFound},updated_at:now})});
   return;
