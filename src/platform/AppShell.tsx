@@ -4,9 +4,7 @@ import type { User } from '@supabase/supabase-js'
 import type { Workspace } from '../lib/auth'
 import { platformApps, type PlatformApp, type PlatformAppId } from './appRegistry'
 import { usePlatformRouter } from './router'
-import ModulePlaceholder from './ModulePlaceholder'
 import LeadFinderApp from '../apps/lead-finder/LeadFinderApp'
-import FacebookDiscoveryApp from '../apps/facebook-discovery/FacebookDiscoveryApp'
 import SystemSettingsModule from './SystemSettingsModule'
 
 type Props = { user: User; workspace: Workspace }
@@ -25,7 +23,7 @@ function AppLauncher({ onOpen }: { onOpen: (id: PlatformAppId) => void }) {
       <div className="platform-app-grid">{platformApps.map(app =>
         <button className="platform-app-card" key={app.id} onClick={() => onOpen(app.id)}>
           <div className="platform-card-top"><AppIcon app={app} size={24}/></div>
-          <div className="platform-card-copy"><h2>{app.name}</h2></div>
+          <div className="platform-card-copy"><h2>{app.name}</h2><span>{app.tagline}</span><p>{app.description}</p></div>
           <div className="platform-card-bottom"><span>{app.category}</span><span className="platform-card-open">打开 <ChevronRight size={14}/></span></div>
         </button>
       )}</div>
@@ -87,8 +85,7 @@ export default function AppShell({ user, workspace }: Props) {
     <div className="platform-body"><main className="platform-main">
       {active ? (active.id === 'settings'
         ? <SystemSettingsModule route={route} navigate={navigate} onHome={goHome}/>
-        : active.id === 'lead-development' ? <LeadFinderApp/>
-        : active.id === 'ops-discovery' ? <FacebookDiscoveryApp onOpenPersonalSearch={() => navigate({ appId: 'lead-development', section: 'home', providerKey: 'apify' })}/>
+        : active.id === 'lead-development' ? <LeadFinderApp route={route} navigate={navigate}/>
         : <ModulePlaceholder app={active} onHome={goHome}/>)
         : <AppLauncher onOpen={openApp}/>}
     </main></div>

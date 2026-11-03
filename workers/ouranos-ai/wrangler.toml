@@ -2,9 +2,13 @@ name = "ouranos-ai-assistant"
 main = "index.js"
 compatibility_date = "2026-11-01"
 
+# Worker Previews are intentionally isolated from production bindings.
+previews = {}
+
 [ai]
 binding = "AI"
 
 [vars]
 SUPABASE_URL = "https://riridqzemfcnnjfiqevm.supabase.co"
 SUPABASE_PUBLISHABLE_KEY = "sb_publishable_PjFO615673uSM8X_gnsLYA_gIyGS6XB"
+
