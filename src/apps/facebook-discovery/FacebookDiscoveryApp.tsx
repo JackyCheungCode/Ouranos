@@ -64,6 +64,7 @@ export default function FacebookDiscoveryApp({ onOpenPersonalSearch }: { onOpenP
   const keys=Object.keys(props).filter(key=>allowed.has(key)||required.has(key)||key==='scrapeMode')
   return keys
  },[schema,modeId])
+ const advancedKeys=useMemo(()=>Object.keys(props).filter(key=>!visibleKeys.includes(key)&&key!=='facebookAppToken'),[schema,visibleKeys])
  const actorModeValue=useMemo(()=>{
   const field=props.scrapeMode
   if(!field)return mode.actorValue
@@ -101,7 +102,7 @@ export default function FacebookDiscoveryApp({ onOpenPersonalSearch }: { onOpenP
  const setField=(key:string,value:unknown)=>setValues(current=>({...current,[key]:value}))
  const actorInput=()=>{
   const input:Record<string,unknown>={}
-  for(const key of visibleKeys){
+  for(const key of Object.keys(props)){
    if(key==='loginCookies'||key==='facebookAppToken')continue
    const value=values[key]
    if(value!==undefined&&!empty(value))input[key]=value
@@ -112,6 +113,9 @@ export default function FacebookDiscoveryApp({ onOpenPersonalSearch }: { onOpenP
  }
  const validate=()=>{
   if(!schemaReady)return 'Actor Schema 尚未完整加载，请刷新 Schema。'
+  const modeField=props.scrapeMode
+  if(modeField?.enum?.length&&!modeField.enum.some(option=>String(option)===String(actorModeValue)))return '当前 Actor Schema 暂不支持「'+mode.title+'」模式，请刷新 Schema 或选择其他模式。'
+  for(const [key,field] of Object.entries(props)){const value=values[key];if(empty(value))continue;const type=asType(field);if((type==='integer'||type==='number')&&(!Number.isFinite(Number(value))||(type==='integer'&&!Number.isInteger(Number(value)))))return (FIELD_LABELS[key]||field.title||key)+' 必须填写有效数值。';if((type==='integer'||type==='number')&&field.minimum!==undefined&&Number(value)<field.minimum)return (FIELD_LABELS[key]||field.title||key)+' 不能小于 '+field.minimum+'。';if((type==='integer'||type==='number')&&field.maximum!==undefined&&Number(value)>field.maximum)return (FIELD_LABELS[key]||field.title||key)+' 不能大于 '+field.maximum+'。';if(field.enum?.length&&!field.enum.some(option=>String(option)===String(value)))return (FIELD_LABELS[key]||field.title||key)+' 不是有效选项。'}
   if(missingRequired.length)return '请补充必填项：'+missingRequired.map(k=>FIELD_LABELS[k]||props[k]?.title||k).join('、')
   if(!cookieReady)return '当前模式需要 Facebook 登录 Cookie。'
   if(!Number.isFinite(Number(maxCost))||Number(maxCost)<=0)return '请设置大于 0 的单次费用上限。'
