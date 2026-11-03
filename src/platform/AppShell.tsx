@@ -6,7 +6,6 @@ import { platformApps, type PlatformApp, type PlatformAppId } from './appRegistr
 import { usePlatformRouter } from './router'
 import ModulePlaceholder from './ModulePlaceholder'
 import LeadFinderApp from '../apps/lead-finder/LeadFinderApp'
-import FacebookDiscoveryApp from '../apps/facebook-discovery/FacebookDiscoveryApp'
 import SystemSettingsModule from './SystemSettingsModule'
 
 type Props = { user: User; workspace: Workspace }
@@ -88,7 +87,6 @@ export default function AppShell({ user, workspace }: Props) {
       {active ? (active.id === 'settings'
         ? <SystemSettingsModule route={route} navigate={navigate} onHome={goHome}/>
         : active.id === 'lead-development' ? <LeadFinderApp/>
-        : active.id === 'ops-discovery' ? <FacebookDiscoveryApp onOpenPersonalSearch={() => navigate({ appId: 'lead-development', section: 'home', providerKey: 'apify' })}/>
         : <ModulePlaceholder app={active} onHome={goHome}/>)
         : <AppLauncher onOpen={openApp}/>}
     </main></div>
