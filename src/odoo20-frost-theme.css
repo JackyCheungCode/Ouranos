@@ -1,0 +1,220 @@
+/* Ouranos — Odoo 20 Frost-inspired visual system.
+   Presentation-only overrides: preserve existing routes, data flows and business logic. */
+:root {
+  --o20-chrome: #e9e9e9;
+  --o20-canvas: #f3f3f3;
+  --o20-paper: #ffffff;
+  --o20-ink: #343434;
+  --o20-muted: #777777;
+  --o20-line: #dcdcdc;
+  --o20-accent: #714b67;
+  --o20-accent-soft: #eee7ed;
+  --o20-radius: 9px;
+  --o20-radius-sm: 6px;
+  --o20-shadow: 0 1px 2px rgba(0,0,0,.045);
+  font-family: "DM Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  color-scheme: light;
+}
+html, body, #root { min-height: 100%; }
+body { background: var(--o20-canvas); color: var(--o20-ink); }
+button, input, select, textarea { font-family: inherit; }
+
+/* Global application chrome */
+.ouranos-platform {
+  --ink: var(--o20-ink);
+  --muted: var(--o20-muted);
+  --line: var(--o20-line);
+  --surface: var(--o20-paper);
+  --canvas: var(--o20-canvas);
+  --plum: var(--o20-chrome);
+  --plum-dark: #dedede;
+  background: var(--o20-canvas);
+  color: var(--o20-ink);
+}
+.platform-topbar {
+  height: 58px;
+  background: var(--o20-chrome);
+  color: var(--o20-ink);
+  border-bottom: 1px solid #d6d6d6;
+  box-shadow: none;
+}
+.platform-brand-area { min-width: 280px; gap: 10px; }
+.platform-brand { color: #393939; font-size: 20px; letter-spacing: -.7px; }
+.platform-brand small { color: #777; }
+.odoo-brand-mark i { background: var(--o20-accent); }
+.platform-brand-divider, .platform-top-divider { background: #c9c9c9; }
+.platform-sidebar-trigger, .platform-launcher-trigger, .platform-top-icon {
+  color: #555;
+  border-radius: var(--o20-radius-sm);
+}
+.platform-sidebar-trigger:hover, .platform-launcher-trigger:hover, .platform-top-icon:hover {
+  background: #dcdcdc;
+}
+.platform-current-app { color: #555; font-weight: 600; }
+.platform-top-chevron { color: #8a8a8a; }
+.platform-user { color: #454545; border-radius: 7px; }
+.platform-user:hover { background: #dcdcdc; }
+.platform-user > span, .platform-user-menu-head > span {
+  border-radius: 50%;
+  background: #d9cbd7;
+  color: #65445f;
+}
+.platform-notification i { border-color: var(--o20-chrome); }
+.platform-search-pop {
+  top: 10px;
+  height: 38px;
+  border: 1px solid #d0d0d0;
+  border-radius: 20px;
+  box-shadow: 0 3px 12px #00000012;
+}
+.platform-search-pop input { font-size: 12px; }
+.platform-body { min-height: calc(100vh - 58px); background: var(--o20-canvas); }
+.platform-main { background: var(--o20-canvas); }
+.platform-launcher-menu, .platform-user-menu {
+  border: 1px solid #d8d8d8;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px #00000014;
+}
+.platform-launcher-menu > button, .platform-user-menu > button { border-radius: 7px; }
+.platform-launcher-menu > button:hover, .platform-user-menu > button:hover { background: #f1f1f1; }
+.platform-sidebar-drawer {
+  background: #ededed;
+  border-right: 1px solid #d7d7d7;
+}
+.platform-sidebar-drawer > button { border-radius: 7px; }
+.platform-sidebar-drawer > button.selected { background: #ded5dd; color: #5d3c56; }
+
+/* Odoo-style app switcher / home */
+.platform-home, .platform-module { max-width: 1600px; padding: 30px 36px 24px; }
+.platform-home-heading { margin-bottom: 24px; }
+.platform-eyebrow { color: #8a7185; letter-spacing: 1.1px; }
+.platform-home-heading h1 { font-size: 25px; letter-spacing: -.5px; }
+.platform-home-meta {
+  border: 1px solid #dedede;
+  border-radius: 20px;
+  background: #fff;
+  padding: 7px 12px;
+}
+.platform-app-section {
+  border: 1px solid #dedede;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--o20-shadow);
+  padding: 20px 22px 24px;
+}
+.platform-section-title { border-color: #ededed; }
+.platform-section-title > div > span { font-size: 14px; }
+.platform-app-grid { gap: 12px; }
+.platform-app-card {
+  min-height: 190px;
+  border: 1px solid #e2e2e2;
+  border-radius: 9px;
+  box-shadow: none;
+  transition: background .15s, border-color .15s, box-shadow .15s;
+}
+.platform-app-card:hover {
+  transform: none;
+  border-color: #cbbbc9;
+  background: #fdfcfd;
+  box-shadow: 0 3px 12px #0000000b;
+}
+.platform-app-icon { border-radius: 10px; }
+.platform-card-copy h2 { font-size: 15px; }
+.platform-card-bottom { border-color: #ededed; }
+.platform-card-open { color: #76536f; }
+.platform-home-foot { color: #999; }
+
+/* Consistent Odoo 20-style controls across application modules */
+.ouranos-platform input:not([type="checkbox"]):not([type="radio"]),
+.ouranos-platform select,
+.ouranos-platform textarea,
+.ouranos input:not([type="checkbox"]):not([type="radio"]),
+.ouranos select,
+.ouranos textarea {
+  border: 1px solid #d8d8d8;
+  border-radius: 7px;
+  background: #fff;
+  color: #383838;
+  box-shadow: none;
+}
+.ouranos-platform input:focus, .ouranos-platform select:focus,
+.ouranos-platform textarea:focus, .ouranos input:focus,
+.ouranos select:focus, .ouranos textarea:focus {
+  outline: 2px solid #9b7b96;
+  outline-offset: 1px;
+  border-color: #9b7b96;
+}
+.ouranos-platform button, .ouranos button { transition: background-color .12s, border-color .12s, color .12s; }
+.ouranos-platform button:not(.platform-brand):not(.platform-sidebar-trigger):not(.platform-launcher-trigger):not(.platform-top-icon):not(.platform-user),
+.ouranos button {
+  border-radius: 7px;
+}
+.ouranos-platform table, .ouranos table { border-collapse: separate; border-spacing: 0; }
+.ouranos-platform th, .ouranos th {
+  background: #ededed;
+  color: #565656;
+  font-weight: 600;
+}
+.ouranos-platform td, .ouranos-platform th,
+.ouranos td, .ouranos th { border-color: #e5e5e5; }
+.ouranos-platform tr:hover td, .ouranos tr:hover td { background: #fafafa; }
+
+/* Shared page surfaces, panels and data grids */
+.ouranos-platform [class*="panel"],
+.ouranos-platform [class*="card"],
+.ouranos [class*="panel"],
+.ouranos [class*="card"] {
+  box-shadow: none;
+}
+.ouranos-platform [class*="panel"],
+.ouranos [class*="panel"] {
+  border-color: #dedede;
+  border-radius: 9px;
+}
+.ouranos-platform [class*="table"] thead,
+.ouranos [class*="table"] thead { background: #ededed; }
+.ouranos-platform [class*="table"] th,
+.ouranos [class*="table"] th {
+  background: #ededed;
+  color: #5c5c5c;
+  font-size: 11px;
+  font-weight: 600;
+}
+.ouranos-platform [class*="table"] td,
+.ouranos [class*="table"] td { border-color: #e9e9e9; }
+
+/* Softer Odoo pastel semantic states */
+.ouranos-platform [class*="success"], .ouranos [class*="success"] { --state-bg: #e4f1e8; }
+.ouranos-platform [class*="warning"], .ouranos [class*="warning"] { --state-bg: #fbf0d9; }
+.ouranos-platform [class*="danger"], .ouranos [class*="danger"] { --state-bg: #f7e5e4; }
+.ouranos-platform [class*="badge"], .ouranos [class*="badge"],
+.ouranos-platform [class*="status"], .ouranos [class*="status"] {
+  border-radius: 999px;
+}
+
+/* Login and loading screens */
+.platform-loading, .auth-loading {
+  background: var(--o20-canvas);
+  color: #777;
+}
+
+/* Responsive shell: keep Odoo-like density without clipping controls */
+@media (max-width: 1000px) {
+  .platform-home, .platform-module { padding: 26px 22px 20px; }
+}
+@media (max-width: 720px) {
+  .platform-topbar { height: 54px; }
+  .platform-body { min-height: calc(100vh - 54px); }
+  .platform-brand-area { min-width: 0; }
+  .platform-home, .platform-module { padding: 20px 14px 18px; }
+  .platform-app-section { padding: 16px 14px 18px; }
+  .platform-app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .platform-app-card { min-height: 176px; }
+  .platform-home-heading { align-items: flex-start; }
+  .platform-home-meta { display: none; }
+}
+@media (max-width: 420px) {
+  .platform-app-grid { gap: 8px; }
+  .platform-app-card { padding: 12px; min-height: 165px; }
+  .platform-card-copy h2 { font-size: 14px; }
+}
