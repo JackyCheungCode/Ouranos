@@ -117,9 +117,6 @@ function MarketMap({selected,location}:{selected:typeof countries;location:MapLo
 }
 
 export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated, page }: Props) {
- const isFacebookPeople=page.id==='facebook-pages'
- const isFacebookMatrix=page.id==='facebook-matrix'
- const facebookMatrixActorId='get-leads~all-in-one-facebook-scraper'
  const [channel,setChannel] = useState(page.platformKeys[0] || 'google-maps')
  const [provider,setProvider] = useState('Apify')
  const [directoryPlatforms,setDirectoryPlatforms] = useState<DirectoryPlatform[]>([])
@@ -203,10 +200,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [error,setError] = useState('')
  const [notice,setNotice] = useState('')
  const [showRequestPreview,setShowRequestPreview] = useState(true)
-  const [facebookFlowStep,setFacebookFlowStep] = useState(1)
-  const [facebookCookieValue,setFacebookCookieValue] = useState('')
-  const [facebookCookieSecretRef,setFacebookCookieSecretRef] = useState('')
-  const [facebookCookieSaving,setFacebookCookieSaving] = useState(false)
  const aiContextKey=useMemo(()=>stableStringify({channel,provider,actor_id:actor?.id||'',schema,aiModel,aiRequest,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost}),[channel,provider,actor?.id,schema,aiModel,aiRequest,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost])
  const schemaValidation=useMemo(()=>{
   const errors:Record<string,string>={}
@@ -337,7 +330,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  }
  const selectActor = async (item: Actor) => {
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
-  setActor(item);setActorPickerOpen(false);setSchema(null);setValues({});setFacebookCookieSecretRef('');setFacebookCookieValue('');setAiGenerated(null);setAiSummary('');setAiStrategy('');setAiWarnings([]);setAiSuggestions([]);setAiMissingInformation([]);setAiFieldExplanations({});setAiApplied(false);setAiAnalyzedContext('');setAutoAnalysisKey('');setAiError('');setSchemaBusy(true);setError('');setNotice('');
+  setActor(item);setActorPickerOpen(false);setSchema(null);setValues({});setAiGenerated(null);setAiSummary('');setAiStrategy('');setAiWarnings([]);setAiSuggestions([]);setAiMissingInformation([]);setAiFieldExplanations({});setAiApplied(false);setAiAnalyzedContext('');setAutoAnalysisKey('');setAiError('');setSchemaBusy(true);setError('');setNotice('');
   setChatMessages(current=>[current[0],...current.filter(message=>message.role==='user'),{role:'assistant',content:'已选择 '+(item.title||item.name)+'。我正在读取它的真实输入 Schema，随后会根据参数要求继续与你确认。'}])
   const actorId=item.username+'~'+item.name
   const {data,error:invokeError}=await supabase.functions.invoke('apify-actor-schema',{body:{workspace_id:workspaceId,actor_id:actorId,channel_key:channel,supported_record_types:channel==='facebook'?['company']:['company','contact']}})
@@ -356,24 +349,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   setSchema(nextSchema);setValues(initial);if(page.id==='facebook-pages'){const countKey=Object.keys(nextSchema.properties||{}).find(key=>/^(maxResults|maxItems|maxResultsPerQuery)$/i.test(key));if(countKey&&initial[countKey]!==undefined)setTargetCount(String(initial[countKey]))}
   setNotice(data.verification_status==='verified'&&data.maintenance_status==='maintained'?'已读取 Actor 最新输入 Schema。该数据源已通过客户输出审核。':'已读取 Actor 最新输入 Schema。该 Actor 尚未通过直接客户资料审核，当前只能预览参数，不能启动正式采集。')
   setSchemaBusy(false)
- }
- useEffect(()=>{
-  if(!isFacebookMatrix||!canSearchSelectedProvider||actor||schemaBusy)return
-  void selectActor({id:facebookMatrixActorId,username:'get-leads',name:'all-in-one-facebook-scraper',title:'All-in-One Facebook Scraper',description:'12 种 Facebook 数据发现模式，按最新 Actor Schema 动态配置。',url:'https://apify.com/get-leads/all-in-one-facebook-scraper'})
- },[isFacebookMatrix,canSearchSelectedProvider,actor?.id,schemaBusy,workspaceId])
- const saveFacebookCookie=async()=>{
-  if(!supabase||!facebookCookieValue.trim())return
-  setFacebookCookieSaving(true);setError('')
-  try{
-   const {data,error:saveError}=await supabase.functions.invoke('facebook-discovery-secret',{body:{workspace_id:workspaceId,secret:facebookCookieValue.trim()}})
-   if(saveError||data?.error)throw new Error(data?.error||saveError?.message||'安全保存 Cookie 失败')
-   setFacebookCookieSecretRef(String(data.secret_ref||''))
-   const cookieKey=Object.keys(schema?.properties||{}).find(key=>/^(loginCookies|cookies)$/i.test(key))
-   if(cookieKey)setValues(current=>({...current,[cookieKey]:'__vault_secret__'}))
-   setFacebookCookieValue('')
-   setNotice('登录凭据已加密保存，仅用于本次 Actor 启动。')
-  }catch(e){setError(e instanceof Error?e.message:'安全保存 Cookie 失败')}
-  finally{setFacebookCookieSaving(false)}
  }
  const selectFacebookActor=(option:typeof facebookProfileActors[number])=>{
   const configured=approvedActors.find(item=>item.username===option.username&&item.name===option.name)
@@ -537,6 +512,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   void sendAssistantTurn(chatMessages,aiRequest)
  },[schema,actor?.id,aiContextKey])
  const startSearch = async () => {
+  const isFacebookPeople=page.id==='facebook-pages'
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
   if(!actor){setError('请先选择一个 Facebook 个人资料 Actor。');return}
@@ -574,19 +550,18 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    }
    const taskTitle=taskName.trim()||(isFacebookPeople?'Facebook个人客户：'+keywords.trim():product.trim()||keywords.trim()||actor.title)
    const schemaHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stableStringify(isFacebookPeople?{}:schema))).then(d=>[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join(''))
-   const profile={criteria:taskTitle,facebook_cookie_secret_ref:isFacebookMatrix?facebookCookieSecretRef:null,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:isFacebookPeople?'contacts':targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:isFacebookPeople?null:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel,provider_key:selectedProviderKey,adapter_key:selectedAdapterKey,ai_analysis:isFacebookPeople?null:aiGenerated?{model:aiModel,user_request:aiRequest,conversation:chatMessages,summary:aiSummary,strategy:aiStrategy,actor_input:actorInput,field_explanations:aiFieldExplanations,missing_information:aiMissingInformation,warnings:aiWarnings,analyzed_at:new Date().toISOString()}:null}
+   const profile={criteria:taskTitle,keywords,product,industry,countries:selectedCountryItems.map(c=>({code:c.code,name:c.name,geoName:c.geoName})),regions:region&&region!=='__all__'?[region]:[],cities:city?[city]:[],target_type:isFacebookPeople?'contacts':targetType,provider,actor_id:actorId,actor_input:actorInput,actor_input_schema:isFacebookPeople?null:schema,actor_schema_hash:schemaHash,location:{countries:selectedCountryItems.map(c=>c.geoName),country:selectedCountry?.geoName||'',region:region==='__all__'?'':region,city},source_channel:channel,provider_key:selectedProviderKey,adapter_key:selectedAdapterKey,ai_analysis:isFacebookPeople?null:aiGenerated?{model:aiModel,user_request:aiRequest,conversation:chatMessages,summary:aiSummary,strategy:aiStrategy,actor_input:actorInput,field_explanations:aiFieldExplanations,missing_information:aiMissingInformation,warnings:aiWarnings,analyzed_at:new Date().toISOString()}:null}
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspaceId,created_by:userId,name:taskTitle,status:'draft',target_profile:profile,selected_channels:[channel],target_count:Number(targetCount)}).select('id').single()
    if(taskError)throw new Error(taskError.message)
    const {data:selections,error:selectionQueryError}=await supabase.from('workspace_adapter_selections').select('id,adapter_key,config,discovery_adapter_catalog!inner(external_actor_id,provider_key,verification_status,maintenance_status,is_active)').eq('workspace_id',workspaceId).eq('channel_key',channel).eq('is_enabled',true).eq('discovery_adapter_catalog.provider_key',selectedProviderKey)
    if(selectionQueryError)throw selectionQueryError
-   const selection=(selections||[]).find((row:any)=>row.adapter_key===selectedAdapterKey&&row.discovery_adapter_catalog?.external_actor_id===actorId&&row.discovery_adapter_catalog?.is_active===true&&(isFacebookPeople||isFacebookMatrix||row.discovery_adapter_catalog?.verification_status==='verified'&&row.discovery_adapter_catalog?.maintenance_status==='maintained'))
+   const selection=(selections||[]).find((row:any)=>row.adapter_key===selectedAdapterKey&&row.discovery_adapter_catalog?.external_actor_id===actorId&&row.discovery_adapter_catalog?.is_active===true&&(isFacebookPeople||row.discovery_adapter_catalog?.verification_status==='verified'&&row.discovery_adapter_catalog?.maintenance_status==='maintained'))
    if(!selection)throw new Error('当前 Actor 已不在可用目录中，请刷新页面并联系管理员检查配置。')
    const config={...(selection.config||{}),max_cost:Number(maxCost),max_items:Number(targetCount)}
    const {error:selectionError}=await supabase.from('workspace_adapter_selections').update({config,updated_at:new Date().toISOString()}).eq('id',selection.id).eq('workspace_id',workspaceId)
    if(selectionError)throw new Error('搜索任务已保存，但适配器参数配置失败：'+selectionError.message)
    const {data:queued,error:queueError}=await supabase.functions.invoke('enqueue-lead-search',{body:{workspace_id:workspaceId,task_id:task.id,confirm_cost:true}})
    if(queueError||queued?.error)throw new Error(queued?.error||queueError?.message||'启动搜索失败')
-   if(isFacebookMatrix&&facebookCookieSecretRef)setFacebookCookieSecretRef('')
    setNotice('搜索任务已成功进入队列。')
    await onTaskCreated(task.id)
   }catch(e){setError(e instanceof Error?e.message:'无法创建搜索任务')}
@@ -598,36 +573,6 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   const unit=pricing.unitName ? ' / '+String(pricing.unitName) : ''
   const price=pricing.pricePerUnitUsd ? ' · $'+String(pricing.pricePerUnitUsd)+unit : ''
   return model+price
- }
- if(isFacebookMatrix){
-  const props=schema?.properties||{}, keys=Object.keys(props)
-  const modeKey=keys.find(k=>/^(scrapeMode|mode)$/i.test(k))||keys.find(k=>/scrape.?mode/i.test(k))||''
-  const mode=String(values[modeKey]||'')
-  const cookieKey=keys.find(k=>/^(loginCookies|cookies)$/i.test(k))||''
-  const needsCookie=/groups|search|reviews|comments|reels|ads/i.test(mode)
-  const required=new Set(schema?.required||[])
-  const targetPattern=/^(pages|searchQueries|searchTerms|groupUrls|marketplaceQueries|marketplaceLocation|eventSearchQueries|postUrls|commentUrls|reviewUrls|reelUrls|adSearchQueries|adLibraryUrls|startUrls|queries|urls)$/i
-  const fields=schemaKeys(schema||{}).filter(([k])=>k!==modeKey&&k!==cookieKey)
-  const targets=fields.filter(([k])=>required.has(k)||targetPattern.test(k))
-  const targetKeys=new Set(targets.map(([k])=>k))
-  const advanced=fields.filter(([k])=>!targetKeys.has(k))
-  return <div className="ldw-shell ldw-manual-first fb-step-shell">
-   <div className="ldw-workflow-head"><div><span className="ldw-eyebrow">FACEBOOK DISCOVERY WORKFLOW</span><h2>Facebook 数据发现</h2><p>已读取 All-in-One Facebook Scraper 最新 Input Schema，按步骤配置并校验。</p></div><a href="https://apify.com/get-leads/all-in-one-facebook-scraper" target="_blank" rel="noreferrer">Actor 文档 ↗</a></div>
-   <div className="fb-stepper">{['选择采集类型','填写发现条件','高级设置','确认并抓取'].map((label,i)=><div key={label} className={facebookFlowStep===i+1?'active':facebookFlowStep>i+1?'done':''}><span>{facebookFlowStep>i+1?'✓':i+1}</span><b>{label}</b></div>)}</div>
-   {!canSearchSelectedProvider&&<div className="ldw-provider-note">请先在「系统设置 → 集成」连接并启用 Apify API Key。</div>}
-   {schemaBusy&&<div className="ldw-loading"><Loader2 size={16} className="ldw-spin"/> 正在读取 Actor 最新 Schema…</div>}
-   {actor&&schema&&<>
-    {facebookFlowStep===1&&<section className="ldw-card fb-step-card"><div className="ldw-step-title"><span>1</span><div><h3>选择采集类型</h3><p>下拉选项直接来自 Actor Schema，不使用自行编造的模式值。</p></div></div><div className="fb-actor-summary"><b>{actor.title}</b><small>get-leads~all-in-one-facebook-scraper · {keys.length} 个 Schema 字段</small></div>{modeKey?renderField([modeKey,props[modeKey]]):<p>Actor Schema 未包含模式选择字段，暂不能继续。</p>}</section>}
-    {facebookFlowStep===2&&<section className="ldw-card fb-step-card"><div className="ldw-step-title"><span>2</span><div><h3>填写发现条件</h3><p>仅展示目标入口和必填项；每行填写一个关键词或网址。</p></div></div><div className="fb-selected-mode"><span>采集模式</span><b>{mode||'未选择'}</b><button type="button" onClick={()=>setFacebookFlowStep(1)}>更改</button></div>{targets.length?<div className="ldw-form-grid">{targets.map(renderField)}</div>:<p>该模式无需额外目标参数。</p>}{!schemaValidation.valid&&<small className="ldw-field-error">请完成必填字段：{Object.keys(schemaValidation.errors).join('、')}</small>}</section>}
-    {facebookFlowStep===3&&<section className="ldw-card fb-step-card"><div className="ldw-step-title"><span>3</span><div><h3>高级设置与访问凭据</h3><p>默认值来自 Actor Schema；不确定时保持默认即可。</p></div></div>{advanced.length>0&&<div className="ldw-form-grid">{advanced.map(renderField)}</div>}
-     {cookieKey&&<div className="fb-cookie-panel"><b>Facebook 登录 Cookie {needsCookie?'（此模式必需）':'（可选）'}</b><p>凭据会单独加密保存，不写入任务参数和日志。Actor 成功启动后删除本次临时凭据。</p>{facebookCookieSecretRef?<div className="fb-cookie-saved"><ShieldCheck size={16}/> 已加密保存 <button type="button" onClick={()=>setFacebookCookieSecretRef('')}>更换</button></div>:<><textarea value={facebookCookieValue} onChange={e=>setFacebookCookieValue(e.target.value)} rows={3} placeholder="粘贴 c_user=…; xs=…" autoComplete="off"/><button type="button" disabled={!facebookCookieValue.trim()||facebookCookieSaving} onClick={()=>void saveFacebookCookie()}>{facebookCookieSaving?'正在保存…':'安全保存 Cookie'}</button></>}{needsCookie&&!facebookCookieSecretRef&&<small className="ldw-field-error">此模式需要先安全保存 Cookie。</small>}</div>}
-     <label className="fb-cost-field"><span>单次费用上限（USD）</span><input type="number" min="0.1" step="0.1" value={maxCost} onChange={e=>setMaxCost(e.target.value)}/><small>实际费用以 Apify 账单为准。</small></label></section>}
-    {facebookFlowStep===4&&<section className="ldw-card fb-step-card"><div className="ldw-step-title"><span>4</span><div><h3>确认并开始抓取</h3><p>提交前检查参数与费用上限。</p></div></div><div className="fb-review-grid"><div><small>采集模式</small><b>{mode}</b></div><div><small>Actor</small><b>All-in-One Facebook Scraper</b></div><div><small>参数数量</small><b>{Object.keys(schemaValidation.payload).filter(k=>k!==cookieKey).length}</b></div><div><small>费用上限</small><b>${maxCost} USD</b></div></div><details className="fb-json-preview"><summary>查看提交参数（已排除 Cookie）</summary><pre>{JSON.stringify(Object.fromEntries(Object.entries(schemaValidation.payload).filter(([k])=>k!==cookieKey)),null,2)}</pre></details><div className="fb-consent-note"><ShieldCheck size={16}/><span>确认后会启动一次 Actor 任务并可能产生费用；仅采集公开可见或你有权访问的数据。</span></div>{!schemaValidation.valid&&<small className="ldw-field-error">Schema 校验未通过。</small>}</section>}
-   </>}
-   {error&&<div className="ldw-error">{error}</div>}{notice&&<div className="ldw-notice">{notice}</div>}
-   <div className="fb-step-actions"><button type="button" className="fb-back-button" disabled={facebookFlowStep===1||busy} onClick={()=>setFacebookFlowStep(s=>Math.max(1,s-1))}>上一步</button>{facebookFlowStep<4?<button type="button" className="fb-next-button" disabled={!schema||schemaBusy||!canSearchSelectedProvider||(facebookFlowStep===1&&!mode)||(facebookFlowStep===2&&!schemaValidation.valid)||(facebookFlowStep===3&&needsCookie&&!facebookCookieSecretRef)} onClick={()=>{setError('');setFacebookFlowStep(s=>s+1)}}>下一步 <ArrowRight size={15}/></button>:<button type="button" className="fb-next-button" disabled={!schemaValidation.valid||busy||!canSearchSelectedProvider||Number(maxCost)<=0} onClick={()=>void startSearch()}>{busy?'正在创建任务…':'开始抓取'} <ArrowRight size={15}/></button>}</div>
-   <div className="fb-step-footnote">任务创建后可在抓取结果和搜索任务中查看。原始记录按 Actor 实际返回字段完整保存。</div>
-  </div>
  }
  return <div className="ldw-shell ldw-manual-first">
   <div className="ldw-workflow-head"><div><span className="ldw-eyebrow">MANUAL DISCOVERY</span><h2>{page.title} · 数据源配置</h2><p>{page.description} {page.id==='facebook-pages'?'Facebook 个人客户发现使用统一中文表单；选择 Actor 后由系统转换其专属参数。':'选择平台、服务商和 Actor 后，系统读取真实 Schema 并生成中文参数表单。'}</p></div>{page.id!=='facebook-pages'&&<button type="button" className="ldw-ai-sidebar-trigger" aria-expanded={aiSidebarOpen} onClick={()=>setAiSidebarOpen(value=>!value)}><Sparkles size={14}/>{aiSidebarOpen?'收起 AI 助手':'打开 AI 助手'}</button>}</div>
