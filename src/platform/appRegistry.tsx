@@ -1,5 +1,4 @@
-
-export type PlatformAppId = 'lead-development' | 'ops-discovery' | 'settings'
+export type PlatformAppId = 'lead-development' | 'settings'
 
 export type PlatformApp = {
   id: PlatformAppId
@@ -13,28 +12,28 @@ export type PlatformApp = {
   navigation: string[]
 }
 
-export const platformApps: PlatformApp[] = [{id:'ops-discovery',name:'运维和发现',englishName:'Operations & Discovery',description:'Facebook 数据发现矩阵与采集运维。',tagline:'多模式发现与任务运维',icon:'fab fa-facebook',color:'#1877F2',category:'数据运营',navigation:['Facebook','Facebook发现']},
+export const platformApps: PlatformApp[] = [
   {
     id: 'lead-development',
-    name: '线索发展',
-    englishName: 'Lead Development',
-    description: '发现潜在客户，拓展业务机会。',
-    tagline: '从市场发现到销售机会',
+    name: '线索发现',
+    englishName: 'Lead Discovery',
+    description: '从多个公开渠道发现潜在客户，并将结果沉淀到统一线索中心。',
+    tagline: '从市场发现到可用线索',
     icon: 'fas fa-search',
     color: '#714B67',
-    category: '业务应用',
-    navigation: ['工作台', '线索发现', '线索池', '采集任务'],
+    category: '客户开发',
+    navigation: ['发现平台', '采集任务', '线索结果'],
   },
   {
     id: 'settings',
-    name: '系统设置',
-    englishName: 'Settings',
-    description: '管理工作空间、用户权限与系统集成。',
-    tagline: '统一管理系统配置',
+    name: '系统管理',
+    englishName: 'System Management',
+    description: '统一管理数据服务、AI 模型和工作空间配置。',
+    tagline: '管理数据源与系统能力',
     icon: 'fas fa-sliders-h',
     color: '#65758B',
     category: '管理',
-    navigation: ['工作台', '用户与权限', '系统集成', '工作空间'],
+    navigation: ['数据服务', 'AI 模型', '工作空间'],
   },
 ]
 
