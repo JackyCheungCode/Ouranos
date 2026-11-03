@@ -9,7 +9,7 @@ import { countries } from './countries'
 import './LeadDiscoveryWizard.css'
 import type { DiscoveryPageDefinition } from './DiscoveryPageHub'
 
-type Props = { workspaceId: string; userId: string; onTaskCreated: () => void; page: DiscoveryPageDefinition }
+type Props = { workspaceId: string; userId: string; onTaskCreated: (taskId?:string) => void; page: DiscoveryPageDefinition }
 type Actor = { id: string; name: string; username: string; title: string; description: string; url: string; adapterKey?:string; stats?: { totalUsers?: number; actorReviewRating?: number; actorReviewCount?: number }; currentPricingInfo?: Record<string, unknown> }
 type SchemaField = { title?: string; description?: string; type?: string | string[]; editor?: string; default?: unknown; prefill?: unknown; example?: unknown; placeholderValue?: string; enum?: unknown[]; items?: SchemaField; properties?: Record<string, SchemaField>; required?: string[]; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; minItems?: number; maxItems?: number; pattern?: string; format?: string }
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
@@ -563,7 +563,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    const {data:queued,error:queueError}=await supabase.functions.invoke('enqueue-lead-search',{body:{workspace_id:workspaceId,task_id:task.id,confirm_cost:true}})
    if(queueError||queued?.error)throw new Error(queued?.error||queueError?.message||'启动搜索失败')
    setNotice('搜索任务已成功进入队列。')
-   onTaskCreated()
+   onTaskCreated(task.id)
   }catch(e){setError(e instanceof Error?e.message:'无法创建搜索任务')}
   finally{setBusy(false)}
  }
