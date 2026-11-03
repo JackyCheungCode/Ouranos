@@ -64,7 +64,7 @@ button{font:inherit}
 .platform-section-title{display:flex;align-items:center;justify-content:space-between;padding-bottom:18px;border-bottom:1px solid #efedef;margin-bottom:19px}
 .platform-section-title>div{display:flex;align-items:baseline;gap:9px}.platform-section-title>div>span{font-size:14px;font-weight:700}.platform-section-title small{color:#a19ba4;font-size:9px;letter-spacing:1px}
 .platform-app-count{color:#9a949e;font-size:10px}
-.platform-app-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.platform-app-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:15px;max-width:920px}
 .platform-app-card{min-height:208px;display:flex;flex-direction:column;align-items:stretch;padding:17px 17px 14px;border:1px solid #eae7eb;border-radius:5px;background:#fff;color:var(--ink);text-align:left;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s}
 .platform-app-card:hover{transform:translateY(-2px);border-color:#c9b8c7;box-shadow:0 7px 20px #392c3910}
 .platform-card-top{display:flex;align-items:center;justify-content:space-between}
