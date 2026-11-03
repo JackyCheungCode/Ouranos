@@ -354,6 +354,24 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
   setNotice(data.verification_status==='verified'&&data.maintenance_status==='maintained'?'已读取 Actor 最新输入 Schema。该数据源已通过客户输出审核。':'已读取 Actor 最新输入 Schema。该 Actor 尚未通过直接客户资料审核，当前只能预览参数，不能启动正式采集。')
   setSchemaBusy(false)
  }
+ useEffect(()=>{
+  if(!isFacebookMatrix||!canSearchSelectedProvider||actor||schemaBusy)return
+  void selectActor({id:facebookMatrixActorId,username:'get-leads',name:'all-in-one-facebook-scraper',title:'All-in-One Facebook Scraper',description:'12 种 Facebook 数据发现模式，按最新 Actor Schema 动态配置。',url:'https://apify.com/get-leads/all-in-one-facebook-scraper'})
+ },[isFacebookMatrix,canSearchSelectedProvider,actor?.id,schemaBusy,workspaceId])
+ const saveFacebookCookie=async()=>{
+  if(!supabase||!facebookCookieValue.trim())return
+  setFacebookCookieSaving(true);setError('')
+  try{
+   const {data,error:saveError}=await supabase.functions.invoke('facebook-discovery-secret',{body:{workspace_id:workspaceId,secret:facebookCookieValue.trim()}})
+   if(saveError||data?.error)throw new Error(data?.error||saveError?.message||'安全保存 Cookie 失败')
+   setFacebookCookieSecretRef(String(data.secret_ref||''))
+   const cookieKey=Object.keys(schema?.properties||{}).find(key=>/^(loginCookies|cookies)$/i.test(key))
+   if(cookieKey)setValues(current=>({...current,[cookieKey]:'__vault_secret__'}))
+   setFacebookCookieValue('')
+   setNotice('登录凭据已加密保存，仅用于本次 Actor 启动。')
+  }catch(e){setError(e instanceof Error?e.message:'安全保存 Cookie 失败')}
+  finally{setFacebookCookieSaving(false)}
+ }
  const selectFacebookActor=(option:typeof facebookProfileActors[number])=>{
   const configured=approvedActors.find(item=>item.username===option.username&&item.name===option.name)
   const selected:Actor=configured||{id:option.username+'~'+option.name,username:option.username,name:option.name,title:option.title,description:option.description,url:'https://apify.com/'+option.username+'/'+option.name}
