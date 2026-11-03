@@ -200,6 +200,10 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  const [error,setError] = useState('')
  const [notice,setNotice] = useState('')
  const [showRequestPreview,setShowRequestPreview] = useState(true)
+  const [facebookFlowStep,setFacebookFlowStep] = useState(1)
+  const [facebookCookieValue,setFacebookCookieValue] = useState('')
+  const [facebookCookieSecretRef,setFacebookCookieSecretRef] = useState('')
+  const [facebookCookieSaving,setFacebookCookieSaving] = useState(false)
  const aiContextKey=useMemo(()=>stableStringify({channel,provider,actor_id:actor?.id||'',schema,aiModel,aiRequest,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost}),[channel,provider,actor?.id,schema,aiModel,aiRequest,countryCode,selectedCountries,region,regionManual,city,taskName,product,industry,keywords,targetType,targetCount,maxCost])
  const schemaValidation=useMemo(()=>{
   const errors:Record<string,string>={}
@@ -513,6 +517,8 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
  },[schema,actor?.id,aiContextKey])
  const startSearch = async () => {
   const isFacebookPeople=page.id==='facebook-pages'
+  const isFacebookMatrix=page.id==='facebook-matrix'
+  const facebookMatrixActorId='get-leads~all-in-one-facebook-scraper'
   if(!supabase){setError('Supabase 尚未配置，请先完成系统连接。');return}
   if(!workspaceId||!userId){setError('当前工作空间或用户会话不可用，请重新登录后重试。');return}
   if(!actor){setError('请先选择一个 Facebook 个人资料 Actor。');return}
