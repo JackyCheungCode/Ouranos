@@ -22,7 +22,7 @@ export const platformApps: PlatformApp[] = [
     icon: 'fas fa-search',
     color: '#714B67',
     category: '客户开发',
-    navigation: ['发现平台', '采集任务', '线索结果'],
+    navigation: ['发现平台', '采集任务', '采集数据'],
   },
   {
     id: 'settings',
