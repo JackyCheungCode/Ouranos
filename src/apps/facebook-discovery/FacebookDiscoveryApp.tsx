@@ -133,11 +133,15 @@ export default function FacebookDiscoveryApp({ onOpenPersonalSearch }: { onOpenP
   let cookieSecretId:string|null=null
   try{
    if(cookieValue.trim()){
-    const {data:secretId,error:secretError}=await supabase.rpc('integration_secret_create',{p_secret:cookieValue.trim(),p_name:'Facebook Actor Cookie · '+mode.id,p_description:'仅供本次 Facebook Actor 抓取启动时使用'})
-    if(secretError||!secretId)throw new Error(secretError?.message||'Cookie 加密保存失败')
-    cookieSecretId=String(secretId)
+    const {data:secretData,error:secretError}=await supabase.functions.invoke('facebook-discovery-secret',{body:{workspace_id:workspace.id,action:'save',secret:cookieValue.trim()}})
+    if(secretError||secretData?.error||!secretData?.secret_ref)throw new Error(secretData?.error||secretError?.message||'Cookie 加密保存失败')
+    cookieSecretId=String(secretData.secret_ref)
    }
    const input=actorInput()
+   const {data:selection,error:selectionReadError}=await supabase.from('workspace_adapter_selections').select('id,config').eq('workspace_id',workspace.id).eq('channel_key','facebook').eq('adapter_key',adapterKey).eq('is_enabled',true).maybeSingle()
+   if(selectionReadError||!selection)throw new Error(selectionReadError?.message||'Actor 尚未启用，请刷新 Schema 后重试。')
+   const {error:selectionUpdateError}=await supabase.from('workspace_adapter_selections').update({config:{...(selection.config||{}),max_cost:Number(maxCost),max_items:Number(values.resultsPerPage||50)},updated_at:new Date().toISOString()}).eq('id',selection.id).eq('workspace_id',workspace.id)
+   if(selectionUpdateError)throw new Error('费用与数量限制保存失败：'+selectionUpdateError.message)
    const taskTitle=taskName.trim()||'Facebook '+mode.title+' · '+new Date().toLocaleString()
    const profile={criteria:taskTitle,source_channel:'facebook',provider_key:'apify',actor_id:ACTOR_ID,adapter_key:adapterKey,actor_input:input,actor_input_schema:schema,actor_schema_hash:'runtime-schema',raw_results_only:true,facebook_cookie_secret_ref:cookieSecretId,max_cost:Number(maxCost),mode_id:modeId,mode_title:mode.title}
    const {data:task,error:taskError}=await supabase.from('lead_search_tasks').insert({workspace_id:workspace.id,created_by:user.id,name:taskTitle,status:'draft',target_profile:profile,selected_channels:['facebook'],target_count:Number(values.resultsPerPage||50)}).select('id').single()
@@ -146,7 +150,7 @@ export default function FacebookDiscoveryApp({ onOpenPersonalSearch }: { onOpenP
    if(queueError||queued?.error)throw new Error(queued?.error||queueError?.message||'任务进入队列失败')
    setCookieValue('');setNotice('抓取任务已成功启动。完成后可在「抓取结果」查看 Actor 原始返回记录。');setTab('wizard');setStep(4);await refreshData()
   }catch(e){
-   if(cookieSecretId)await supabase.rpc('integration_secret_delete',{p_secret_id:cookieSecretId})
+   if(cookieSecretId)await supabase.functions.invoke('facebook-discovery-secret',{body:{workspace_id:workspace.id,action:'delete',secret_ref:cookieSecretId}})
    setError(e instanceof Error?e.message:'启动抓取失败')
   }finally{setBusy(false)}
  }
@@ -164,7 +168,7 @@ export default function FacebookDiscoveryApp({ onOpenPersonalSearch }: { onOpenP
   }catch(e){setDataError(e instanceof Error?e.message:'读取抓取结果失败')}
   finally{setDataBusy(false)}
  }
- useEffect(()=>{void refreshData()},[workspace?.id])
+ useEffect(()=>{void refreshData();if(tab!=='tasks'&&tab!=='results')return;const timer=window.setInterval(()=>void refreshData(),5000);return()=>window.clearInterval(timer)},[workspace?.id,tab])
  const fieldControl=(key:string,field:SchemaField)=>{
   const type=asType(field);const value=values[key]??defaultFor(field);const requiredField=required.has(key)
   const label=FIELD_LABELS[key]||field.title||key
