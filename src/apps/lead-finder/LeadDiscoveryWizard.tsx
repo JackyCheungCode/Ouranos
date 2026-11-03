@@ -9,7 +9,7 @@ import { countries } from './countries'
 import './LeadDiscoveryWizard.css'
 import type { DiscoveryPageDefinition } from './DiscoveryPageHub'
 
-type Props = { workspaceId: string; userId: string; onTaskCreated: (taskId?:string) => void; page: DiscoveryPageDefinition }
+type Props = { workspaceId: string; userId: string; onTaskCreated: (taskId?:string) => void | Promise<void>; page: DiscoveryPageDefinition }
 type Actor = { id: string; name: string; username: string; title: string; description: string; url: string; adapterKey?:string; stats?: { totalUsers?: number; actorReviewRating?: number; actorReviewCount?: number }; currentPricingInfo?: Record<string, unknown> }
 type SchemaField = { title?: string; description?: string; type?: string | string[]; editor?: string; default?: unknown; prefill?: unknown; example?: unknown; placeholderValue?: string; enum?: unknown[]; items?: SchemaField; properties?: Record<string, SchemaField>; required?: string[]; minimum?: number; maximum?: number; minLength?: number; maxLength?: number; minItems?: number; maxItems?: number; pattern?: string; format?: string }
 type JsonSchema = { properties?: Record<string, SchemaField>; required?: string[] }
@@ -563,7 +563,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
    const {data:queued,error:queueError}=await supabase.functions.invoke('enqueue-lead-search',{body:{workspace_id:workspaceId,task_id:task.id,confirm_cost:true}})
    if(queueError||queued?.error)throw new Error(queued?.error||queueError?.message||'启动搜索失败')
    setNotice('搜索任务已成功进入队列。')
-   onTaskCreated(task.id)
+   await onTaskCreated(task.id)
   }catch(e){setError(e instanceof Error?e.message:'无法创建搜索任务')}
   finally{setBusy(false)}
  }
@@ -636,7 +636,7 @@ export default function LeadDiscoveryWizard({ workspaceId, userId, onTaskCreated
     {page.id==='facebook-pages' ? <section className="ldw-card ldw-facebook-task-card">
      <div className="ldw-step-title"><span>1</span><div><h3>填写通用搜索条件</h3><p>先填写客户关键词与目标地区，再选择一个 Facebook 个人资料 Actor。</p></div></div>
      <div className="ldw-form-grid">
-      <label className="ldw-field"><span>搜索关键词 <b>* 必填</b></span><input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="例如：real estate agent、software engineer、wedding photographer"/><small>填写职业、行业、业务类型或目标人群；一次填写一个清晰关键词。</small></label>
+      <label className="ldw-field"><span>搜索关键词 <b>* 必填</b></span><input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="例如：real estate agent、software engineer、wedding photographer"/><small>填写职业、岗位、行业角色或目标人群；若销售商品，请搜索“买家 / 采购 / 经销商”等人群，而不是只填商品名称。</small></label>
       <div className="ldw-field ldw-country-field"><span>国家 / 地区 <b>* 必填</b></span><button type="button" className="ldw-country-trigger" aria-expanded={countryPickerOpen} onClick={()=>{setCountryPickerOpen(value=>!value);setCountrySearch('')}}>{selectedCountry?.geoName||'Select a country / region'} <ChevronDown size={15}/></button>{countryPickerOpen&&<div className="ldw-country-menu"><input autoFocus value={countrySearch} onChange={e=>setCountrySearch(e.target.value)} placeholder="Search country / region in English…"/><div className="ldw-country-options">{countries.filter(c=>(c.geoName+' '+c.code).toLowerCase().includes(countrySearch.trim().toLowerCase())).map(c=><button type="button" key={c.code} className={countryCode===c.code?'selected':''} onClick={()=>{setCountryCode(c.code);setSelectedCountries([c.code]);setRegion('__all__');setCity('');setCountryPickerOpen(false);setCountrySearch('')}}>{c.geoName} <small>{c.code}</small></button>)}</div></div>}<small>Country / region names are sent to the Actor in English to avoid localization and parameter mismatch.</small>{locationBusy&&<small className="ldw-inline-loading"><Loader2 size={12}/> 正在加载地区信息…</small>}</div>
       <label className="ldw-field"><span>城市（可选）</span><input value={city} onChange={e=>setCity(e.target.value)} placeholder="例如：Tokyo、New York、London"/><small>建议使用英文城市名，以便 Actor 识别 Facebook 地点。</small></label>
       <label className="ldw-field"><span>最多抓取人数 <b>* 必填</b></span><input type="number" min={10} max={500} step={1} value={targetCount} onChange={e=>setTargetCount(e.target.value)}/><small>统一限制为 10–500 人；实际返回数量可能少于设置值。</small></label>
