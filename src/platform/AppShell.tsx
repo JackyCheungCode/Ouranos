@@ -24,7 +24,7 @@ function AppLauncher({ onOpen }: { onOpen: (id: PlatformAppId) => void }) {
       <div className="platform-app-grid">{platformApps.map(app =>
         <button className="platform-app-card" key={app.id} onClick={() => onOpen(app.id)}>
           <div className="platform-card-top"><AppIcon app={app} size={24}/></div>
-          <div className="platform-card-copy"><h2>{app.name}</h2></div>
+          <div className="platform-card-copy"><h2>{app.name}</h2><span>{app.tagline}</span><p>{app.description}</p></div>
           <div className="platform-card-bottom"><span>{app.category}</span><span className="platform-card-open">打开 <ChevronRight size={14}/></span></div>
         </button>
       )}</div>
