@@ -86,7 +86,7 @@ export default function AppShell({ user, workspace }: Props) {
     <div className="platform-body"><main className="platform-main">
       {active ? (active.id === 'settings'
         ? <SystemSettingsModule route={route} navigate={navigate} onHome={goHome}/>
-        : active.id === 'lead-development' ? <LeadFinderApp/>
+        : active.id === 'lead-development' ? <LeadFinderApp route={route} navigate={navigate}/>
         : <ModulePlaceholder app={active} onHome={goHome}/>)
         : <AppLauncher onOpen={openApp}/>}
     </main></div>
