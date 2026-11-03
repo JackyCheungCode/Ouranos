@@ -21,7 +21,7 @@ const MODES:Mode[]=[
  {id:'events',title:'活动发现',actorValue:'facebook-events-scraper',group:'商业机会与商品',description:'发现活动名称、组织者、时间、地点和响应人数。',inputs:['pages','eventSearchQueries','resultsPerPage']},
  {id:'marketplace',title:'Marketplace 商品',actorValue:'facebook-marketplace-scraper',group:'商业机会与商品',description:'搜索商品列表、价格、卖家和商品地区。',inputs:['marketplaceQueries','marketplaceLocation','resultsPerPage','loginCookies']},
  {id:'reels',title:'Reels 短视频',actorValue:'facebook-reels-scraper',group:'商业机会与商品',description:'采集短视频文案、作者、发布时间和互动数。',inputs:['pages','resultsPerPage','loginCookies'],requiresCookies:true},
- {id:'ads',title:'广告情报',actorValue:'facebook-ads-scraper',group:'商业机会与商品',description:'分析 Meta 广告素材、广告主、投放日期和目标地区。',inputs:['searchQueries','pages','resultsPerPage','loginCookies','facebookAppToken'],requiresCookies:true},
+ {id:'ads',title:'广告情报',actorValue:'facebook-ads-scraper',group:'商业机会与商品',description:'分析 Meta 广告素材、广告主、投放日期和目标地区。',inputs:['searchQueries','pages','resultsPerPage','loginCookies'],requiresCookies:true},
  {id:'all-in-one',title:'多模式组合采集',actorValue:'facebook-scraper',group:'组合采集',description:'一次运行组合多个发现入口。建议先从单模式小批量开始。',inputs:['pages','searchQueries','locations','groupUrls','eventSearchQueries','marketplaceQueries','marketplaceLocation','resultsPerPage','loginCookies'],requiresCookies:true},
  {id:'data-extractor',title:'轻量数据提取',actorValue:'facebook-data-extractor',group:'组合采集',description:'使用 Actor 的轻量数据提取模式，字段以实际 Schema 为准。',inputs:['pages','searchQueries','locations','groupUrls','eventSearchQueries','marketplaceQueries','marketplaceLocation','resultsPerPage','loginCookies']}
 ]
