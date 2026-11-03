@@ -60,12 +60,13 @@ async function processRun(run:Record<string,unknown>,admin:string){
  if(!connection?.secret_ref||connection.status!=="connected"||connection.is_enabled!==true)throw new Error("Provider connection is not enabled");
  const credentials=await readSecret(connection.secret_ref,admin);
  const config=obj(run.adapter_config_snapshot);if(run.provider_cursor)config.dataset_id=run.provider_cursor;
- const ctx:AdapterContext={credentials,config,input:obj(run.input_payload),costApproved:obj(run.billing_details).cost_approved===true,maxCost:Number(obj(run.billing_details).max_cost)||undefined};
+ const input={...obj(run.input_payload)};const cookieSecretRef=asText(config.login_cookies_secret_ref);if(cookieSecretRef){const cookieResponse=await rest("rpc/integration_secret_read",admin,{method:"POST",body:JSON.stringify({p_secret_id:cookieSecretRef})});if(!cookieResponse.ok)throw new Error("Unable to read encrypted Facebook login cookie");const cookie=await cookieResponse.json();if(typeof cookie!=="string"||!cookie)throw new Error("Facebook login cookie secret is empty");input.loginCookies=cookie;}
+ const ctx:AdapterContext={credentials,config,input,costApproved:obj(run.billing_details).cost_approved===true,maxCost:Number(obj(run.billing_details).max_cost)||Number(config.max_cost)||undefined};
  const jobId=asText(run.provider_job_id);const now=new Date().toISOString();
  if(!jobId){
   await logTask(String(run.task_id),workspaceId,run,'validating','正在验证 Actor 输入参数与服务商连接',admin);await adapter.validate(ctx);
   await logTask(String(run.task_id),workspaceId,run,'starting','参数验证通过，正在向服务商提交采集任务',admin);const started=await adapter.start(ctx);await logTask(String(run.task_id),workspaceId,run,'submitted','服务商已接收任务',admin,{provider_job_id:started.providerJobId,state:started.state});
-  const usage=obj(started.usage);
+  const usage=obj(started.usage);if(cookieSecretRef){await rest("rpc/integration_secret_delete",admin,{method:"POST",body:JSON.stringify({p_secret_id:cookieSecretRef})});delete config.login_cookies_secret_ref;}
   if(await taskIsCancelled(String(run.task_id),workspaceId,admin)){await rest(`lead_task_runs?id=eq.${encodeURIComponent(String(run.id))}`,admin,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status:'cancelled',provider_job_id:started.providerJobId,provider_status:'cancelled',locked_by:null,lease_expires_at:null,completed_at:new Date().toISOString(),updated_at:new Date().toISOString()})});return;}
   if(started.state==="completed"){
    const items=extractItems(started.raw);const counts=await processItems(run,items,admin);await logTask(String(run.task_id),workspaceId,run,'completed','服务商同步返回结果，原始结果已保存；标准线索转换为独立步骤',admin,{item_count:items.length});
